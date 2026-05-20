@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FAST TECH — تفعيل الترخيص</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --acc:#00ffcc;--acc2:#00ccff;--acc3:#3388ff;
+  --bg:#080c14;--bg2:#0d1526;--bg3:#111b33;
+  --border:rgba(0,255,204,.15);--text:#e0eeff;--muted:rgba(180,210,255,.5);
+}
+html,body{width:100%;height:100%;background:var(--bg);color:var(--text);
+  font-family:'Segoe UI',Arial,sans-serif;overflow:hidden;user-select:none}
+
+/* ── Title bar drag region ── */
+#titlebar{
+  -webkit-app-region:drag;
+  height:32px;display:flex;align-items:center;justify-content:space-between;
+  padding:0 12px;background:rgba(8,12,20,.95);
+  border-bottom:1px solid var(--border);flex-shrink:0;
+}
+#titlebar-title{font-size:11px;color:var(--muted);letter-spacing:2px;text-transform:uppercase}
+#close-btn{
+  -webkit-app-region:no-drag;
+  width:26px;height:26px;border-radius:50%;border:none;cursor:pointer;
+  background:rgba(255,80,80,.12);color:#ff5555;font-size:14px;
+  display:flex;align-items:center;justify-content:center;
+  transition:background .2s;
+}
+#close-btn:hover{background:rgba(255,80,80,.25)}
+
+/* ── Main layout ── */
+#wrap{
+  height:calc(100vh - 32px);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:28px 40px;gap:0;
+  background:
+    radial-gradient(ellipse at 50% 0%,rgba(0,255,204,.06) 0%,transparent 60%),
+    radial-gradient(ellipse at 80% 100%,rgba(0,150,255,.05) 0%,transparent 50%),
+    var(--bg);
+}
+
+/* ── Logo / brand ── */
+.brand{display:flex;align-items:center;gap:14px;margin-bottom:24px}
+.brand-logo{
+  width:56px;height:56px;border-radius:50%;
+  background:radial-gradient(ellipse at 38% 30%,#1a2850,#050c18);
+  border:1.5px solid var(--acc);
+  box-shadow:0 0 24px rgba(0,255,204,.35),0 0 60px rgba(0,255,204,.1);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Arial Black',Impact,sans-serif;
+  font-size:18px;font-weight:900;letter-spacing:-1px;
+  background-clip:text;
+  color:var(--acc);
+  text-shadow:0 0 18px rgba(0,255,204,.9);
+  position:relative;overflow:hidden;
+}
+.brand-logo::after{
+  content:'';position:absolute;inset:0;border-radius:50%;
+  background:radial-gradient(ellipse at 38% 30%,#1a2850,#050c18);
+  z-index:-1;
+}
+.brand-text h1{font-size:20px;font-weight:700;color:var(--acc);letter-spacing:1.5px;
+  text-shadow:0 0 14px rgba(0,255,204,.5)}
+.brand-text p{font-size:11px;color:var(--muted);letter-spacing:3px;text-transform:uppercase;margin-top:2px}
+
+/* ── Card ── */
+.card{
+  width:100%;max-width:480px;
+  background:var(--bg2);
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:28px 28px;
+  box-shadow:0 8px 40px rgba(0,0,0,.5),0 0 80px rgba(0,255,204,.04);
+}
+.card-title{
+  font-size:13px;font-weight:600;color:var(--acc2);
+  letter-spacing:2px;text-transform:uppercase;margin-bottom:20px;
+  display:flex;align-items:center;gap:8px;
+}
+.card-title::before{
+  content:'';width:3px;height:16px;background:var(--acc);border-radius:2px;
+  box-shadow:0 0 8px rgba(0,255,204,.6);
+}
+
+/* ── Form elements ── */
+.field{margin-bottom:16px}
+.field label{display:block;font-size:11px;color:var(--muted);
+  letter-spacing:1px;text-transform:uppercase;margin-bottom:7px}
+.field input{
+  width:100%;padding:12px 16px;
+  background:var(--bg3);border:1px solid var(--border);
+  border-radius:8px;color:var(--text);font-size:14px;
+  font-family:'Courier New',monospace;letter-spacing:2px;text-align:center;
+  outline:none;transition:border-color .25s,box-shadow .25s;
+  text-transform:uppercase;
+}
+.field input::placeholder{color:rgba(100,140,200,.3);letter-spacing:1px;
+  text-transform:none;font-family:'Segoe UI',Arial,sans-serif}
+.field input:focus{
+  border-color:rgba(0,255,204,.5);
+  box-shadow:0 0 0 3px rgba(0,255,204,.08),0 0 20px rgba(0,255,204,.12);
+}
+
+/* Machine ID display */
+.machine-box{
+  background:rgba(0,0,0,.3);border:1px solid rgba(0,255,204,.08);
+  border-radius:8px;padding:10px 14px;
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+}
+.machine-id{
+  font-family:'Courier New',monospace;font-size:12px;
+  color:rgba(0,255,204,.6);letter-spacing:1.5px;word-break:break-all;
+}
+.copy-btn{
+  flex-shrink:0;padding:5px 10px;font-size:10px;letter-spacing:1px;
+  background:rgba(0,255,204,.08);border:1px solid rgba(0,255,204,.2);
+  border-radius:5px;color:var(--acc);cursor:pointer;transition:all .2s;
+  text-transform:uppercase;
+}
+.copy-btn:hover{background:rgba(0,255,204,.15);border-color:rgba(0,255,204,.4)}
+
+/* ── Activate button ── */
+#btn-activate{
+  width:100%;padding:14px;margin-top:8px;
+  background:linear-gradient(135deg,rgba(0,255,204,.15),rgba(0,180,255,.1));
+  border:1px solid rgba(0,255,204,.4);border-radius:10px;
+  color:var(--acc);font-size:14px;font-weight:700;
+  letter-spacing:2px;text-transform:uppercase;cursor:pointer;
+  transition:all .25s;position:relative;overflow:hidden;
+}
+#btn-activate::before{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(135deg,rgba(0,255,204,.25),rgba(0,180,255,.18));
+  opacity:0;transition:opacity .25s;
+}
+#btn-activate:hover::before{opacity:1}
+#btn-activate:hover{box-shadow:0 0 24px rgba(0,255,204,.3),0 4px 20px rgba(0,0,0,.4)}
+#btn-activate:active{transform:scale(.98)}
+#btn-activate:disabled{opacity:.4;cursor:not-allowed}
+
+/* ── Status message ── */
+#status{
+  margin-top:14px;padding:10px 14px;border-radius:8px;
+  font-size:12px;text-align:center;line-height:1.6;
+  display:none;
+}
+#status.error{
+  background:rgba(255,80,80,.08);border:1px solid rgba(255,80,80,.25);color:#ff7777;
+}
+#status.success{
+  background:rgba(0,255,150,.08);border:1px solid rgba(0,255,150,.25);color:#00ff99;
+}
+#status.info{
+  background:rgba(0,180,255,.08);border:1px solid rgba(0,180,255,.2);color:#55ccff;
+}
+#status.grace{
+  background:rgba(255,200,0,.07);border:1px solid rgba(255,200,0,.2);color:#ffcc44;
+}
+
+/* ── Loading spinner in button ── */
+@keyframes spin{to{transform:rotate(360deg)}}
+.spinner{
+  display:inline-block;width:14px;height:14px;
+  border:2px solid rgba(0,255,204,.3);border-top-color:var(--acc);
+  border-radius:50%;animation:spin .7s linear infinite;
+  vertical-align:middle;margin-left:8px;
+}
+
+/* ── Footer links ── */
+.footer{
+  margin-top:16px;display:flex;justify-content:center;gap:20px;
+  font-size:11px;color:var(--muted);
+}
+.footer a{color:rgba(0,200,255,.5);text-decoration:none;transition:color .2s;cursor:pointer}
+.footer a:hover{color:var(--acc2)}
+
+/* ── Pulse animation on border ── */
+@keyframes borderPulse{
+  0%,100%{box-shadow:0 8px 40px rgba(0,0,0,.5),0 0 0 0 rgba(0,255,204,.15)}
+  50%{box-shadow:0 8px 40px rgba(0,0,0,.5),0 0 0 6px rgba(0,255,204,0)}
+}
+.card{animation:borderPulse 4s ease-in-out infinite}
+
+/* ── Section divider ── */
+.divider{height:1px;background:var(--border);margin:18px 0}
+
+/* ── Info row ── */
+.info-row{display:flex;align-items:center;gap:10px;font-size:11px;color:var(--muted)}
+.info-row .dot{width:6px;height:6px;border-radius:50%;background:rgba(0,255,204,.4);flex-shrink:0}
+</style>
+</head>
+<body>
+
+<!-- Title bar -->
+<div id="titlebar">
+  <span id="titlebar-title">FAST TECH — تفعيل الترخيص</span>
+  <button id="close-btn" onclick="window.ftwa?.close()" title="إغلاق">✕</button>
+</div>
+
+<div id="wrap">
+
+  <!-- Brand -->
+  <div class="brand">
+    <div class="brand-logo">FT</div>
+    <div class="brand-text">
+      <h1>FAST TECH</h1>
+      <p>WhatsApp Cyber Nexus</p>
+    </div>
+  </div>
+
+  <!-- Activation card -->
+  <div class="card">
+    <div class="card-title">تفعيل الترخيص</div>
+
+    <div class="field">
+      <label>مفتاح الترخيص</label>
+      <input id="key-input" type="text" placeholder="XXXX-XXXX-XXXX-XXXX-XXXX"
+             maxlength="60" autocomplete="off" spellcheck="false"
+             oninput="onKeyInput(this)" onkeydown="onKeyDown(event)">
+    </div>
+
+    <button id="btn-activate" onclick="doActivate()">تفعيل البرنامج</button>
+
+    <div id="status"></div>
+
+    <div class="divider"></div>
+
+    <div class="field">
+      <label>معرف الجهاز (للدعم الفني)</label>
+      <div class="machine-box">
+        <span class="machine-id" id="machine-display">جارٍ التحميل...</span>
+        <button class="copy-btn" onclick="copyMachineId()">نسخ</button>
+      </div>
+    </div>
+
+    <div class="info-row" style="margin-top:8px">
+      <span class="dot"></span>
+      <span>يُسمح بتثبيت واحد لكل ترخيص. لنقل الترخيص لجهاز آخر: <a onclick="doDeactivate()" style="color:rgba(0,200,255,.5);cursor:pointer;text-decoration:underline">إلغاء التفعيل</a></span>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <a onclick="openSupport()">الدعم الفني</a>
+    <span>|</span>
+    <a onclick="openKeygen()">شراء ترخيص</a>
+  </div>
+
+</div>
+
+<script>
+const BE = window.ftwa;
+
+let _machineId = '';
+
+async function init() {
+  try {
+    _machineId = await BE?.license?.getMachineId?.() || '';
+    document.getElementById('machine-display').textContent =
+      _machineId ? formatMachineId(_machineId) : 'غير متاح';
+
+    // Check if there's already a license (but invalid) — pre-fill key
+    const info = await BE?.license?.getInfo?.();
+    if (info?.licenseKey) {
+      // Partially show the key
+      document.getElementById('key-input').value = info.licenseKey;
+    }
+  } catch (_) {}
+}
+
+function formatMachineId(id) {
+  // Show as groups of 8 chars
+  return id.match(/.{1,8}/g)?.join('-') || id;
+}
+
+async function copyMachineId() {
+  const full = _machineId || document.getElementById('machine-display').textContent;
+  try {
+    await navigator.clipboard.writeText(full);
+    const btn = document.querySelector('.copy-btn');
+    const orig = btn.textContent;
+    btn.textContent = 'تم ✓';
+    setTimeout(() => { btn.textContent = orig; }, 1500);
+  } catch (_) {}
+}
+
+function onKeyInput(el) {
+  // Auto-uppercase + remove invalid chars
+  let v = el.value.toUpperCase().replace(/[^A-Z0-9\-]/g, '');
+  el.value = v;
+}
+
+function onKeyDown(e) {
+  if (e.key === 'Enter') doActivate();
+}
+
+function showStatus(msg, type) {
+  const el = document.getElementById('status');
+  el.textContent = msg;
+  el.className   = type;
+  el.style.display = 'block';
+}
+
+function hideStatus() {
+  const el = document.getElementById('status');
+  el.style.display = 'none';
+}
+
+async function doActivate() {
+  const key = document.getElementById('key-input').value.trim();
+  if (!key) {
+    showStatus('الرجاء إدخال مفتاح الترخيص', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('btn-activate');
+  btn.disabled = true;
+  btn.innerHTML = 'جارٍ التحقق<span class="spinner"></span>';
+  hideStatus();
+
+  try {
+    const res = await BE?.license?.activate?.(key);
+    if (!res) throw new Error('no response');
+
+    if (res.success) {
+      showStatus('✅ ' + res.message, 'success');
+      btn.innerHTML = '✅ تم التفعيل';
+      // Notify main process to proceed
+      setTimeout(async () => {
+        await BE?.license?.notifyActivated?.();
+      }, 1200);
+    } else {
+      showStatus('❌ ' + res.message, 'error');
+      btn.disabled = false;
+      btn.innerHTML = 'تفعيل البرنامج';
+    }
+  } catch (err) {
+    showStatus('خطأ غير متوقع — أعد المحاولة', 'error');
+    btn.disabled = false;
+    btn.innerHTML = 'تفعيل البرنامج';
+  }
+}
+
+async function doDeactivate() {
+  if (!confirm('هل تريد إلغاء تفعيل الترخيص على هذا الجهاز؟ البرنامج سيُغلق بعدها.')) return;
+  try {
+    const res = await BE?.license?.deactivate?.();
+    if (res?.success) {
+      showStatus('تم إلغاء التفعيل. البرنامج سيُغلق الآن...', 'info');
+      setTimeout(() => BE?.close?.(), 1500);
+    } else {
+      showStatus(res?.message || 'فشل إلغاء التفعيل', 'error');
+    }
+  } catch (_) {
+    showStatus('خطأ — أعد المحاولة', 'error');
+  }
+}
+
+function openSupport() {
+  BE?.license?.openExternal?.('mailto:support@fasttech.sa?subject=License Support');
+}
+function openKeygen() {
+  BE?.license?.openExternal?.('https://fasttech.sa/license');
+}
+
+init();
+</script>
+</body>
+</html>

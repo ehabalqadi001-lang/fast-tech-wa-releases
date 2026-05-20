@@ -1,0 +1,6 @@
+node_modules/
+dist-new/
+dist/
+src/main-obfuscated/
+*.log
+.env

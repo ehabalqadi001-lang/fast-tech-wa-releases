@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install *)",
+      "Bash(node -e \"require\\('./src/main/database.js'\\); console.log\\('database.js OK'\\)\")",
+      "Bash(node -e \"require\\('./src/main/sending-engine.js'\\); console.log\\('sending-engine.js OK'\\)\")",
+      "Bash(node -e \"require\\('./src/main/scraper-service.js'\\); console.log\\('scraper-service.js OK'\\)\")",
+      "Bash(node -e \"require\\('./src/main/ai-service.js'\\); console.log\\('ai-service.js OK'\\)\")",
+      "Bash(node -e \"require\\('./src/main/ipc-handlers.js'\\); console.log\\('ipc-handlers.js OK'\\)\")",
+      "Bash(node --check src/main/whatsapp-web-service.js)",
+      "Bash(node -e \"const p=require\\('./package.json'\\); console.log\\('whatsapp-web.js:',p.dependencies['whatsapp-web.js']\\); console.log\\('qrcode:',p.dependencies.qrcode\\); console.log\\('puppeteer:',p.dependencies.puppeteer\\); console.log\\('js-obfuscator:',p.devDependencies['javascript-obfuscator']\\);\")",
+      "Bash(powershell -command \"\\(Get-Content 'src/renderer/index.html'\\).Count\")",
+      "Bash(powershell -command \"Select-String -Path 'src/renderer/index.html' -Pattern 'p-devices|p-engine|p-inbox|m-qr|m-add-device|wa:qr|wa:ready|startBulkSend|loadInbox' | Measure-Object | Select-Object -ExpandProperty Count\")",
+      "Bash(node -e \"const e=require\\('electron'\\); console.log\\('Electron path:', e\\);\")",
+      "Bash(node -e \"const e = require\\('electron'\\); console.log\\(typeof e, e\\)\")",
+      "Bash(node_modules/electron/dist/electron.exe .)",
+      "Bash(unset ELECTRON_RUN_AS_NODE)",
+      "Bash(node_modules/electron/dist/electron.exe test-electron.js)",
+      "Bash(ELECTRON_RUN_AS_NODE=1 node ../prebuild-install/bin.js --runtime electron --target 29.4.6 --arch x64)",
+      "Bash(node -e ' *)",
+      "PowerShell(Start-Process -FilePath \"node_modules\\\\electron\\\\dist\\\\electron.exe\" -ArgumentList \".\" -WorkingDirectory \"d:\\\\FASTTECH WHATS APP MANAGER\\\\FAST TECH WHATS APP MANAGER\" -WindowStyle Normal)",
+      "PowerShell(Get-Process electron -ErrorAction SilentlyContinue)",
+      "PowerShell(Stop-Process -Force)",
+      "Bash(npm run *)",
+      "Bash(npm start *)",
+      "PowerShell(Get-WmiObject Win32_Process | Where-Object {$_.Name -eq \"node.exe\"} | Select-Object ProcessId, CommandLine | Format-List)",
+      "PowerShell(cd \"d:\\\\FASTTECH WHATS APP MANAGER\\\\FAST TECH WHATS APP MANAGER\"; $psi = New-Object System.Diagnostics.ProcessStartInfo; $psi.FileName = \"cmd.exe\"; $psi.Arguments = '/c \".\\\\node_modules\\\\.bin\\\\electron.cmd\" . 2>&1'; $psi.WorkingDirectory = \"d:\\\\FASTTECH WHATS APP MANAGER\\\\FAST TECH WHATS APP MANAGER\"; $psi.UseShellExecute = $false; $psi.RedirectStandardOutput = $true; $psi.RedirectStandardError = $true; $p = [System.Diagnostics.Process]::Start\\($psi\\); Start-Sleep -Seconds 15; if \\(!$p.HasExited\\) { Write-Host \"App is running! PID: $\\($p.Id\\)\"; tasklist /fi \"imagename eq electron.exe\" } else { $out = $p.StandardOutput.ReadToEnd\\(\\); $err = $p.StandardError.ReadToEnd\\(\\); Write-Host \"STDOUT: $out\"; Write-Host \"STDERR: $err\" })"
+    ]
+  }
+}
