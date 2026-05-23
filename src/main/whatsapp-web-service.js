@@ -119,6 +119,7 @@ class WhatsAppWebService extends EventEmitter {
       this._db.sessionUpdateField(sessionId, 'qr_code', null);  // clear stale QR
       this._clients.delete(sessionId);
       this._push('wa:authFailed', { sessionId, message: msg });
+      this.emit('auth_failure_internal', sessionId);  // picked up by AntiBanService via IPC hooks
       console.warn(`[WA-WEB] Auth failure: ${sessionId}`);
     });
 
@@ -160,6 +161,7 @@ class WhatsAppWebService extends EventEmitter {
         msg_type:    msg.type || 'chat',
         has_media:   msg.hasMedia ? 1 : 0,
         is_group:    isGroup ? 1 : 0,
+        group_name:  groupName || null,
         timestamp:   new Date(msg.timestamp * 1000).toISOString(),
       });
 

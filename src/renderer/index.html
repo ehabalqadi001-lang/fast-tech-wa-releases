@@ -124,6 +124,11 @@ textarea.fc{resize:vertical;min-height:90px}
 /* PROGRESS */
 .pb{height:5px;background:rgba(var(--ar),.08);border-radius:3px;overflow:hidden}
 .pf{height:100%;background:var(--acc);border-radius:3px}
+/* Send Engine — source buttons */
+.src-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-top:8px}
+.src-btn{padding:7px 6px;border:1px solid rgba(var(--ar),.18);background:rgba(var(--ar),.05);color:var(--t);border-radius:8px;cursor:pointer;font-size:11px;text-align:center;transition:all .2s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.src-btn:hover{background:rgba(var(--ar),.14);border-color:rgba(var(--ar),.4)}
+.src-btn.active{background:rgba(var(--ar),.2);border-color:var(--acc);color:var(--acc)}
 
 /* CHART BARS */
 .cbr{display:flex;align-items:center;gap:10px;margin-bottom:10px}
@@ -246,7 +251,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
 .dn-l{font-size:9px;color:var(--ts)}
 
 /* UTILS */
-.flex{display:flex}.fi{flex:1}.ic{align-items:center}.jb{justify-content:space-between}.gap6{gap:6px}.gap8{gap:8px}.gap12{gap:12px}.gap16{gap:16px}.gap20{gap:20px}.mb14{margin-bottom:14px}.mb18{margin-bottom:18px}.mb22{margin-bottom:22px}.wf{width:100%}.ta{color:var(--acc)}.ts{color:var(--ts)}.fm{font-family:'Orbitron';font-weight:700}.f11{font-size:11px}.f12{font-size:12px}.f13{font-size:13px}.fw6{font-weight:600}.fw7{font-weight:700}.mt14{margin-top:14px}.mt18{margin-top:18px}
+.flex{display:flex}.fi{flex:1}.ic{align-items:center}.jb{justify-content:space-between}.gap6{gap:6px}.gap8{gap:8px}.gap12{gap:12px}.gap16{gap:16px}.gap20{gap:20px}.mb0{margin-bottom:0}.mb8{margin-bottom:8px}.mb14{margin-bottom:14px}.mb18{margin-bottom:18px}.mb22{margin-bottom:22px}.mt4{margin-top:4px}.mt8{margin-top:8px}.mt10{margin-top:10px}.wf{width:100%}.ta{color:var(--acc)}.ts{color:var(--ts)}.fm{font-family:'Orbitron';font-weight:700}.f10{font-size:10px}.f11{font-size:11px}.f12{font-size:12px}.f13{font-size:13px}.f16{font-size:16px}.fw6{font-weight:600}.fw7{font-weight:700}.mt14{margin-top:14px}.mt18{margin-top:18px}
 .cyline{height:1px;background:linear-gradient(90deg,transparent,var(--acc),transparent);margin:18px 0;opacity:.25}
 .spinner{width:18px;height:18px;border:2px solid rgba(var(--ar),.2);border-top-color:var(--acc);border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -333,6 +338,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
     <div class="ni" onclick="nav('devices')"><span class="ni-ic">📲</span><span class="ni-lb">الأجهزة</span><span class="nb-badge" id="nb-devices">0</span></div>
     <div class="ni" onclick="nav('engine')"><span class="ni-ic">⚡</span><span class="ni-lb">محرك الإرسال</span></div>
     <div class="ni" onclick="nav('inbox')"><span class="ni-ic">📩</span><span class="ni-lb">صندوق الوارد</span><span class="nb-badge" id="nb-inbox" style="display:none;background:#ff3344">0</span></div>
+    <div class="ni" onclick="nav('antiban')"><span class="ni-ic">🛡️</span><span class="ni-lb">حماية Anti-Ban</span></div>
   </div>
   <div class="ndiv"></div>
   <div class="nb-sec">
@@ -349,10 +355,11 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
     <div class="ph-l"><div class="ph-ic">📊</div><div><h1>DASHBOARD</h1><p>نظرة عامة شاملة على النظام</p></div></div>
     <div class="flex gap8"><button class="btn bo bsm" onclick="loadDashboard()">🔄 تحديث</button><button class="btn bp bsm" onclick="nav('engine')">⚡ إرسال جماعي</button></div>
   </div>
-  <div class="sg">
+  <div class="sg" style="grid-template-columns:repeat(5,1fr)">
     <div class="sc"><div class="si">📲</div><div class="sn" id="dash-s-accounts">0</div><div class="sl">أجهزة متصلة</div></div>
     <div class="sc"><div class="si">📤</div><div class="sn" id="dash-s-sent">0</div><div class="sl">رسائل مُرسلة</div></div>
     <div class="sc"><div class="si">💬</div><div class="sn" id="dash-s-replies">0</div><div class="sl">ردود واردة</div></div>
+    <div class="sc" style="cursor:pointer" onclick="nav('inbox')"><div class="si">🔔</div><div class="sn ta fm" id="dash-s-unreplied">0</div><div class="sl">تنتظر رد</div></div>
     <div class="sc"><div class="si">📅</div><div class="sn" id="dash-s-scheduled">0</div><div class="sl">مهام مجدولة</div></div>
   </div>
   <div class="g2 mb22">
@@ -386,9 +393,9 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
   <div class="card mb22">
     <div class="ct flex ic jb"><span>📩 آخر الرسائل الواردة</span><button class="btn bo bsm" onclick="nav('inbox')">عرض الكل</button></div>
     <table class="dt">
-      <thead><tr><th>من</th><th>الرسالة</th><th>الجلسة</th><th>الوقت</th></tr></thead>
+      <thead><tr><th>من</th><th>المجموعة</th><th>الرسالة</th><th>الجلسة</th><th>الوقت</th><th></th></tr></thead>
       <tbody id="dash-activity-tbody">
-        <tr><td colspan="4" class="ta f12 ts" style="padding:24px">لا توجد بيانات حتى الآن</td></tr>
+        <tr><td colspan="6" class="ta f12 ts" style="padding:24px">لا توجد بيانات حتى الآن</td></tr>
       </tbody>
     </table>
   </div>
@@ -666,23 +673,176 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
 <div id="p-scheduler" class="page">
   <div class="ph">
     <div class="ph-l"><div class="ph-ic">📅</div><div><h1>SCHEDULER</h1><p id="scheduler-subtitle">جدولة الرسائل بمواعيد محددة</p></div></div>
-    <button class="btn bp" onclick="loadScheduler()">🔄 تحديث</button>
+    <div class="flex gap8">
+      <button class="btn bo bsm" onclick="loadScheduler()">🔄 تحديث</button>
+      <button class="btn bp bsm" onclick="openSchModal()">➕ جدولة جديدة</button>
+    </div>
   </div>
-  <div class="g2 mb18">
-    <div class="card">
-      <div class="ct">⏰ إضافة جدولة جديدة</div>
-      <div class="fg"><label class="fl">اسم المهمة</label><input id="sch-name" class="fc" type="text" placeholder="مثال: عروض رمضان"></div>
-      <div class="fg"><label class="fl">التاريخ والوقت</label><input id="sch-datetime" type="datetime-local" class="fc"></div>
-      <div class="fg"><label class="fl">التكرار</label><select id="sch-repeat" class="fc"><option value="once">مرة واحدة</option><option value="daily">يومياً</option><option value="weekly">أسبوعياً</option><option value="monthly">شهرياً</option></select></div>
-      <div class="fg"><label class="fl">الجهاز المُرسِل</label><select id="sch-session" class="fc"><option value="">توزيع تلقائي</option></select></div>
-      <button class="btn bp wf" onclick="saveSchedule()">📅 حفظ الجدولة</button>
+
+  <!-- Stats row -->
+  <div class="sg" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px">
+    <div class="sc"><div class="si">✅</div><div class="sn ta fm" id="sch-stat-active">0</div><div class="sl">مهام نشطة</div></div>
+    <div class="sc"><div class="si">⏸️</div><div class="sn" id="sch-stat-paused">0</div><div class="sl">موقوفة</div></div>
+    <div class="sc"><div class="si">🔁</div><div class="sn" id="sch-stat-runs">0</div><div class="sl">تشغيلات إجمالية</div></div>
+    <div class="sc"><div class="si">⏰</div><div class="sn f11 ta fm" id="sch-stat-next" style="font-size:11px">—</div><div class="sl">أقرب تشغيل</div></div>
+  </div>
+
+  <!-- Tasks list -->
+  <div class="card">
+    <div class="ct flex ic jb">
+      <span>⏳ المهام المجدولة</span>
+      <span class="f11 ts" id="sch-count">0 مهمة</span>
     </div>
-    <div class="card">
-      <div class="ct flex ic jb"><span>⏳ المهام المجدولة</span><span class="f11 ts" id="sch-count">0 مهمة</span></div>
-      <div id="tasks-list">
-        <div style="text-align:center;padding:24px;opacity:.5" class="f12 ts">لا توجد مهام مجدولة</div>
+    <div id="tasks-list">
+      <div style="text-align:center;padding:40px;opacity:.4" class="f12 ts">لا توجد مهام مجدولة — أضف مهمة جديدة</div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: New / Edit scheduled task -->
+<div class="mo" id="m-scheduler">
+  <div class="md" style="max-width:600px;max-height:92vh;display:flex;flex-direction:column;padding:0;overflow:hidden">
+
+    <!-- ── Sticky header ── -->
+    <div style="padding:18px 22px 14px;border-bottom:1px solid rgba(var(--ar),.1);flex-shrink:0">
+      <div class="md-tt" id="sch-modal-title" style="margin:0;padding:0;border:none">📅 جدولة مهمة جديدة</div>
+    </div>
+    <input type="hidden" id="sch-edit-id">
+
+    <!-- ── Scrollable body ── -->
+    <div style="flex:1;overflow-y:auto;padding:16px 22px;display:flex;flex-direction:column;gap:0">
+
+      <!-- Name -->
+      <div class="fg">
+        <label class="fl">اسم المهمة</label>
+        <input id="sch-name" class="fc" type="text" placeholder="مثال: عروض نهاية الأسبوع">
       </div>
+
+      <!-- Message -->
+      <div class="fg">
+        <div class="flex ic jb mb6">
+          <label class="fl" style="margin:0">📝 نص الرسالة</label>
+          <select id="sch-tmpl-sel" class="fc bsm" style="max-width:180px" onchange="applySchTemplate()">
+            <option value="">من القوالب...</option>
+          </select>
+        </div>
+        <textarea id="sch-body" class="fc" rows="3" placeholder="اكتب نص الرسالة هنا..." style="resize:vertical"></textarea>
+      </div>
+
+      <!-- Media -->
+      <div class="fg">
+        <div class="flex ic gap8">
+          <label class="fl" style="margin:0;flex:1">📎 وسائط (اختياري)</label>
+          <button class="btn bo bsm" onclick="pickSchMedia()">اختر ملف</button>
+          <button class="btn bd bsm" onclick="clearSchMedia()" id="btn-sch-clear-media" style="display:none">✕</button>
+        </div>
+        <div class="f11 ts mt4" id="sch-media-label">لا يوجد ملف مرفق</div>
+        <input type="hidden" id="sch-media-path">
+        <input type="hidden" id="sch-media-type">
+      </div>
+
+      <!-- Recipients -->
+      <div class="fg">
+        <label class="fl">👥 المستقبلون</label>
+        <select id="sch-recipients-type" class="fc" onchange="onSchRecipientsChange()">
+          <option value="all">كل جهات الاتصال المُوافِقة</option>
+          <option value="label">بالتصنيف (Label)</option>
+          <option value="manual">قائمة يدوية (أرقام)</option>
+        </select>
+      </div>
+      <div id="sch-label-row" class="fg" style="display:none">
+        <label class="fl">اسم التصنيف (Label)</label>
+        <input id="sch-label-input" class="fc" type="text" placeholder="مثال: VIP">
+      </div>
+      <div id="sch-manual-row" class="fg" style="display:none">
+        <label class="fl">أرقام الهواتف (سطر لكل رقم)</label>
+        <textarea id="sch-phones-input" class="fc" rows="3" placeholder="966500000001&#10;966500000002"></textarea>
+      </div>
+
+      <!-- Session -->
+      <div class="fg">
+        <label class="fl">📱 جهاز الإرسال</label>
+        <select id="sch-session" class="fc">
+          <option value="">توزيع تلقائي</option>
+        </select>
+      </div>
+
+      <!-- Quick presets -->
+      <div class="fg">
+        <label class="fl">⚡ اختصارات سريعة</label>
+        <div class="flex gap6" style="flex-wrap:wrap" id="sch-presets-row"></div>
+      </div>
+
+      <!-- Date/time + repeat -->
+      <div class="g2">
+        <div class="fg">
+          <label class="fl">📅 التاريخ والوقت</label>
+          <input id="sch-datetime" type="datetime-local" class="fc">
+        </div>
+        <div class="fg">
+          <label class="fl">🔁 التكرار</label>
+          <select id="sch-repeat" class="fc" onchange="onSchRepeatChange()">
+            <option value="once">مرة واحدة</option>
+            <option value="daily">يومياً</option>
+            <option value="workdays">الأيام الاعتيادية (ن–ج)</option>
+            <option value="weekly">أسبوعياً (يوم محدد)</option>
+            <option value="monthly">شهرياً</option>
+            <option value="hourly">كل ساعة</option>
+            <option value="custom">Cron مخصص</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Day-of-week -->
+      <div id="sch-dow-row" class="fg" style="display:none">
+        <label class="fl">أيام التكرار</label>
+        <div class="flex gap6" style="flex-wrap:wrap">
+          <label class="flex ic gap4 f12"><input type="checkbox" id="dow-0" value="0"> الأحد</label>
+          <label class="flex ic gap4 f12"><input type="checkbox" id="dow-1" value="1"> الإثنين</label>
+          <label class="flex ic gap4 f12"><input type="checkbox" id="dow-2" value="2"> الثلاثاء</label>
+          <label class="flex ic gap4 f12"><input type="checkbox" id="dow-3" value="3"> الأربعاء</label>
+          <label class="flex ic gap4 f12"><input type="checkbox" id="dow-4" value="4"> الخميس</label>
+          <label class="flex ic gap4 f12"><input type="checkbox" id="dow-5" value="5"> الجمعة</label>
+          <label class="flex ic gap4 f12"><input type="checkbox" id="dow-6" value="6"> السبت</label>
+        </div>
+      </div>
+
+      <!-- Custom cron -->
+      <div id="sch-cron-row" class="fg" style="display:none">
+        <label class="fl">Cron Expression</label>
+        <input id="sch-cron-custom" class="fc" type="text" placeholder="0 9 * * 1-5" style="font-family:monospace">
+        <div class="f11 ts mt4">مثال: <b>0 9 * * *</b> (يومياً 9ص) — <b>*/30 * * * *</b> (كل 30 دقيقة)</div>
+      </div>
+
+      <!-- Timezone -->
+      <div class="fg">
+        <label class="fl">🌐 المنطقة الزمنية</label>
+        <select id="sch-timezone" class="fc">
+          <option value="Asia/Riyadh">Asia/Riyadh — الرياض (UTC+3)</option>
+          <option value="Asia/Dubai">Asia/Dubai — دبي (UTC+4)</option>
+          <option value="Africa/Cairo">Africa/Cairo — القاهرة (UTC+2/3)</option>
+          <option value="Asia/Kuwait">Asia/Kuwait — الكويت (UTC+3)</option>
+          <option value="Asia/Baghdad">Asia/Baghdad — بغداد (UTC+3)</option>
+          <option value="Africa/Tunis">Africa/Tunis — تونس (UTC+1)</option>
+          <option value="Europe/London">Europe/London — لندن (UTC+0/1)</option>
+          <option value="UTC">UTC</option>
+        </select>
+      </div>
+
+      <!-- Preview -->
+      <div style="padding:10px 14px;background:rgba(var(--ar),.05);border-radius:8px;border:1px solid rgba(var(--ar),.1)">
+        <div class="f11 ts">معاينة الجدولة:</div>
+        <div class="f12 ta fm mt4" id="sch-preview">—</div>
+      </div>
+
+    </div><!-- end scrollable body -->
+
+    <!-- ── Sticky footer ── -->
+    <div style="padding:14px 22px;border-top:1px solid rgba(var(--ar),.1);flex-shrink:0;display:flex;gap:10px;justify-content:flex-end">
+      <button class="btn bo" onclick="closeM('m-scheduler')">إلغاء</button>
+      <button class="btn bp" id="btn-sch-save" onclick="saveSchedule()">📅 حفظ الجدولة</button>
     </div>
+
   </div>
 </div>
 
@@ -736,7 +896,15 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
       </div>
       <div class="card">
         <div class="ct">⚙️ إعدادات AI</div>
-        <div class="fg"><label class="fl">النموذج المفضل</label><select id="ai-model-pref" class="fc"><option value="gemini">Google Gemini Pro</option><option value="claude">Anthropic Claude</option></select></div>
+        <div class="fg"><label class="fl">المزوّد المفضل</label><select id="ai-model-pref" class="fc"><option value="gemini">Google Gemini</option><option value="claude">Anthropic Claude</option></select></div>
+        <div class="fg"><label class="fl">نموذج Gemini</label>
+          <select id="ai-gemini-model" class="fc">
+            <option value="gemini-2.0-flash">Gemini 2.0 Flash (الأحدث — موصى به)</option>
+            <option value="gemini-2.0-flash-lite">Gemini 2.0 Flash Lite (أسرع وأرخص)</option>
+            <option value="gemini-1.5-pro">Gemini 1.5 Pro (أقوى — أبطأ)</option>
+            <option value="gemini-1.5-flash-002">Gemini 1.5 Flash 002</option>
+          </select>
+        </div>
         <div class="fg"><label class="fl">Google Gemini API Key</label><input id="ai-gemini-key" class="fc" type="password" placeholder="AIza..."></div>
         <div class="fg"><label class="fl">Anthropic Claude API Key</label><input id="ai-claude-key" class="fc" type="password" placeholder="sk-ant-..."></div>
         <div class="fg"><label class="fl">لغة الإخراج</label><select id="ai-lang" class="fc"><option value="ar">عربي</option><option value="en">إنجليزي</option><option value="both">ثنائي (عربي + إنجليزي)</option></select></div>
@@ -752,30 +920,183 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
     <div class="ph-l"><div class="ph-ic">🔗</div><div><h1>CRM INTEGRATION</h1><p>ربط البرنامج بأنظمة إدارة علاقات العملاء</p></div></div>
     <button class="btn bo bsm" onclick="loadCRM()">🔄 تحديث</button>
   </div>
+
+  <!-- CRM cards grid -->
   <div class="g4 mb18">
-    <div class="crm-c" id="crm-card-hubspot"><div class="crm-lg" style="background:rgba(255,122,0,.15)">🟠</div><div class="fw7 f13">HubSpot</div><div class="f11 ts">CRM متكامل</div><span class="bge bg-r" id="crm-st-hubspot">غير متصل</span></div>
-    <div class="crm-c"><div class="crm-lg" style="background:rgba(0,161,224,.15)">🔵</div><div class="fw7 f13">Salesforce</div><div class="f11 ts">Enterprise CRM</div><span class="bge bg-y">قريباً</span></div>
-    <div class="crm-c"><div class="crm-lg" style="background:rgba(34,197,94,.15)">🟢</div><div class="fw7 f13">Zoho CRM</div><div class="f11 ts">Cloud CRM</div><span class="bge bg-y">قريباً</span></div>
-    <div class="crm-c"><div class="crm-lg" style="background:rgba(99,102,241,.15)">🟣</div><div class="fw7 f13">Pipedrive</div><div class="f11 ts">Sales CRM</div><span class="bge bg-y">قريباً</span></div>
-    <div class="crm-c"><div class="crm-lg" style="background:rgba(255,51,68,.15)">🔴</div><div class="fw7 f13">Google Sheets</div><div class="f11 ts">جداول جوجل</div><span class="bge bg-y">قريباً</span></div>
-    <div class="crm-c"><div class="crm-lg" style="background:rgba(255,204,0,.15)">🟡</div><div class="fw7 f13">Airtable</div><div class="f11 ts">قاعدة البيانات</div><span class="bge bg-y">قريباً</span></div>
-    <div class="crm-c" id="crm-card-webhook"><div class="crm-lg" style="background:rgba(0,255,136,.15)">🟢</div><div class="fw7 f13">Webhook</div><div class="f11 ts">تكامل مخصص</div><span class="bge bg-r" id="crm-st-webhook">غير متصل</span></div>
-    <div class="crm-c" style="opacity:.5"><div class="crm-lg" style="background:rgba(var(--ar),.1)">➕</div><div class="fw7 f13">قريباً</div><div class="f11 ts">تكاملات إضافية</div><span class="bge bg-p">قادم</span></div>
+    <div class="crm-c" id="crm-card-hubspot" onclick="crmSelect('hubspot')">
+      <div class="crm-lg" style="background:rgba(255,122,0,.15)">🟠</div>
+      <div class="fw7 f13">HubSpot</div><div class="f11 ts">CRM متكامل</div>
+      <span class="bge bg-r" id="crm-st-hubspot">غير متصل</span>
+    </div>
+    <div class="crm-c" id="crm-card-pipedrive" onclick="crmSelect('pipedrive')">
+      <div class="crm-lg" style="background:rgba(99,102,241,.15)">🟣</div>
+      <div class="fw7 f13">Pipedrive</div><div class="f11 ts">Sales CRM</div>
+      <span class="bge bg-r" id="crm-st-pipedrive">غير متصل</span>
+    </div>
+    <div class="crm-c" id="crm-card-airtable" onclick="crmSelect('airtable')">
+      <div class="crm-lg" style="background:rgba(255,204,0,.15)">🟡</div>
+      <div class="fw7 f13">Airtable</div><div class="f11 ts">قاعدة البيانات</div>
+      <span class="bge bg-r" id="crm-st-airtable">غير متصل</span>
+    </div>
+    <div class="crm-c" id="crm-card-webhook" onclick="crmSelect('webhook')">
+      <div class="crm-lg" style="background:rgba(0,255,136,.15)">🔗</div>
+      <div class="fw7 f13">Webhook</div><div class="f11 ts">تكامل مخصص</div>
+      <span class="bge bg-r" id="crm-st-webhook">غير متصل</span>
+    </div>
+    <div class="crm-c" id="crm-card-gsheets" onclick="crmSelect('gsheets')">
+      <div class="crm-lg" style="background:rgba(255,51,68,.15)">📊</div>
+      <div class="fw7 f13">Google Sheets</div><div class="f11 ts">جداول جوجل</div>
+      <span class="bge bg-r" id="crm-st-gsheets">غير متصل</span>
+    </div>
+    <div class="crm-c" style="opacity:.5">
+      <div class="crm-lg" style="background:rgba(0,161,224,.15)">🔵</div>
+      <div class="fw7 f13">Salesforce</div><div class="f11 ts">Enterprise CRM</div>
+      <span class="bge bg-y">OAuth — قريباً</span>
+    </div>
+    <div class="crm-c" style="opacity:.5">
+      <div class="crm-lg" style="background:rgba(34,197,94,.15)">🟢</div>
+      <div class="fw7 f13">Zoho CRM</div><div class="f11 ts">Cloud CRM</div>
+      <span class="bge bg-y">OAuth — قريباً</span>
+    </div>
+    <div class="crm-c" style="opacity:.5">
+      <div class="crm-lg" style="background:rgba(var(--ar),.1)">➕</div>
+      <div class="fw7 f13">قريباً</div><div class="f11 ts">تكاملات إضافية</div>
+      <span class="bge bg-p">قادم</span>
+    </div>
   </div>
-  <div class="card">
-    <div class="ct">⚙️ إعدادات HubSpot</div>
-    <div class="g2">
-      <div>
-        <div class="fg"><label class="fl">API Key</label><input id="crm-hub-key" class="fc" type="password" placeholder="hub_api_xxxxxxxxxxxx"></div>
-        <div class="fg"><label class="fl">Portal ID</label><input id="crm-hub-portal" class="fc" type="text" placeholder="1234567"></div>
-        <div class="fg"><label class="fl">Webhook URL</label><input id="crm-webhook-url" class="fc" type="text" placeholder="https://..."></div>
-      </div>
-      <div>
-        <div class="fg"><label class="fl">مزامنة جهات الاتصال</label><select id="crm-sync-freq" class="fc"><option value="15">كل 15 دقيقة</option><option value="60">كل ساعة</option><option value="0">يدوي</option></select></div>
-        <div class="fg"><label class="fl">عند وصول رد</label><select id="crm-on-reply" class="fc"><option value="update_deal">تحديث حالة الصفقة تلقائياً</option><option value="add_note">إضافة ملاحظة للعميل</option><option value="notify">إرسال تنبيه للفريق</option></select></div>
-        <button class="btn bp wf mt14" onclick="saveCRM()">💾 حفظ وتزامن</button>
+
+  <!-- Dynamic settings panel -->
+  <div class="card" id="crm-settings-panel" style="display:none">
+
+    <!-- HubSpot -->
+    <div id="crm-panel-hubspot" style="display:none">
+      <div class="ct">🟠 إعدادات HubSpot</div>
+      <div class="g2">
+        <div>
+          <div class="fg"><label class="fl">API Key / Access Token</label><input id="crm-hub-key" class="fc" type="password" placeholder="pat-na-xxxxxxxx-xxxx"></div>
+          <div class="fg"><label class="fl">Portal ID <span class="f11 ts">(اختياري)</span></label><input id="crm-hub-portal" class="fc" placeholder="1234567"></div>
+          <div class="fg"><label class="fl">تردد المزامنة التلقائية</label><select id="crm-hub-freq" class="fc"><option value="0">يدوي فقط</option><option value="60">كل ساعة</option><option value="360">كل 6 ساعات</option><option value="1440">يومياً</option></select></div>
+        </div>
+        <div>
+          <div class="f11 ts mb12">🔑 احصل على API Key من: HubSpot → Settings → Integrations → Private Apps</div>
+          <div id="crm-test-result-hubspot" class="f12 mb12" style="min-height:20px"></div>
+          <div class="flex gap8 flex-wrap">
+            <button class="btn bo bsm" onclick="crmTest('hubspot')">🔌 اختبار الاتصال</button>
+            <button class="btn bp bsm fi" onclick="crmSave('hubspot')">💾 حفظ</button>
+          </div>
+          <div class="flex gap8 flex-wrap mt10">
+            <button class="btn bo bsm fi" onclick="crmSync('hubspot')">⬇️ استيراد جهات اتصال HubSpot</button>
+            <button class="btn bo bsm fi" onclick="crmPush('hubspot')">⬆️ تصدير جهاتنا → HubSpot</button>
+          </div>
+        </div>
       </div>
     </div>
+
+    <!-- Pipedrive -->
+    <div id="crm-panel-pipedrive" style="display:none">
+      <div class="ct">🟣 إعدادات Pipedrive</div>
+      <div class="g2">
+        <div>
+          <div class="fg"><label class="fl">API Token</label><input id="crm-pipe-key" class="fc" type="password" placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"></div>
+          <div class="f11 ts mt8">🔑 من Pipedrive → Settings → Personal preferences → API</div>
+        </div>
+        <div>
+          <div id="crm-test-result-pipedrive" class="f12 mb12" style="min-height:20px"></div>
+          <div class="flex gap8 flex-wrap">
+            <button class="btn bo bsm" onclick="crmTest('pipedrive')">🔌 اختبار الاتصال</button>
+            <button class="btn bp bsm fi" onclick="crmSave('pipedrive')">💾 حفظ</button>
+          </div>
+          <div class="flex gap8 flex-wrap mt10">
+            <button class="btn bo bsm fi" onclick="crmSync('pipedrive')">⬇️ استيراد جهات اتصال Pipedrive</button>
+            <button class="btn bo bsm fi" onclick="crmPush('pipedrive')">⬆️ تصدير جهاتنا → Pipedrive</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Airtable -->
+    <div id="crm-panel-airtable" style="display:none">
+      <div class="ct">🟡 إعدادات Airtable</div>
+      <div class="g2">
+        <div>
+          <div class="fg"><label class="fl">Personal Access Token</label><input id="crm-air-key" class="fc" type="password" placeholder="patXXXXXX.XXXXXXXX"></div>
+          <div class="fg"><label class="fl">Base ID</label><input id="crm-air-base" class="fc" placeholder="appXXXXXXXXXXXXXX" style="direction:ltr"></div>
+          <div class="fg"><label class="fl">Table Name</label><input id="crm-air-table" class="fc" placeholder="Contacts" style="direction:ltr"></div>
+          <div class="f11 ts mt8">🔑 من airtable.com → Account → Developer Hub → Personal Access Tokens</div>
+        </div>
+        <div>
+          <div id="crm-test-result-airtable" class="f12 mb12" style="min-height:20px"></div>
+          <div class="flex gap8 flex-wrap">
+            <button class="btn bo bsm" onclick="crmTest('airtable')">🔌 اختبار الاتصال</button>
+            <button class="btn bp bsm fi" onclick="crmSave('airtable')">💾 حفظ</button>
+          </div>
+          <div class="flex gap8 flex-wrap mt10">
+            <button class="btn bo bsm fi" onclick="crmSync('airtable')">⬇️ استيراد سجلات Airtable</button>
+            <button class="btn bo bsm fi" onclick="crmPush('airtable')">⬆️ تصدير جهاتنا → Airtable</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Webhook -->
+    <div id="crm-panel-webhook" style="display:none">
+      <div class="ct">🔗 إعدادات Webhook</div>
+      <div class="g2">
+        <div>
+          <div class="fg"><label class="fl">Webhook URL</label><input id="crm-wh-url" class="fc" type="url" placeholder="https://your-server.com/webhook" style="direction:ltr"></div>
+          <div class="fg"><label class="fl">Secret Header <span class="f11 ts">(اختياري)</span></label><input id="crm-wh-secret" class="fc" placeholder="X-Webhook-Secret value"></div>
+          <div class="flex gap10 mt10">
+            <label class="f12 ic gap6"><input type="checkbox" id="crm-wh-on-send" checked> إرسال عند إكمال حملة</label>
+            <label class="f12 ic gap6"><input type="checkbox" id="crm-wh-on-reply" checked> إرسال عند وصول رد</label>
+          </div>
+        </div>
+        <div>
+          <div class="f11 ts mb12">📨 سيتم إرسال POST بصيغة JSON عند كل حدث. يشمل: بيانات الحملة، الأرقام، الحالة.</div>
+          <div id="crm-test-result-webhook" class="f12 mb12" style="min-height:20px"></div>
+          <div class="flex gap8 flex-wrap">
+            <button class="btn bo bsm" onclick="crmTest('webhook')">🔌 اختبار — إرسال Ping</button>
+            <button class="btn bp bsm fi" onclick="crmSave('webhook')">💾 حفظ</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Google Sheets -->
+    <div id="crm-panel-gsheets" style="display:none">
+      <div class="ct">📊 إعدادات Google Sheets</div>
+      <div class="g2">
+        <div>
+          <div class="fg"><label class="fl">رابط الجدول</label><input id="crm-gs-url" class="fc" type="url" placeholder="https://docs.google.com/spreadsheets/d/..." style="direction:ltr"></div>
+          <div class="fg"><label class="fl">اسم عمود الهاتف</label><input id="crm-gs-phone-col" class="fc" placeholder="phone" style="direction:ltr"></div>
+          <div class="fg"><label class="fl">اسم عمود الاسم</label><input id="crm-gs-name-col" class="fc" placeholder="name" style="direction:ltr"></div>
+          <div class="f11 ts mt8">⚠️ يجب أن يكون الجدول مشاركاً (anyone with link can view)</div>
+        </div>
+        <div>
+          <div id="crm-test-result-gsheets" class="f12 mb12" style="min-height:20px"></div>
+          <div class="flex gap8 flex-wrap">
+            <button class="btn bo bsm" onclick="crmTest('gsheets')">🔌 اختبار الاتصال</button>
+            <button class="btn bp bsm fi" onclick="crmSave('gsheets')">💾 حفظ</button>
+          </div>
+          <div class="flex gap8 mt10">
+            <button class="btn bo bsm fi" onclick="crmSync('gsheets')">⬇️ استيراد جهات الاتصال من الجدول</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Imported leads table -->
+  <div class="card mt18" id="crm-leads-card" style="display:none">
+    <div class="ct flex ic jb">
+      <span>📋 جهات الاتصال المستوردة من CRM</span>
+      <button class="btn bo bsm" onclick="loadCRMLeads()">🔄</button>
+    </div>
+    <table class="dt">
+      <thead><tr><th>المصدر</th><th>الاسم</th><th>الهاتف</th><th>البريد</th><th>الحالة</th></tr></thead>
+      <tbody id="crm-leads-tbody">
+        <tr><td colspan="5" style="text-align:center;padding:24px;opacity:.5">لا توجد بيانات — قم بمزامنة CRM أولاً</td></tr>
+      </tbody>
+    </table>
   </div>
 </div>
 
@@ -784,7 +1105,13 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
   <div class="ph">
     <div class="ph-l"><div class="ph-ic">📈</div><div><h1>REPORTS</h1><p>تقارير شاملة وتحليلات متقدمة</p></div></div>
     <div class="flex gap8">
-      <select id="reports-period" class="fc" style="max-width:140px" onchange="loadReports()"><option value="7">هذا الأسبوع</option><option value="30" selected>هذا الشهر</option><option value="90">آخر 3 أشهر</option></select>
+      <select id="reports-period" class="fc bsm" style="max-width:140px" onchange="loadReports()"><option value="7">هذا الأسبوع</option><option value="30" selected>هذا الشهر</option><option value="90">آخر 3 أشهر</option></select>
+      <select id="reports-session" class="fc bsm" style="max-width:180px" onchange="loadReports()"><option value="">📲 كل الأجهزة</option></select>
+      <select id="reports-reply-filter" class="fc bsm" style="max-width:160px" onchange="loadReports()">
+        <option value="">💬 كل الردود</option>
+        <option value="unreplied">🔔 لم يُرد عليها</option>
+        <option value="replied">✅ تم الرد</option>
+      </select>
       <button class="btn bp bsm" onclick="exportReportExcel()">📊 تصدير Excel</button>
     </div>
   </div>
@@ -808,12 +1135,18 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
       </div>
     </div>
   </div>
+  <!-- Reply stats summary -->
+  <div class="sg mb18" style="grid-template-columns:repeat(3,1fr)">
+    <div class="sc"><div class="si">💬</div><div class="sn" id="rep-rs-total">0</div><div class="sl">إجمالي الردود الواردة</div></div>
+    <div class="sc"><div class="si">🔔</div><div class="sn ta fm" id="rep-rs-unreplied">0</div><div class="sl">لم يُرد عليها</div></div>
+    <div class="sc"><div class="si">✅</div><div class="sn" id="rep-rs-replied">0</div><div class="sl">تم الرد عليها</div></div>
+  </div>
   <div class="card">
     <div class="ct flex ic jb"><span>💬 الرسائل الواردة (ردود)</span><button class="btn bo bsm" onclick="exportReportExcel()">📊 تصدير</button></div>
     <table class="dt">
-      <thead><tr><th>من</th><th>رقم الهاتف</th><th>الجلسة</th><th>الرسالة</th><th>الوقت</th><th>الحالة</th></tr></thead>
+      <thead><tr><th>من / الجروب</th><th>الجلسة</th><th>الرسالة</th><th>الوقت</th><th>الحالة</th></tr></thead>
       <tbody id="rep-replies-tbody">
-        <tr><td colspan="6" class="ta f12 ts" style="padding:24px">لا توجد ردود حتى الآن</td></tr>
+        <tr><td colspan="5" class="ta f12 ts" style="padding:24px">لا توجد ردود حتى الآن</td></tr>
       </tbody>
     </table>
   </div>
@@ -979,11 +1312,20 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
       <div class="ct">📋 بيانات الحملة</div>
       <div class="fg"><label class="fl">اسم الحملة</label><input id="eng-name" class="fc" type="text" placeholder="مثال: حملة رمضان 2025"></div>
       <div class="fg">
-        <label class="fl">أرقام الهواتف <span class="f11 ts">(رقم في كل سطر أو بفاصلة)</span></label>
-        <textarea id="eng-recipients" class="fc" style="min-height:130px;direction:ltr" placeholder="966501234567&#10;971509876543&#10;201012345678" oninput="countEngineTargets()"></textarea>
+        <label class="fl">أرقام الهواتف / معرفات المجموعات <span class="f11 ts">(رقم أو JID في كل سطر)</span></label>
+        <textarea id="eng-recipients" class="fc" style="min-height:110px;direction:ltr" placeholder="966501234567&#10;971509876543&#10;120363XXXXXX@g.us" oninput="countEngineTargets()"></textarea>
+        <div class="f11 ts mb6 mt8">📂 استيراد من مصدر:</div>
+        <div class="src-grid">
+          <button class="src-btn" onclick="engImportContacts()">📥 جهات الاتصال المسحوبة</button>
+          <button class="src-btn" onclick="engImportScrapedGroups()">👥 الجروبات المسحوبة</button>
+          <button class="src-btn" onclick="engOpenGroupPicker()">🔍 من جروبات محددة</button>
+          <button class="src-btn" onclick="engImportAllGroupMembers()">📱 أعضاء كل الجروبات</button>
+          <button class="src-btn" onclick="engImportFromFile()">📂 Excel / CSV</button>
+          <button class="src-btn" onclick="engOpenSheetsModal()">🔗 Google Sheets</button>
+        </div>
         <div class="flex gap8 mt8 ic">
-          <button class="btn bo bsm fi" onclick="importEngineContacts()">📥 من جهات الاتصال</button>
-          <span class="f11 ts" id="eng-count">0 مستهدف</span>
+          <span class="f11 ts fi" id="eng-count">0 مستهدف</span>
+          <button class="btn bd bsm" onclick="document.getElementById('eng-recipients').value='';countEngineTargets()">🗑️ مسح</button>
         </div>
       </div>
       <div class="fg">
@@ -1001,14 +1343,36 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
         </div>
       </div>
     </div>
-    <!-- RIGHT: scripts + delay -->
+    <!-- RIGHT: A/B Script Builder + Account Selection -->
     <div class="card">
-      <div class="ct">✍️ نصوص الرسائل — A/B Testing</div>
-      <div class="f11 ts mb12" style="line-height:1.6">أدخل حتى 5 نصوص مختلفة — النظام يختار نصاً عشوائياً لكل رسالة لتجنب الحظر ومتابعة اهتمام العملاء</div>
-      <div class="fg"><label class="fl">النص 1 ✶ مطلوب</label><textarea id="eng-body-1" class="fc" style="min-height:65px" placeholder="أهلاً! لدينا عرض مميز هذا الأسبوع 🎁"></textarea></div>
-      <div class="fg"><label class="fl">النص 2</label><textarea id="eng-body-2" class="fc" style="min-height:65px" placeholder="مرحباً! لا تفوتك فرصة العرض الحصري 🔥"></textarea></div>
-      <div class="fg"><label class="fl">النص 3</label><textarea id="eng-body-3" class="fc" style="min-height:65px" placeholder="السلام عليكم! عرض خاص لفترة محدودة ⚡"></textarea></div>
-      <button class="btn bo bsm wf mb14" onclick="generateEngineVariants()">🤖 توليد 5 نسخ AI تلقائياً</button>
+      <div class="ct jb">
+        <span>✍️ سكريبتات الرسائل — A/B Testing</span>
+        <button class="btn bo" style="padding:3px 10px;font-size:10px;letter-spacing:.5px;border-radius:6px" onclick="loadAbResults()">📊 نتائج A/B</button>
+      </div>
+      <div class="f11 ts mb12" style="line-height:1.7">أضف حتى 10 سكريبتات — النظام يختار عشوائياً لكل مستهدف لتجنب الحظر وقياس أفضل الرسائل. يمكن إرفاق ملف مختلف لكل سكريبت.</div>
+
+      <!-- Dynamic script slots -->
+      <div id="ab-scripts-container" style="max-height:280px;overflow-y:auto;padding-left:1px;margin-bottom:2px"></div>
+
+      <!-- Add script + AI buttons -->
+      <div class="flex gap8 mb14 mt8">
+        <button class="btn bo bsm fi" onclick="addAbScript()">➕ إضافة سكريبت</button>
+        <button class="btn bo bsm fi" onclick="generateEngineVariants()">🤖 توليد 5 نسخ AI</button>
+      </div>
+
+      <!-- Account Participation -->
+      <div class="fg">
+        <label class="fl">الأجهزة المشاركة في الحملة</label>
+        <div class="flex gap8 mb8">
+          <button id="acc-mode-auto"   class="src-btn active fi" onclick="setAccMode('auto')">🔄 توزيع تلقائي</button>
+          <button id="acc-mode-select" class="src-btn fi"        onclick="setAccMode('select')">☑️ أجهزة محددة</button>
+        </div>
+        <div id="acc-check-list" style="display:none;max-height:110px;overflow-y:auto;background:rgba(0,0,0,.25);border:1px solid rgba(var(--ar),.12);border-radius:8px;padding:6px 10px">
+          <div class="f11 ts" style="padding:10px;text-align:center;opacity:.6">لا توجد أجهزة متصلة حالياً</div>
+        </div>
+      </div>
+
+      <!-- Delay -->
       <div class="fg">
         <label class="fl">التأخير العشوائي بين الرسائل</label>
         <div class="flex gap10 ic mt6">
@@ -1022,6 +1386,15 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
       <button class="btn bp wf" style="margin-top:8px" onclick="startBulkSend()">🚀 بدء الإرسال المضاد للحظر</button>
     </div>
   </div>
+  <!-- Wake Lock status bar -->
+  <div id="eng-wakelock-bar" style="display:none;background:rgba(var(--ar),.08);border:1px solid rgba(var(--ar),.2);border-radius:10px;padding:10px 16px;margin-bottom:12px;display:none;align-items:center;gap:10px">
+    <span style="font-size:18px">☀️</span>
+    <div class="fi">
+      <div class="f12 fw7" style="color:var(--acc)">منع وضع السكون نشط</div>
+      <div class="f11 ts">الحملة قيد التشغيل — سيعود الجهاز لوضعه الطبيعي عند الانتهاء</div>
+    </div>
+    <div class="pulse-dot" style="width:8px;height:8px;border-radius:50%;background:var(--acc);animation:pulse 1.5s infinite"></div>
+  </div>
   <!-- Progress -->
   <div class="card" id="eng-progress-card" style="display:none">
     <div class="ct flex ic jb">
@@ -1033,6 +1406,24 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
       <span>✅ مُرسَل: <b class="ta" id="eng-prog-sent">0</b></span>
       <span>❌ فشل: <b style="color:#ff3344" id="eng-prog-fail">0</b></span>
       <span>⏳ متبقي: <b id="eng-prog-left">0</b></span>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<!-- MODAL: A/B Testing Results                                            -->
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<div class="mo" id="m-ab-results">
+  <div class="md" style="max-width:660px;width:95%;max-height:84vh;overflow-y:auto;padding:24px">
+    <div class="md-tt">📊 نتائج A/B Testing</div>
+    <div class="md-st" style="margin-bottom:18px">أداء كل سكريبت عبر الحملات — اكتشف الرسائل الأعلى استجابة من عملائك</div>
+    <div id="ab-results-content" style="min-height:120px">
+      <div class="flex ic jb" style="padding:40px;opacity:.4;justify-content:center">
+        <span class="f12">جارٍ التحميل...</span>
+      </div>
+    </div>
+    <div class="md-cl">
+      <button class="btn bo" onclick="closeM('m-ab-results')">إغلاق</button>
     </div>
   </div>
 </div>
@@ -1051,17 +1442,211 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
       <button class="btn bo bsm" onclick="markAllRead()">✔✔ قراءة الكل</button>
     </div>
   </div>
-  <div class="card mb18" style="padding:14px">
+  <div class="card mb14" style="padding:14px">
     <div class="flex ic gap20">
       <span class="f12"><b class="ta fm" id="inbox-unread">0</b> رسالة غير مقروءة</span>
+      <span class="f12"><b style="color:#bf00ff" id="inbox-unreplied-count">0</b> تنتظر رد</span>
       <span class="f12 ts" id="inbox-total-count">0 إجمالي</span>
     </div>
   </div>
+  <!-- Tabs: All / Unreplied / Replied -->
+  <div class="flex gap0 mb14" style="border-bottom:2px solid rgba(var(--ar),.1)">
+    <button id="inbox-tab-all"       class="tab-btn active" onclick="switchInboxTab('all')"       style="padding:9px 20px;background:none;border:none;border-bottom:2px solid var(--hp);color:var(--hp);cursor:pointer;font-size:13px;font-weight:600;margin-bottom:-2px">📨 الكل</button>
+    <button id="inbox-tab-unreplied" class="tab-btn"        onclick="switchInboxTab('unreplied')" style="padding:9px 20px;background:none;border:none;border-bottom:2px solid transparent;color:var(--ts);cursor:pointer;font-size:13px;font-weight:600;margin-bottom:-2px">🔔 لم يُرد عليها</button>
+    <button id="inbox-tab-replied"   class="tab-btn"        onclick="switchInboxTab('replied')"   style="padding:9px 20px;background:none;border:none;border-bottom:2px solid transparent;color:var(--ts);cursor:pointer;font-size:13px;font-weight:600;margin-bottom:-2px">✅ تم الرد</button>
+  </div>
   <div class="card">
     <table class="dt">
-      <thead><tr><th>الجهاز</th><th>من</th><th>الرسالة</th><th>مجموعة؟</th><th>الوقت</th><th>الحالة</th><th></th></tr></thead>
+      <thead><tr><th>الجهاز</th><th>من / الجروب</th><th>الرسالة</th><th>الوقت</th><th>الحالة</th><th>إجراءات</th></tr></thead>
       <tbody id="inbox-tbody">
-        <tr><td colspan="7" style="text-align:center;padding:32px;opacity:.5">لا توجد رسائل — قم بتوصيل جهاز أولاً</td></tr>
+        <tr><td colspan="6" style="text-align:center;padding:32px;opacity:.5">لا توجد رسائل — قم بتوصيل جهاز أولاً</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- MODAL: Reply to inbox message -->
+<div class="mo" id="m-inbox-reply">
+  <div class="md" style="max-width:520px">
+    <div class="md-tt">↩️ رد على رسالة</div>
+    <div class="card mb14" style="padding:12px;background:rgba(var(--ar),.05)">
+      <div class="f11 ts" id="reply-from-info">من: —</div>
+      <div class="f12 mt4" id="reply-orig-body" style="font-style:italic;color:var(--ts)">—</div>
+    </div>
+    <div class="fg">
+      <label class="fl">إرسال من (جلسة)</label>
+      <select id="reply-session-sel" class="fc"></select>
+    </div>
+    <div class="fg">
+      <label class="fl">نص الرد</label>
+      <textarea id="reply-body-input" class="fc" rows="4" placeholder="اكتب ردك هنا..." style="resize:vertical"></textarea>
+    </div>
+    <div class="md-cl">
+      <button class="btn bo" onclick="closeM('m-inbox-reply')">إلغاء</button>
+      <button class="btn bp" id="btn-send-reply" onclick="sendInboxReply()">↩️ إرسال الرد</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<!-- PAGE: ANTI-BAN                                                        -->
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<div id="p-antiban" class="page">
+  <div class="ph">
+    <div class="ph-l"><div class="ph-ic">🛡️</div><div><h1>ANTI-BAN</h1><p>حماية الحسابات من الحظر — إدارة الحدود والإحماء والصحة</p></div></div>
+    <div class="flex gap8 ic">
+      <button class="btn bo bsm" onclick="loadAntiBan()">🔄 تحديث</button>
+      <button class="btn bp bsm" onclick="saveAntiBanSettings()">💾 حفظ الإعدادات</button>
+    </div>
+  </div>
+
+  <!-- Stats row -->
+  <div class="sg" id="ab-stats-row" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px">
+    <div class="sc"><div class="sn ta fm" id="ab-stat-healthy">0</div><div class="sl">جلسات سليمة</div><div class="si">✅</div></div>
+    <div class="sc"><div class="sn ta fm" id="ab-stat-suspended">0</div><div class="sl">جلسات موقوفة</div><div class="si">⏸️</div></div>
+    <div class="sc"><div class="sn ta fm" id="ab-stat-banned">0</div><div class="sl">محظورة</div><div class="si">🚫</div></div>
+    <div class="sc"><div class="sn ta fm" id="ab-stat-warmup">0</div><div class="sl">في وضع الإحماء</div><div class="si">🔥</div></div>
+  </div>
+
+  <div class="g2" style="gap:18px;margin-bottom:18px">
+    <!-- Settings card -->
+    <div class="card">
+      <div class="ct">⚙️ إعدادات الحماية</div>
+
+      <div class="fg" style="display:flex;align-items:center;justify-content:space-between;padding:10px;background:rgba(var(--ar),.05);border-radius:8px;margin-bottom:14px">
+        <div>
+          <div class="fw6 f13">تفعيل نظام Anti-Ban</div>
+          <div class="f11 ts">يراقب الحدود ويوقف الإرسال تلقائياً</div>
+        </div>
+        <label style="position:relative;display:inline-block;width:44px;height:24px">
+          <input type="checkbox" id="ab-enabled" style="opacity:0;width:0;height:0" onchange="toggleABEnabled(this)">
+          <span id="ab-enabled-track" style="position:absolute;inset:0;border-radius:24px;background:rgba(var(--ar),.15);border:1px solid rgba(var(--ar),.3);cursor:pointer;transition:var(--tr)"></span>
+          <span id="ab-enabled-thumb" style="position:absolute;top:3px;right:3px;width:16px;height:16px;border-radius:50%;background:var(--ts);cursor:pointer;transition:var(--tr)"></span>
+        </label>
+      </div>
+
+      <div class="fg">
+        <label class="fl">ملف التأخير بين الرسائل</label>
+        <select id="ab-delay-profile" class="fc">
+          <option value="stealth">🔕 STEALTH — 2 إلى 5 دقائق (أأمن)</option>
+          <option value="slow">🐢 SLOW — دقيقة إلى دقيقتين</option>
+          <option value="normal" selected>⚡ NORMAL — 15 إلى 45 ثانية (افتراضي)</option>
+          <option value="fast">🚀 FAST — 5 إلى 15 ثانية (خطر)</option>
+        </select>
+      </div>
+
+      <div class="g2">
+        <div class="fg">
+          <label class="fl">الحد اليومي (رسالة/يوم)</label>
+          <input id="ab-daily-limit" class="fc" type="number" min="1" max="5000" value="500">
+        </div>
+        <div class="fg">
+          <label class="fl">الحد الساعي (رسالة/ساعة)</label>
+          <input id="ab-hourly-limit" class="fc" type="number" min="1" max="500" value="60">
+        </div>
+      </div>
+
+      <div class="fg" style="padding:10px;background:rgba(var(--ar),.05);border-radius:8px">
+        <div class="flex ic jb mb8">
+          <div>
+            <div class="fw6 f12">نافذة وقت الإرسال</div>
+            <div class="f11 ts">لا يُرسل خارج هذه الساعات</div>
+          </div>
+          <label style="position:relative;display:inline-block;width:44px;height:24px">
+            <input type="checkbox" id="ab-window-enabled" style="opacity:0;width:0;height:0" onchange="toggleABWindow(this)">
+            <span id="ab-window-track" style="position:absolute;inset:0;border-radius:24px;background:rgba(var(--ar),.15);border:1px solid rgba(var(--ar),.3);cursor:pointer;transition:var(--tr)"></span>
+            <span id="ab-window-thumb" style="position:absolute;top:3px;right:3px;width:16px;height:16px;border-radius:50%;background:var(--ts);cursor:pointer;transition:var(--tr)"></span>
+          </label>
+        </div>
+        <div class="g2">
+          <div class="fg mb0">
+            <label class="fl">من (ساعة)</label>
+            <input id="ab-window-start" class="fc" type="number" min="0" max="23" value="9">
+          </div>
+          <div class="fg mb0">
+            <label class="fl">إلى (ساعة)</label>
+            <input id="ab-window-end" class="fc" type="number" min="0" max="23" value="21">
+          </div>
+        </div>
+      </div>
+
+      <div class="fg mt14" style="padding:10px;background:rgba(var(--ar),.05);border-radius:8px">
+        <div class="flex ic jb mb8">
+          <div>
+            <div class="fw6 f12">محاكاة الكتابة</div>
+            <div class="f11 ts">يُظهر "يكتب..." قبل إرسال كل رسالة</div>
+          </div>
+          <label style="position:relative;display:inline-block;width:44px;height:24px">
+            <input type="checkbox" id="ab-typing-sim" style="opacity:0;width:0;height:0" onchange="toggleABTyping(this)">
+            <span id="ab-typing-track" style="position:absolute;inset:0;border-radius:24px;background:rgba(var(--ar),.15);border:1px solid rgba(var(--ar),.3);cursor:pointer;transition:var(--tr)"></span>
+            <span id="ab-typing-thumb" style="position:absolute;top:3px;right:3px;width:16px;height:16px;border-radius:50%;background:var(--ts);cursor:pointer;transition:var(--tr)"></span>
+          </label>
+        </div>
+        <div class="g2">
+          <div class="fg mb0">
+            <label class="fl">مدة الكتابة الدنيا (ms)</label>
+            <input id="ab-typing-min" class="fc" type="number" min="500" max="10000" value="1000">
+          </div>
+          <div class="fg mb0">
+            <label class="fl">مدة الكتابة القصوى (ms)</label>
+            <input id="ab-typing-max" class="fc" type="number" min="500" max="15000" value="3000">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sessions health card -->
+    <div class="card">
+      <div class="ct flex ic jb"><span>📊 صحة الجلسات</span><button class="btn bo bsm" onclick="loadAntiBan()">🔄</button></div>
+      <div id="ab-sessions-list" style="display:flex;flex-direction:column;gap:10px">
+        <div style="text-align:center;padding:32px;opacity:.5">لا توجد جلسات — أضف جلسة أولاً</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Warmup guide -->
+  <div class="card mb18">
+    <div class="ct">🔥 جدول الإحماء التلقائي — لأرقام جديدة</div>
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;text-align:center">
+      <div style="padding:12px;background:rgba(var(--ar),.05);border-radius:8px;border:1px solid rgba(var(--ar),.1)">
+        <div class="fm f16 ta" style="color:#00ff88">10</div>
+        <div class="f11 ts mt4">رسالة/يوم</div>
+        <div class="f10 ts">أيام 1–3</div>
+      </div>
+      <div style="padding:12px;background:rgba(var(--ar),.05);border-radius:8px;border:1px solid rgba(var(--ar),.1)">
+        <div class="fm f16 ta" style="color:#00ff88">25</div>
+        <div class="f11 ts mt4">رسالة/يوم</div>
+        <div class="f10 ts">أيام 4–7</div>
+      </div>
+      <div style="padding:12px;background:rgba(var(--ar),.05);border-radius:8px;border:1px solid rgba(var(--ar),.1)">
+        <div class="fm f16 ta" style="color:#ffcc00">50</div>
+        <div class="f11 ts mt4">رسالة/يوم</div>
+        <div class="f10 ts">أيام 8–14</div>
+      </div>
+      <div style="padding:12px;background:rgba(var(--ar),.05);border-radius:8px;border:1px solid rgba(var(--ar),.1)">
+        <div class="fm f16 ta" style="color:#ffcc00">100</div>
+        <div class="f11 ts mt4">رسالة/يوم</div>
+        <div class="f10 ts">أيام 15–21</div>
+      </div>
+      <div style="padding:12px;background:rgba(var(--ar),.05);border-radius:8px;border:1px solid rgba(var(--ar),.1)">
+        <div class="fm f16 ta" style="color:#ff6600">200</div>
+        <div class="f11 ts mt4">رسالة/يوم</div>
+        <div class="f10 ts">أيام 22–30</div>
+      </div>
+    </div>
+    <div class="f11 ts mt10" style="text-align:center">بعد اليوم 30 يُرفع الإحماء تلقائياً ويطبق الحد اليومي العام</div>
+  </div>
+
+  <!-- Events log -->
+  <div class="card">
+    <div class="ct flex ic jb">
+      <span>📋 سجل الأحداث</span>
+      <button class="btn bd bsm" onclick="clearABEvents()">🗑️ مسح القديم</button>
+    </div>
+    <table class="dt">
+      <thead><tr><th>الجلسة</th><th>الحدث</th><th>التفاصيل</th><th>الوقت</th></tr></thead>
+      <tbody id="ab-events-tbody">
+        <tr><td colspan="4" style="text-align:center;padding:24px;opacity:.5">لا توجد أحداث مسجلة</td></tr>
       </tbody>
     </table>
   </div>
@@ -1070,6 +1655,42 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
 </main><!-- END MAIN -->
 
 <!-- ═══════ MODALS ═══════ -->
+
+<!-- Send Engine: Group Picker Modal -->
+<div class="mo" id="m-eng-groups" onclick="if(event.target===this)closeM('m-eng-groups')">
+  <div class="md" style="max-width:560px;max-height:80vh;display:flex;flex-direction:column">
+    <div class="md-tt">🔍 اختر الجروبات — استيراد الأعضاء</div>
+    <div class="flex gap8 ic mb10">
+      <input id="eng-grp-search" class="fc fi" placeholder="ابحث باسم الجروب..." oninput="filterEngGroups()">
+      <button class="btn bo bsm" onclick="engGrpSelAll()">تحديد الكل</button>
+      <button class="btn bo bsm" onclick="engGrpSelNone()">إلغاء الكل</button>
+    </div>
+    <div class="f11 ts mb8" id="eng-grp-sel-count">0 مجموعة محددة</div>
+    <div id="eng-grp-list" style="overflow-y:auto;flex:1;max-height:360px;border:1px solid rgba(var(--ar),.1);border-radius:8px;padding:4px"></div>
+    <div class="md-cl" style="margin-top:12px">
+      <button class="btn bo" onclick="closeM('m-eng-groups')">إلغاء</button>
+      <button class="btn bp fi" onclick="engImportSelectedGroupMembers()">📱 استيراد أعضاء المجموعات المحددة</button>
+    </div>
+  </div>
+</div>
+
+<!-- Send Engine: Google Sheets Modal -->
+<div class="mo" id="m-eng-sheets" onclick="if(event.target===this)closeM('m-eng-sheets')">
+  <div class="md" style="max-width:480px">
+    <div class="md-tt">🔗 استيراد من Google Sheets</div>
+    <div class="md-st">أدخل رابط جدول Google Sheets العام (منشور أو مشارك عام)</div>
+    <div class="fg">
+      <label class="fl">رابط الجدول</label>
+      <input id="eng-sheets-url" class="fc" type="url" placeholder="https://docs.google.com/spreadsheets/d/..." style="direction:ltr">
+    </div>
+    <div class="f11 ts mb10">💡 تأكد أن الجدول مشارك بشكل عام (anyone with link can view)</div>
+    <div class="md-cl">
+      <button class="btn bo" onclick="closeM('m-eng-sheets')">إلغاء</button>
+      <button class="btn bp" onclick="engDoImportSheets()">📥 استيراد الأرقام</button>
+    </div>
+  </div>
+</div>
+
 <div class="mo" id="m-add-acc">
   <div class="md">
     <div class="md-tt">➕ إضافة حساب WhatsApp Business</div>
@@ -1537,9 +2158,11 @@ async function sendAI() {
       _aiMsgs.push({ role:'assistant', content:r.data.content });
       if (bub) bub.innerHTML = r.data.content.replace(/</g,'&lt;').replace(/\n/g,'<br>');
     } else {
+      _aiMsgs.pop(); // remove failed user msg so next send doesn't cause user→user
       if (bub) bub.textContent = '⚠️ ' + (r.error||'خطأ');
     }
   } catch(e) {
+    _aiMsgs.pop(); // remove failed user msg so next send doesn't cause user→user
     const bub = document.getElementById(typId)?.querySelector('.ai-bub');
     if (bub) bub.textContent = '⚠️ ' + e.message;
   }
@@ -1923,14 +2546,18 @@ async function exportReportExcel() {
 }
 
 // ── Dashboard ─────────────────────────────────────────────────────────────
+let _dashRefreshTimer = null;
+
 async function loadDashboard() {
   await updateStats();
   if (!IS_ELECTRON) return;
+  if (_dashRefreshTimer) { clearTimeout(_dashRefreshTimer); _dashRefreshTimer = null; }
   try {
-    const [statsR, inboxR, queueR] = await Promise.all([
+    const [statsR, inboxR, queueR, unrepliedR] = await Promise.all([
       BE.messages.getStats(),
       BE.wa.inbox.list(null),
       BE.wa.send.queueStats(),
+      BE.wa.inbox.unreplied(null),
     ]);
     if (statsR.ok) {
       const s = statsR.data;
@@ -1955,18 +2582,25 @@ async function loadDashboard() {
       document.getElementById('dash-q-sent').textContent    = (q.sent||0).toLocaleString();
       document.getElementById('dash-q-failed').textContent  = (q.failed||0).toLocaleString();
     }
+    if (unrepliedR && unrepliedR.ok) {
+      const cnt = unrepliedR.data || 0;
+      const el = document.getElementById('dash-s-unreplied');
+      if (el) { el.textContent = cnt.toLocaleString(); el.style.color = cnt > 0 ? 'var(--hp)' : ''; }
+    }
     if (inboxR && inboxR.ok) {
       const msgs = inboxR.data.slice(0,6);
       const tbody = document.getElementById('dash-activity-tbody');
       if (tbody) {
         tbody.innerHTML = msgs.length ? msgs.map(m=>`
           <tr>
-            <td class="fm f11">+${esc(m.from_number||'')}</td>
-            <td style="max-width:240px;word-break:break-word">${esc((m.body||'').slice(0,80))}</td>
-            <td class="f11 ts">${esc(m.session_id||'').slice(0,10)}</td>
-            <td class="f11 ts">${m.received_at?m.received_at.slice(0,16):'—'}</td>
+            <td class="fm f11">${esc(m.contact_name||('+'+(m.from_number||'')))}</td>
+            <td class="f11 ts">${m.is_group ? esc(m.group_name||'مجموعة') : '—'}</td>
+            <td style="max-width:220px;word-break:break-word">${esc(bodyText(m).slice(0,80))}</td>
+            <td class="f11 ts">${esc(m.session_name||m.session_id||'').slice(0,16)}</td>
+            <td class="f11 ts" style="white-space:nowrap">${m.received_at?m.received_at.slice(0,16):'—'}</td>
+            <td>${!m.replied ? '<span class="bge bg-y f11" style="cursor:pointer" onclick="nav(\'inbox\')">يحتاج رد</span>' : '<span class="bge f11">تم الرد</span>'}</td>
           </tr>`).join('')
-          : '<tr><td colspan="4" class="ta f12 ts" style="padding:24px">لا توجد رسائل واردة حتى الآن</td></tr>';
+          : '<tr><td colspan="6" class="ta f12 ts" style="padding:24px">لا توجد رسائل واردة حتى الآن</td></tr>';
       }
     }
     const sessR = await BE.wa.sessions.list();
@@ -1980,6 +2614,10 @@ async function loadDashboard() {
       document.getElementById('dash-s-scheduled').textContent = schR.data.filter(t=>t.active).length;
     }
   } catch(_) {}
+  // Auto-refresh every 30 seconds when dashboard is visible
+  _dashRefreshTimer = setTimeout(() => {
+    if (document.getElementById('p-dashboard')?.classList.contains('on')) loadDashboard();
+  }, 30000);
 }
 
 // ── Contacts ────────────────────────────────────────────────────────────────
@@ -2115,77 +2753,392 @@ async function loadCampaigns() {
     <div class="f12 ts mt14">لعرض تفاصيل الحملات والإرسال الجماعي — استخدم <button class="btn bo bsm" onclick="nav('engine')">⚡ محرك الإرسال</button></div>`;
 }
 
-// ── Scheduler ──────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// SCHEDULER
+// ═══════════════════════════════════════════════════════════════════════════
+
 async function loadScheduler() {
   const el  = document.getElementById('tasks-list');
   const cnt = document.getElementById('sch-count');
   const sub = document.getElementById('scheduler-subtitle');
-  if (!IS_ELECTRON) { if(el) el.innerHTML='<div class="f12 ts" style="padding:24px;text-align:center">لا توجد مهام</div>'; return; }
+  if (!IS_ELECTRON) { if(el) el.innerHTML='<div class="f12 ts" style="padding:40px;text-align:center">لا توجد مهام</div>'; return; }
+
   const r = await BE.scheduler.list();
   if (!r.ok) { beErr(r.error); return; }
   const tasks = r.data;
+
+  const active  = tasks.filter(t => t.active);
+  const paused  = tasks.filter(t => !t.active);
+  const runs    = tasks.reduce((s, t) => s + (t.run_count || 0), 0);
+
   if (cnt) cnt.textContent = tasks.length + ' مهمة';
   if (sub) sub.textContent = `جدولة الرسائل بمواعيد محددة — ${tasks.length} مهمة`;
-  const badge = document.getElementById('nb-scheduler');
-  if (badge) badge.textContent = tasks.filter(t=>t.active).length;
-  if (!el) return;
-  el.innerHTML = tasks.length ? tasks.map(t=>`
-    <div style="display:flex;gap:12px;padding:12px;background:rgba(var(--ar),.04);border-radius:8px;border:1px solid rgba(var(--ar),.12);margin-bottom:8px">
-      <div style="font-size:22px">📅</div>
-      <div class="fi">
-        <div class="fw6 f12">${esc(t.name||'مهمة')}</div>
-        <div class="f11 ts mt3">⏰ ${esc(t.cron_expr||'—')} ${t.next_run?'· التالي: '+t.next_run.slice(0,16):''}</div>
-        <div class="f11 ts">🔁 تشغيلات: ${t.run_count||0}</div>
-      </div>
-      <div class="flex" style="flex-direction:column;gap:4px;align-items:flex-end">
-        <span class="bge ${t.active?'bg-g':'bg-r'}">${t.active?'نشط':'موقوف'}</span>
-        <button class="btn bd bsm mt4" onclick="deleteSchedule('${esc(t.id||'')}')">🗑️</button>
-      </div>
-    </div>`).join('')
-  : '<div style="text-align:center;padding:24px;opacity:.5" class="f12 ts">لا توجد مهام مجدولة</div>';
 
-  // populate session dropdown
-  const selR = await BE.wa.sessions.list();
-  const schSel = document.getElementById('sch-session');
-  if (selR.ok && schSel) {
-    const cur = schSel.value;
-    schSel.innerHTML = '<option value="">توزيع تلقائي</option>';
-    selR.data.filter(s=>s.state==='ready').forEach(s=>{
-      const o = document.createElement('option'); o.value=s.id; o.textContent=s.name||s.id; schSel.appendChild(o);
+  const setEl = (id, v) => { const e=document.getElementById(id); if(e) e.textContent=v; };
+  setEl('sch-stat-active', active.length);
+  setEl('sch-stat-paused', paused.length);
+  setEl('sch-stat-runs',   runs.toLocaleString());
+
+  // Nearest upcoming run
+  const upcoming = active.filter(t=>t.next_run).sort((a,b)=>a.next_run.localeCompare(b.next_run));
+  setEl('sch-stat-next', upcoming.length ? _fmtNextRun(upcoming[0].next_run) : '—');
+
+  const badge = document.getElementById('nb-scheduler');
+  if (badge) { badge.textContent = active.length; badge.style.display = active.length ? '' : 'none'; }
+
+  if (!el) return;
+  el.innerHTML = tasks.length ? tasks.map(t => {
+    const running   = t.running;
+    const statusCls = running ? 'bg-b' : t.active ? 'bg-g' : 'bg-r';
+    const statusLbl = running ? '▶ يعمل الآن' : t.active ? 'نشط' : 'موقوف';
+    const bodyPrev  = t.message_body ? esc(t.message_body.slice(0, 70)) + (t.message_body.length > 70 ? '…' : '') : '<span class="ts">لا توجد رسالة محددة</span>';
+    const nextRunLbl = t.next_run ? _fmtNextRun(t.next_run) : '—';
+    const recLabel  = _recipientsLabel(t);
+    return `
+    <div style="border:1px solid rgba(var(--ar),.12);border-radius:10px;padding:14px 16px;margin-bottom:10px;background:rgba(var(--ar),.03)">
+      <div class="flex ic jb mb8">
+        <div class="flex ic gap10">
+          <span style="font-size:20px">📅</span>
+          <div>
+            <div class="fw6 f13">${esc(t.name||'مهمة')}</div>
+            <div class="f11 ts mt2">${esc(_cronLabel(t.cron_expr||''))} · منطقة: ${esc(t.timezone||'Asia/Riyadh')}</div>
+          </div>
+        </div>
+        <span class="bge ${statusCls} f11">${statusLbl}</span>
+      </div>
+      <div class="f12 ts mb8" style="padding:8px 10px;background:rgba(var(--ar),.05);border-radius:6px;font-style:italic">${bodyPrev}</div>
+      <div class="flex ic gap16 f11 ts mb10">
+        <span>👥 ${recLabel}</span>
+        <span>⏰ ${nextRunLbl}</span>
+        <span>🔁 ${t.run_count||0} تشغيل</span>
+        ${t.last_run ? `<span>⏱ آخر تشغيل: ${t.last_run.slice(0,16)}</span>` : ''}
+      </div>
+      <div class="flex gap6">
+        <button class="btn bp bsm" onclick="runTaskNow('${esc(t.id)}')" ${running?'disabled':''}>▶ الآن</button>
+        ${t.active
+          ? `<button class="btn bo bsm" onclick="pauseTask('${esc(t.id)}')">⏸ إيقاف</button>`
+          : `<button class="btn bo bsm" onclick="resumeTask('${esc(t.id)}')">▶ تفعيل</button>`}
+        <button class="btn bo bsm" onclick="editTask('${esc(t.id)}')">✏ تعديل</button>
+        <button class="btn bd bsm" onclick="deleteSchedule('${esc(t.id)}')">🗑</button>
+      </div>
+    </div>`;
+  }).join('')
+  : '<div style="text-align:center;padding:40px;opacity:.4" class="f12 ts">لا توجد مهام مجدولة — اضغط "جدولة جديدة" للإضافة</div>';
+}
+
+function _fmtNextRun(iso) {
+  if (!iso) return '—';
+  try {
+    const d = new Date(iso);
+    const now = new Date();
+    const diff = d - now;
+    if (diff < 0) return 'منتهية';
+    if (diff < 60000)   return 'خلال ثوانٍ';
+    if (diff < 3600000) return `خلال ${Math.round(diff/60000)} دقيقة`;
+    if (diff < 86400000) return `خلال ${Math.round(diff/3600000)} ساعة`;
+    return d.toLocaleDateString('ar-SA') + ' ' + d.toLocaleTimeString('ar-SA',{hour:'2-digit',minute:'2-digit'});
+  } catch(_) { return iso.slice(0,16); }
+}
+
+function _cronLabel(expr) {
+  const map = {
+    '0 9 * * *':    'يومياً 9 صباحاً',
+    '0 12 * * *':   'يومياً 12 ظهراً',
+    '0 18 * * *':   'يومياً 6 مساءً',
+    '0 9 * * 0-4':  'الأيام الاعتيادية 9ص',
+    '0 10 * * 0':   'كل أحد 10ص',
+    '0 9 1 * *':    'أول كل شهر 9ص',
+    '0 * * * *':    'كل ساعة',
+    '*/30 * * * *': 'كل 30 دقيقة',
+  };
+  return map[expr] || expr;
+}
+
+function _recipientsLabel(t) {
+  const type = t.recipients_type || 'all';
+  if (type === 'all')    return 'كل جهات الاتصال';
+  if (type === 'label')  return 'تصنيف: ' + (t.recipients_json || '—');
+  if (type === 'manual') {
+    try {
+      const phones = JSON.parse(t.recipients_json || '[]');
+      return `${phones.length} رقم يدوي`;
+    } catch(_) { return 'قائمة يدوية'; }
+  }
+  return '—';
+}
+
+// ── Modal helpers ──────────────────────────────────────────────────────────
+
+async function openSchModal(task) {
+  // Reset
+  document.getElementById('sch-edit-id').value     = task?.id || '';
+  document.getElementById('sch-modal-title').textContent = task ? '✏️ تعديل جدولة' : '📅 جدولة مهمة جديدة';
+  document.getElementById('sch-name').value         = task?.name || '';
+  document.getElementById('sch-body').value         = task?.message_body || '';
+  document.getElementById('sch-media-path').value   = task?.media_path || '';
+  document.getElementById('sch-media-type').value   = task?.media_type || '';
+  document.getElementById('sch-media-label').textContent = task?.media_path ? task.media_path.split(/[\\/]/).pop() : 'لا يوجد ملف مرفق';
+  document.getElementById('btn-sch-clear-media').style.display = task?.media_path ? '' : 'none';
+  document.getElementById('sch-label-input').value  = '';
+  document.getElementById('sch-phones-input').value = '';
+
+  // Recipients
+  const rType = task?.recipients_type || 'all';
+  document.getElementById('sch-recipients-type').value = rType;
+  if (rType === 'label')  document.getElementById('sch-label-input').value  = task?.recipients_json || '';
+  if (rType === 'manual') {
+    try { document.getElementById('sch-phones-input').value = JSON.parse(task?.recipients_json||'[]').join('\n'); } catch(_) {}
+  }
+  onSchRecipientsChange();
+
+  // Repeat & datetime
+  const repeatVal = task ? _cronToRepeat(task.cron_expr) : 'once';
+  document.getElementById('sch-repeat').value = repeatVal;
+
+  // Set datetime from next_run or now+1hr
+  const base = task?.next_run ? new Date(task.next_run) : (() => { const d=new Date(); d.setHours(d.getHours()+1,0,0,0); return d; })();
+  document.getElementById('sch-datetime').value = base.toISOString().slice(0,16);
+
+  // DOW
+  if (repeatVal === 'weekly' && task?.cron_expr) {
+    const parts = task.cron_expr.split(' ');
+    const days  = (parts[4]||'').split(',');
+    [0,1,2,3,4,5,6].forEach(d => {
+      const cb = document.getElementById(`dow-${d}`);
+      if (cb) cb.checked = days.includes(String(d));
     });
-    if (cur) schSel.value = cur;
+  }
+
+  // Custom cron
+  document.getElementById('sch-cron-custom').value = repeatVal === 'custom' ? (task?.cron_expr||'') : '';
+  onSchRepeatChange();
+
+  // Timezone
+  document.getElementById('sch-timezone').value = task?.timezone || 'Asia/Riyadh';
+
+  // Session dropdown
+  const schSel = document.getElementById('sch-session');
+  schSel.innerHTML = '<option value="">توزيع تلقائي</option>';
+  if (IS_ELECTRON) {
+    const sessR = await BE.wa.sessions.list();
+    if (sessR.ok) sessR.data.forEach(s => {
+      const o = document.createElement('option'); o.value=s.id; o.textContent='📱 '+(s.name||s.id);
+      if (task?.session_id === s.id) o.selected = true;
+      schSel.appendChild(o);
+    });
+  }
+
+  // Template dropdown
+  const tmplSel = document.getElementById('sch-tmpl-sel');
+  tmplSel.innerHTML = '<option value="">اختر من القوالب...</option>';
+  if (IS_ELECTRON) {
+    const tR = await BE.templates.list();
+    if (tR.ok) tR.data.forEach(t => {
+      const o = document.createElement('option'); o.value=t.body||''; o.textContent=t.name; tmplSel.appendChild(o);
+    });
+  }
+
+  // Preset buttons
+  const presetsRow = document.getElementById('sch-presets-row');
+  if (presetsRow && IS_ELECTRON) {
+    const pr = await BE.scheduler.presets();
+    if (pr.ok) {
+      presetsRow.innerHTML = pr.data.map(p =>
+        `<button class="btn bo bsm" onclick="applySchPreset('${p.value.replace(/'/g,"\\'")}','${p.label.replace(/'/g,"\\'")}')">⚡ ${p.label}</button>`
+      ).join('');
+    }
+  }
+
+  updateSchPreview();
+  openM('m-scheduler');
+  setTimeout(() => document.getElementById('sch-name').focus(), 120);
+}
+
+function applySchTemplate() {
+  const sel  = document.getElementById('sch-tmpl-sel');
+  const body = document.getElementById('sch-body');
+  if (sel.value) { body.value = sel.value; sel.value = ''; }
+}
+
+function applySchPreset(cronVal, label) {
+  // Parse cron to detect repeat type and set fields accordingly
+  document.getElementById('sch-repeat').value = 'custom';
+  document.getElementById('sch-cron-custom').value = cronVal;
+  onSchRepeatChange();
+  updateSchPreview();
+  beOk('تم تطبيق: ' + label);
+}
+
+function onSchRecipientsChange() {
+  const type = document.getElementById('sch-recipients-type')?.value;
+  document.getElementById('sch-label-row').style.display  = type === 'label'  ? '' : 'none';
+  document.getElementById('sch-manual-row').style.display = type === 'manual' ? '' : 'none';
+}
+
+function onSchRepeatChange() {
+  const v = document.getElementById('sch-repeat')?.value;
+  document.getElementById('sch-dow-row').style.display  = v === 'weekly' ? '' : 'none';
+  document.getElementById('sch-cron-row').style.display = v === 'custom' ? '' : 'none';
+  updateSchPreview();
+}
+
+function updateSchPreview() {
+  const el = document.getElementById('sch-preview');
+  if (!el) return;
+  try {
+    const expr = _buildCronExpr();
+    el.textContent = expr ? _cronLabel(expr) + '  (' + expr + ')' : '—';
+  } catch(_) { el.textContent = '—'; }
+}
+
+async function pickSchMedia() {
+  if (!IS_ELECTRON) return;
+  const fp = await BE.openFile({ filters:[
+    { name:'وسائط', extensions:['jpg','jpeg','png','gif','mp4','mov','pdf','doc','docx','xls','xlsx','zip'] }
+  ]});
+  if (!fp) return;
+  const ext = fp.split('.').pop().toLowerCase();
+  const type = ['jpg','jpeg','png','gif','webp'].includes(ext) ? 'image'
+             : ['mp4','mov','avi'].includes(ext) ? 'video'
+             : 'document';
+  document.getElementById('sch-media-path').value = fp;
+  document.getElementById('sch-media-type').value = type;
+  document.getElementById('sch-media-label').textContent = fp.split(/[\\/]/).pop();
+  document.getElementById('btn-sch-clear-media').style.display = '';
+}
+
+function clearSchMedia() {
+  document.getElementById('sch-media-path').value = '';
+  document.getElementById('sch-media-type').value = '';
+  document.getElementById('sch-media-label').textContent = 'لا يوجد ملف مرفق';
+  document.getElementById('btn-sch-clear-media').style.display = 'none';
+}
+
+function _buildCronExpr() {
+  const repeat = document.getElementById('sch-repeat')?.value || 'once';
+  const dt     = document.getElementById('sch-datetime')?.value;
+
+  if (repeat === 'custom') return document.getElementById('sch-cron-custom')?.value.trim() || '';
+  if (repeat === 'hourly') return '0 * * * *';
+
+  if (!dt) return '';
+  const d = new Date(dt);
+  const m = d.getMinutes();
+  const h = d.getHours();
+  const day = d.getDate();
+  const mon = d.getMonth() + 1;
+
+  switch (repeat) {
+    case 'daily':     return `${m} ${h} * * *`;
+    case 'workdays':  return `${m} ${h} * * 0-4`;
+    case 'weekly': {
+      const checked = [0,1,2,3,4,5,6].filter(i => document.getElementById(`dow-${i}`)?.checked);
+      const days = checked.length ? checked.join(',') : String(d.getDay());
+      return `${m} ${h} * * ${days}`;
+    }
+    case 'monthly':   return `${m} ${h} ${day} * *`;
+    default:          return `${m} ${h} ${day} ${mon} *`;  // once
   }
 }
 
-function _datetimeToCron(datetimeStr, repeatType) {
-  const dt  = new Date(datetimeStr);
-  const m   = dt.getMinutes();
-  const h   = dt.getHours();
-  const day = dt.getDate();
-  const mon = dt.getMonth() + 1;
-  const dow = dt.getDay();
-  switch (repeatType) {
-    case 'daily':   return `${m} ${h} * * *`;
-    case 'weekly':  return `${m} ${h} * * ${dow}`;
-    case 'monthly': return `${m} ${h} ${day} * *`;
-    default:        return `${m} ${h} ${day} ${mon} *`;
-  }
+function _cronToRepeat(expr) {
+  if (!expr) return 'once';
+  const p = expr.split(' ');
+  if (p[4] === '0-4' || p[4] === '1-5') return 'workdays';
+  if (p[2] === '*' && p[3] === '*' && p[4] === '*') return 'daily';
+  if (p[0] === '0' && p[1] === '*')  return 'hourly';
+  if (p[2] !== '*' && p[3] !== '*')  return 'once';
+  if (p[4] !== '*' && p[2] === '*')  return 'weekly';
+  if (p[2] !== '*' && p[3] === '*')  return 'monthly';
+  return 'custom';
 }
 
 async function saveSchedule() {
   if (!IS_ELECTRON) { beOk('جدولة (وضع العرض)'); return; }
-  const name   = document.getElementById('sch-name')?.value.trim();
-  const dt     = document.getElementById('sch-datetime')?.value;
-  const repeat = document.getElementById('sch-repeat')?.value || 'once';
-  if (!name || !dt) { beErr('يرجى ملء اسم المهمة والوقت'); return; }
-  const cron_expr = _datetimeToCron(dt, repeat);
-  const r = await BE.scheduler.create({ name, cron_expr, active:1 });
-  if (r.ok) { beOk('تمت الجدولة بنجاح ✅'); loadScheduler(); }
-  else beErr(r.error||'تأكد من صحة التاريخ والوقت');
+
+  const name    = document.getElementById('sch-name')?.value.trim();
+  const body    = document.getElementById('sch-body')?.value.trim();
+  const editId  = document.getElementById('sch-edit-id')?.value;
+
+  if (!name)  { beErr('أدخل اسم المهمة'); return; }
+  if (!body)  { beErr('أدخل نص الرسالة'); return; }
+
+  const cron_expr = _buildCronExpr();
+  if (!cron_expr) { beErr('حدد التاريخ والوقت أو أدخل Cron expression صحيح'); return; }
+
+  const rType = document.getElementById('sch-recipients-type')?.value || 'all';
+  let recipients_json = null;
+  if (rType === 'label')  recipients_json = document.getElementById('sch-label-input')?.value.trim() || null;
+  if (rType === 'manual') {
+    const lines = (document.getElementById('sch-phones-input')?.value || '').split('\n').map(l=>l.trim()).filter(Boolean);
+    recipients_json = JSON.stringify(lines);
+  }
+
+  const payload = {
+    name,
+    cron_expr,
+    message_body:    body,
+    media_path:      document.getElementById('sch-media-path')?.value || null,
+    media_type:      document.getElementById('sch-media-type')?.value || null,
+    recipients_type: rType,
+    recipients_json,
+    session_id:      document.getElementById('sch-session')?.value || null,
+    timezone:        document.getElementById('sch-timezone')?.value || 'Asia/Riyadh',
+    active:          1,
+  };
+
+  const btn = document.getElementById('btn-sch-save');
+  if (btn) { btn.disabled=true; btn.textContent='⏳ جاري الحفظ...'; }
+
+  try {
+    const r = editId
+      ? await BE.scheduler.update({ ...payload, id: editId })
+      : await BE.scheduler.create(payload);
+
+    if (r.ok) {
+      beOk(editId ? 'تم تعديل الجدولة ✅' : 'تمت الجدولة بنجاح ✅');
+      closeM('m-scheduler');
+      loadScheduler();
+    } else {
+      beErr(r.error || 'تأكد من صحة البيانات');
+    }
+  } finally {
+    if (btn) { btn.disabled=false; btn.textContent='📅 حفظ الجدولة'; }
+  }
+}
+
+async function editTask(id) {
+  if (!IS_ELECTRON) return;
+  const r = await BE.scheduler.list();
+  if (!r.ok) return;
+  const task = r.data.find(t => t.id === id);
+  if (task) openSchModal(task);
+}
+
+async function runTaskNow(id) {
+  if (!IS_ELECTRON) return;
+  if (!confirm('تشغيل هذه المهمة الآن فوراً؟')) return;
+  const r = await BE.scheduler.runNow(id);
+  if (r.ok) { beOk('تم تشغيل المهمة'); loadScheduler(); }
+  else beErr(r.error);
+}
+
+async function pauseTask(id) {
+  if (!IS_ELECTRON) return;
+  const r = await BE.scheduler.pause(id);
+  if (r.ok) { beOk('تم إيقاف المهمة مؤقتاً'); loadScheduler(); }
+  else beErr(r.error);
+}
+
+async function resumeTask(id) {
+  if (!IS_ELECTRON) return;
+  const r = await BE.scheduler.resume(id);
+  if (r.ok) { beOk('تم تفعيل المهمة'); loadScheduler(); }
+  else beErr(r.error);
 }
 
 async function deleteSchedule(id) {
-  if (!confirm('حذف هذه الجدولة؟')) return;
+  if (!confirm('حذف هذه الجدولة نهائياً؟')) return;
   if (!IS_ELECTRON) return;
   const r = await BE.scheduler.remove(id);
   if (r.ok) { beOk('تم الحذف'); loadScheduler(); }
@@ -2241,8 +3194,13 @@ async function deleteTemplate(id) {
 function useTemplate(id) {
   const t = (_allTemplates||[]).find(x=>String(x.id)===String(id));
   if (t) {
-    document.getElementById('eng-body-1').value = t.body||'';
     nav('engine');
+    _ensureAbInit();
+    // Clear existing slots and load template body into first slot
+    const container = document.getElementById('ab-scripts-container');
+    if (container) container.innerHTML = '';
+    _abSlotCounter = 0;
+    addAbScript(t.body || '');
     beOk('تم تحميل القالب في محرك الإرسال');
   } else {
     nav('engine');
@@ -2256,10 +3214,12 @@ async function loadAiSettings() {
   const r = await BE.ai.getKeys();
   if (!r.ok) return;
   const sv = (id,v) => { const el=document.getElementById(id); if(el&&v) el.value=v; };
-  sv('ai-gemini-key', r.data.geminiKey);
-  sv('ai-claude-key', r.data.claudeKey);
-  sv('set-gemini-key', r.data.geminiKey);
-  sv('set-claude-key', r.data.claudeKey);
+  sv('ai-gemini-key',   r.data.geminiKey);
+  sv('ai-claude-key',   r.data.claudeKey);
+  sv('set-gemini-key',  r.data.geminiKey);
+  sv('set-claude-key',  r.data.claudeKey);
+  if (r.data.provider)    { const el=document.getElementById('ai-model-pref');   if(el) el.value=r.data.provider; }
+  if (r.data.geminiModel) { const el=document.getElementById('ai-gemini-model'); if(el) el.value=r.data.geminiModel; }
   const gs = document.getElementById('ai-gemini-status');
   const cs = document.getElementById('ai-claude-status');
   if (gs) { const ok=!!(r.data.geminiKey); gs.textContent=`🌟 Gemini: ${ok?'✅ متصل':'غير مُهيأ'}`; gs.className=`bge f11 ${ok?'bg-g':'bg-r'}`; gs.style.padding='6px 10px'; }
@@ -2268,64 +3228,193 @@ async function loadAiSettings() {
 
 async function saveAiSettings() {
   if (!IS_ELECTRON) { beOk('تم الحفظ (وضع العرض)'); return; }
-  const gemini = document.getElementById('ai-gemini-key')?.value.trim() || '';
-  const claude = document.getElementById('ai-claude-key')?.value.trim() || '';
-  const model  = document.getElementById('ai-model-pref')?.value || 'gemini';
-  const r = await BE.ai.saveKeys({ geminiKey:gemini, claudeKey:claude, provider:model });
+  const gemini      = document.getElementById('ai-gemini-key')?.value.trim()   || '';
+  const claude      = document.getElementById('ai-claude-key')?.value.trim()   || '';
+  const provider    = document.getElementById('ai-model-pref')?.value          || 'gemini';
+  const geminiModel = document.getElementById('ai-gemini-model')?.value        || 'gemini-2.0-flash';
+  const r = await BE.ai.saveKeys({ geminiKey:gemini, claudeKey:claude, provider, geminiModel });
   if (r.ok) { beOk('تم حفظ إعدادات AI ✅'); loadAiSettings(); }
   else beErr(r.error);
 }
 
 // ── CRM ────────────────────────────────────────────────────────────────────
+// ── CRM Integration ───────────────────────────────────────────────────────
+
+let _crmActive = null;
+let _crmConfig  = {};
+
+function _crmBadge(id, hasKey) {
+  const el = document.getElementById('crm-st-' + id);
+  if (!el) return;
+  el.textContent = hasKey ? 'متصل' : 'غير متصل';
+  el.className   = `bge ${hasKey ? 'bg-g' : 'bg-r'}`;
+}
+function _crmSetActive(card) {
+  document.querySelectorAll('.crm-c').forEach(c => c.style.borderColor = '');
+  const el = document.getElementById('crm-card-' + card);
+  if (el) el.style.borderColor = 'var(--acc)';
+}
+
 async function loadCRM() {
   if (!IS_ELECTRON) return;
   const r = await BE.crm.getConfig();
   if (!r.ok) return;
-  const c = r.data;
-  const sv = (id,v) => { const el=document.getElementById(id); if(el&&v!=null) el.value=v; };
-  sv('crm-hub-key',    c.hubspot_api_key);
-  sv('crm-hub-portal', c.hubspot_portal_id);
-  sv('crm-webhook-url',c.webhook_url);
-  sv('crm-sync-freq',  c.sync_freq);
-  sv('crm-on-reply',   c.on_reply_action);
-  const hubBadge = document.getElementById('crm-st-hubspot');
-  if (hubBadge) {
-    const conn = !!(c.hubspot_api_key);
-    hubBadge.textContent = conn ? 'متصل' : 'غير متصل';
-    hubBadge.className   = `bge ${conn?'bg-g':'bg-r'}`;
+  const c = _crmConfig = r.data;
+  const sv = (id, v) => { const el = document.getElementById(id); if (el && v != null) el.value = v; };
+
+  sv('crm-hub-key',     c.hubspot_key);
+  sv('crm-hub-portal',  c.hubspot_portal_id);
+  sv('crm-hub-freq',    c.hubspot_sync_freq);
+  sv('crm-pipe-key',    c.pipedrive_key);
+  sv('crm-air-key',     c.airtable_key);
+  sv('crm-air-base',    c.airtable_base);
+  sv('crm-air-table',   c.airtable_table);
+  sv('crm-wh-url',      c.webhook_url);
+  sv('crm-wh-secret',   c.webhook_secret);
+  sv('crm-gs-url',      c.gsheets_url);
+  sv('crm-gs-phone-col',c.gsheets_phone_col);
+  sv('crm-gs-name-col', c.gsheets_name_col);
+
+  const wh = document.getElementById('crm-wh-on-send');
+  if (wh) wh.checked = c.webhook_on_send !== '0';
+  const wr = document.getElementById('crm-wh-on-reply');
+  if (wr) wr.checked = c.webhook_on_reply !== '0';
+
+  _crmBadge('hubspot',  !!c.hubspot_key);
+  _crmBadge('pipedrive',!!c.pipedrive_key);
+  _crmBadge('airtable', !!(c.airtable_key && c.airtable_base));
+  _crmBadge('webhook',  !!c.webhook_url);
+  _crmBadge('gsheets',  !!c.gsheets_url);
+}
+
+function crmSelect(type) {
+  _crmActive = type;
+  _crmSetActive(type);
+  document.getElementById('crm-settings-panel').style.display = 'block';
+  ['hubspot','pipedrive','airtable','webhook','gsheets'].forEach(t => {
+    const p = document.getElementById('crm-panel-' + t);
+    if (p) p.style.display = t === type ? 'block' : 'none';
+  });
+}
+
+async function crmSave(type) {
+  if (!IS_ELECTRON) { beOk('تم الحفظ (وضع العرض)'); return; }
+  const gv = id => document.getElementById(id)?.value?.trim() || '';
+  const data = {};
+
+  if (type === 'hubspot') {
+    data.hubspot_key = gv('crm-hub-key');
+    data.hubspot_portal_id = gv('crm-hub-portal');
+    data.hubspot_sync_freq = gv('crm-hub-freq');
+  } else if (type === 'pipedrive') {
+    data.pipedrive_key = gv('crm-pipe-key');
+  } else if (type === 'airtable') {
+    data.airtable_key = gv('crm-air-key');
+    data.airtable_base = gv('crm-air-base');
+    data.airtable_table = gv('crm-air-table');
+  } else if (type === 'webhook') {
+    data.webhook_url = gv('crm-wh-url');
+    data.webhook_secret = gv('crm-wh-secret');
+    data.webhook_on_send  = document.getElementById('crm-wh-on-send')?.checked  ? '1' : '0';
+    data.webhook_on_reply = document.getElementById('crm-wh-on-reply')?.checked ? '1' : '0';
+  } else if (type === 'gsheets') {
+    data.gsheets_url       = gv('crm-gs-url');
+    data.gsheets_phone_col = gv('crm-gs-phone-col');
+    data.gsheets_name_col  = gv('crm-gs-name-col');
   }
-  const wbBadge = document.getElementById('crm-st-webhook');
-  if (wbBadge) {
-    const conn = !!(c.webhook_url);
-    wbBadge.textContent = conn ? 'متصل' : 'غير متصل';
-    wbBadge.className   = `bge ${conn?'bg-g':'bg-r'}`;
+
+  const r = await BE.crm.saveConfig(data);
+  if (r.ok) { beOk(`✅ تم حفظ إعدادات ${type}`); loadCRM(); }
+  else beErr(r.error);
+}
+
+async function crmTest(type) {
+  if (!IS_ELECTRON) return;
+  const resEl = document.getElementById('crm-test-result-' + type);
+  if (resEl) { resEl.textContent = '⏳ جارٍ الاختبار...'; resEl.style.color = 'var(--ts)'; }
+  const r = await BE.crm.testConnection(type);
+  if (resEl) {
+    if (r.ok) {
+      resEl.textContent = '✅ ' + (r.data?.info || 'متصل');
+      resEl.style.color = '#22c55e';
+      _crmBadge(type, true);
+    } else {
+      resEl.textContent = '❌ ' + (r.error || 'فشل الاتصال');
+      resEl.style.color = '#ff3344';
+    }
   }
 }
 
-async function saveCRM() {
-  if (!IS_ELECTRON) { beOk('تم الحفظ (وضع العرض)'); return; }
-  const gv = id => document.getElementById(id)?.value?.trim()||'';
-  const data = {
-    hubspot_api_key:  gv('crm-hub-key'),
-    hubspot_portal_id:gv('crm-hub-portal'),
-    webhook_url:      gv('crm-webhook-url'),
-    sync_freq:        gv('crm-sync-freq'),
-    on_reply_action:  gv('crm-on-reply'),
-  };
-  const r = await BE.crm.saveConfig(data);
-  if (r.ok) { beOk('تم حفظ إعدادات CRM ✅'); loadCRM(); }
-  else beErr(r.error);
+async function crmSync(source) {
+  if (!IS_ELECTRON) return;
+  GP.show(`جارٍ مزامنة ${source}...`, 50, 'جلب');
+  const r = await BE.crm.syncLeads(source);
+  if (r.ok) {
+    GP.done(`تم استيراد ${r.data?.synced || 0} جهة اتصال`);
+    beOk(`✅ ${r.data?.synced || 0} جهة اتصال من ${source}`);
+    loadCRMLeads();
+  } else {
+    GP.hide();
+    beErr(`فشل مزامنة ${source}: ${r.error}`);
+  }
+}
+
+async function crmPush(type) {
+  if (!IS_ELECTRON) return;
+  if (!confirm(`سيتم تصدير جميع جهات الاتصال المحفوظة إلى ${type}. هل تريد المتابعة؟`)) return;
+  GP.show(`جارٍ التصدير إلى ${type}...`, 30, 'تصدير');
+  const r = await BE.crm.pushContacts(type);
+  if (r.ok) {
+    GP.done(`تم تصدير ${r.data?.pushed || 0} جهة اتصال`);
+    beOk(`✅ ${r.data?.pushed || 0} تم تصديرها — ${r.data?.errors || 0} فشل`);
+  } else {
+    GP.hide();
+    beErr('فشل التصدير: ' + r.error);
+  }
+}
+
+async function loadCRMLeads() {
+  if (!IS_ELECTRON) return;
+  const r = await BE.crm.getLeads();
+  if (!r.ok) return;
+  const leads = r.data || [];
+  const card = document.getElementById('crm-leads-card');
+  const tbody = document.getElementById('crm-leads-tbody');
+  if (!tbody) return;
+  if (!leads.length) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;opacity:.5">لا توجد بيانات</td></tr>'; return; }
+  card.style.display = 'block';
+  tbody.innerHTML = leads.map(l => `
+    <tr>
+      <td><span class="bge bg-y" style="font-size:10px">${l.source || '?'}</span></td>
+      <td>${esc(l.name || '—')}</td>
+      <td class="fm f11">${l.phone || '—'}</td>
+      <td class="f11">${l.email || '—'}</td>
+      <td class="f11">${l.status || '—'}</td>
+    </tr>`).join('');
+}
+
+// ── Wake Lock ─────────────────────────────────────────────────────────────
+if (IS_ELECTRON) {
+  BE.on('wakelock:state', ({ active }) => {
+    const bar = document.getElementById('eng-wakelock-bar');
+    if (bar) bar.style.display = active ? 'flex' : 'none';
+    if (active) showN('☀️ منع وضع السكون', 'الجهاز لن يدخل وضع النوم أثناء الحملة', '⚡');
+    else        showN('🌙 انتهت الحملة', 'الجهاز عاد لوضعه الطبيعي', '✅');
+  });
 }
 
 // ── Reports (enhanced) ─────────────────────────────────────────────────────
 async function loadReports() {
   if (!IS_ELECTRON) return;
-  const days = parseInt(document.getElementById('reports-period')?.value||'30');
+  const days        = parseInt(document.getElementById('reports-period')?.value||'30');
+  const repSession  = document.getElementById('reports-session')?.value  || null;
+  const repFilter   = document.getElementById('reports-reply-filter')?.value || null;
   try {
-    const [statsR, repliesR, accountsR] = await Promise.all([
+    const [statsR, repliesR, accountsR, replyStatsR] = await Promise.all([
       BE.messages.getStats(),
-      BE.reports.getReplies(),
+      BE.wa.inbox.list({ sessionId: repSession, filter: repFilter || null, limit: 500 }),
       BE.accounts.list(),
+      BE.wa.inbox.replyStats(),
     ]);
     if (statsR.ok) {
       const s = statsR.data;
@@ -2334,6 +3423,13 @@ async function loadReports() {
       document.getElementById('rep-s-read').textContent    = (s.read_count||0).toLocaleString();
       document.getElementById('rep-s-replies').textContent = (s.replies||0).toLocaleString();
       document.getElementById('rep-s-rate').textContent    = (sent ? ((s.replies||0)/sent*100).toFixed(1) : '0') + '%';
+    }
+    if (replyStatsR && replyStatsR.ok) {
+      const rs = replyStatsR.data || {};
+      const setEl = (id,v) => { const e=document.getElementById(id); if(e) e.textContent=(v||0).toLocaleString(); };
+      setEl('rep-rs-total',     rs.total);
+      setEl('rep-rs-unreplied', rs.unreplied_count);
+      setEl('rep-rs-replied',   rs.replied_count);
     }
     if (accountsR.ok && accountsR.data.length) {
       const accs = accountsR.data;
@@ -2345,19 +3441,32 @@ async function loadReports() {
           <div class="cbv">${(a.msg_count||0).toLocaleString()}</div>
         </div>`).join('');
     }
+    // Populate session dropdown in reports
+    const repSelEl = document.getElementById('reports-session');
+    if (repSelEl && repSelEl.options.length <= 1) {
+      const sessR = await BE.wa.sessions.list();
+      if (sessR.ok) sessR.data.forEach(s => {
+        const o = document.createElement('option'); o.value = s.id;
+        o.textContent = '📱 ' + (s.name||s.id); repSelEl.appendChild(o);
+        if (repSession === s.id) o.selected = true;
+      });
+    }
     if (repliesR && repliesR.ok) {
       const msgs = repliesR.data;
       document.getElementById('rep-replies-tbody').innerHTML = msgs.length
-        ? msgs.map(m=>`
+        ? msgs.map(m=>{
+            const fromName = m.is_group
+              ? `<span class="bge bg-b f11">جروب</span> ${esc(m.group_name||m.from_number||'—')}`
+              : esc(m.contact_name ? m.contact_name : ('+' + (m.from_number||'')));
+            return `
           <tr>
-            <td>${esc(m.from_name||m.from_number||'—')}</td>
-            <td class="fm f11">+${esc(m.from_number||'')}</td>
-            <td class="f11 ts">${esc(m.session_id||'').slice(0,10)}</td>
-            <td class="f12">"${esc((m.body||'').slice(0,80))}"</td>
+            <td>${fromName}</td>
+            <td class="f11 ts">${esc(m.session_name||m.session_id||'').slice(0,16)}</td>
+            <td class="f12" style="max-width:220px;word-break:break-word">${esc(bodyText(m).slice(0,80))}</td>
             <td class="f11 ts">${m.received_at?m.received_at.slice(0,16):'—'}</td>
-            <td><span class="bge bg-b f11">وارد</span></td>
-          </tr>`).join('')
-        : '<tr><td colspan="6" class="ta f12 ts" style="padding:24px">لا توجد ردود حتى الآن</td></tr>';
+            <td>${m.replied ? '<span class="bge bg-g f11">تم الرد</span>' : '<span class="bge bg-y f11">لم يُرد</span>'}</td>
+          </tr>`;}).join('')
+        : '<tr><td colspan="5" class="ta f12 ts" style="padding:24px">لا توجد ردود حتى الآن</td></tr>';
     }
   } catch(_) {}
 }
@@ -2545,6 +3654,8 @@ function _populateSessionSelects(sessions) {
       sel.appendChild(opt);
     });
   });
+  // Refresh A/B account checkboxes
+  refreshAccCheckList(readySessions);
 }
 
 async function startDevice(id) {
@@ -2637,7 +3748,7 @@ if (IS_ELECTRON) {
 
 function countEngineTargets() {
   const raw = document.getElementById('eng-recipients').value;
-  const nums = raw.split(/[\n,]+/).map(s=>s.trim()).filter(s=>/\d{6,}/.test(s));
+  const nums = raw.split(/[\n,]+/).map(s=>s.trim()).filter(s=> s.includes('@') || /\d{6,}/.test(s));
   document.getElementById('eng-count').textContent = nums.length + ' مستهدف';
 }
 
@@ -2707,44 +3818,410 @@ async function importEngineContacts() {
   beOk(`تم استيراد ${r.data.length} جهة اتصال`);
 }
 
+// ── Send Engine: 6-source import functions ────────────────────────────────
+
+// 1. جهات الاتصال المسحوبة (all scraped contacts)
+async function engImportContacts() {
+  if (!IS_ELECTRON) return;
+  const r = await BE.contacts.list({});
+  if (!r.ok) { beErr(r.error); return; }
+  const all = r.data.filter(c => c.phone);
+  document.getElementById('eng-recipients').value = all.map(c => c.phone).join('\n');
+  countEngineTargets();
+  beOk(`✅ تم استيراد ${all.length} جهة اتصال`);
+}
+
+// 2. الجروبات المسحوبة (send TO group chats — group JIDs)
+async function engImportScrapedGroups() {
+  if (!IS_ELECTRON) return;
+  const r = await BE.groups.list();
+  if (!r.ok) { beErr(r.error); return; }
+  const jids = (r.data || []).filter(g => g.id).map(g => g.id);
+  if (!jids.length) { beErr('لا توجد مجموعات مسحوبة — اسحب المجموعات أولاً'); return; }
+  document.getElementById('eng-recipients').value = jids.join('\n');
+  countEngineTargets();
+  beOk(`✅ تم تحميل ${jids.length} مجموعة — سيتم الإرسال إلى المجموعات مباشرة`);
+}
+
+// 3. من جروبات محددة — فتح مودال الاختيار
+let _engGrpAll = [];
+let _engGrpSel = new Set();
+
+async function engOpenGroupPicker() {
+  if (!IS_ELECTRON) return;
+  const r = await BE.groups.list();
+  if (!r.ok) { beErr(r.error); return; }
+  _engGrpAll = (r.data || []).filter(g => g.id && g.name);
+  _engGrpSel = new Set();
+  _engRenderGroupList(_engGrpAll);
+  openM('m-eng-groups');
+}
+
+function _engRenderGroupList(list) {
+  const el = document.getElementById('eng-grp-list');
+  if (!list.length) { el.innerHTML = '<div style="padding:16px;text-align:center;opacity:.5">لا توجد مجموعات</div>'; return; }
+  el.innerHTML = list.map(g => `
+    <label style="display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:6px;cursor:pointer;margin:2px 0" onmouseover="this.style.background='rgba(var(--ar),.06)'" onmouseout="this.style.background=''">
+      <input type="checkbox" ${_engGrpSel.has(g.id)?'checked':''} onchange="engGrpToggle('${g.id}',this.checked)" style="accent-color:var(--acc)">
+      <span class="f12" style="flex:1">${(g.name||'').replace(/</g,'&lt;')}</span>
+      <span class="f11 ts">${(g.member_count||0).toLocaleString()} عضو</span>
+    </label>`).join('');
+  document.getElementById('eng-grp-sel-count').textContent = `${_engGrpSel.size} مجموعة محددة`;
+}
+
+function filterEngGroups() {
+  const q = document.getElementById('eng-grp-search').value.toLowerCase();
+  _engRenderGroupList(_engGrpAll.filter(g => g.name?.toLowerCase().includes(q)));
+}
+
+function engGrpToggle(id, checked) {
+  if (checked) _engGrpSel.add(id); else _engGrpSel.delete(id);
+  document.getElementById('eng-grp-sel-count').textContent = `${_engGrpSel.size} مجموعة محددة`;
+}
+
+function engGrpSelAll() {
+  _engGrpAll.forEach(g => _engGrpSel.add(g.id));
+  _engRenderGroupList(_engGrpAll);
+}
+
+function engGrpSelNone() {
+  _engGrpSel.clear();
+  _engRenderGroupList(_engGrpAll);
+}
+
+async function engImportSelectedGroupMembers() {
+  if (!_engGrpSel.size) { beErr('اختر مجموعة واحدة على الأقل'); return; }
+  const sessionId = document.getElementById('eng-session').value
+                  || document.getElementById('groups-session-sel')?.value || '';
+  if (!sessionId) { beErr('اختر جهاز Web من قائمة "الجهاز المُرسِل" أولاً'); return; }
+  closeM('m-eng-groups');
+  const ids = Array.from(_engGrpSel);
+  const allPhones = new Set();
+  GP.show(`جارٍ جلب أعضاء ${ids.length} مجموعة...`, 0, `0/${ids.length}`);
+  for (let i = 0; i < ids.length; i++) {
+    try {
+      const r = await BE.wa.scraper.getParticipants({ sessionId, groupId: ids[i] });
+      if (r.ok && r.data) r.data.forEach(p => { if (p.phone) allPhones.add(p.phone); });
+    } catch (_) {}
+    GP.step('جلب الأعضاء...', i+1, ids.length, `${i+1}/${ids.length}`);
+  }
+  GP.done(`تم جلب ${allPhones.size} عضو`);
+  if (!allPhones.size) { beErr('لم يتم العثور على أعضاء — تأكد أن الجهاز متصل'); return; }
+  document.getElementById('eng-recipients').value = Array.from(allPhones).join('\n');
+  countEngineTargets();
+  beOk(`✅ ${allPhones.size} عضو من ${ids.length} مجموعة`);
+}
+
+// 4. أعضاء كل الجروبات المسحوبة
+async function engImportAllGroupMembers() {
+  if (!IS_ELECTRON) return;
+  const sessionId = document.getElementById('eng-session').value
+                  || document.getElementById('groups-session-sel')?.value || '';
+  if (!sessionId) { beErr('اختر جهاز Web من قائمة "الجهاز المُرسِل" أولاً'); return; }
+  const rg = await BE.groups.list();
+  if (!rg.ok || !rg.data?.length) { beErr('لا توجد مجموعات مسحوبة — اسحب المجموعات أولاً'); return; }
+  if (!confirm(`سيتم جلب أعضاء ${rg.data.length} مجموعة — قد يستغرق هذا وقتاً طويلاً. هل تريد المتابعة؟`)) return;
+  const ids = rg.data.map(g => g.id);
+  const allPhones = new Set();
+  GP.show(`جارٍ جلب أعضاء ${ids.length} مجموعة...`, 0, `0/${ids.length}`);
+  for (let i = 0; i < ids.length; i++) {
+    try {
+      const r = await BE.wa.scraper.getParticipants({ sessionId, groupId: ids[i] });
+      if (r.ok && r.data) r.data.forEach(p => { if (p.phone) allPhones.add(p.phone); });
+    } catch (_) {}
+    GP.step('جلب الأعضاء...', i+1, ids.length, `${i+1}/${ids.length}`);
+  }
+  GP.done(`تم جلب ${allPhones.size} عضو من ${ids.length} مجموعة`);
+  if (!allPhones.size) { beErr('لم يتم العثور على أعضاء'); return; }
+  document.getElementById('eng-recipients').value = Array.from(allPhones).join('\n');
+  countEngineTargets();
+  beOk(`✅ ${allPhones.size} عضو فريد من ${ids.length} مجموعة`);
+}
+
+// 5. Excel / CSV
+async function engImportFromFile() {
+  if (!IS_ELECTRON) return;
+  const fp = await BE.openFile({ filters:[
+    { name: 'Excel / CSV', extensions: ['xlsx','xls','csv'] }
+  ]});
+  if (!fp) return;
+  const r = await BE.wa.send.importFromFile(fp);
+  if (!Array.isArray(r) || !r.length) { beErr('لم يتم العثور على أرقام في الملف'); return; }
+  document.getElementById('eng-recipients').value = r.join('\n');
+  countEngineTargets();
+  beOk(`✅ تم استيراد ${r.length} رقم من الملف`);
+}
+
+// 6. Google Sheets
+function engOpenSheetsModal() {
+  document.getElementById('eng-sheets-url').value = '';
+  openM('m-eng-sheets');
+}
+
+async function engDoImportSheets() {
+  if (!IS_ELECTRON) return;
+  const url = document.getElementById('eng-sheets-url').value.trim();
+  if (!url) { beErr('أدخل رابط Google Sheets'); return; }
+  closeM('m-eng-sheets');
+  GP.show('جارٍ جلب البيانات من Google Sheets...', 50, 'جلب');
+  try {
+    const phones = await BE.wa.send.importFromSheets(url);
+    GP.done(`تم جلب ${phones?.length || 0} رقم`);
+    if (!phones?.length) { beErr('لم يتم العثور على أرقام في الجدول'); return; }
+    document.getElementById('eng-recipients').value = phones.join('\n');
+    countEngineTargets();
+    beOk(`✅ تم استيراد ${phones.length} رقم من Google Sheets`);
+  } catch (e) {
+    GP.hide();
+    beErr('فشل جلب البيانات: ' + e.message);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// A/B TESTING — DYNAMIC SCRIPT BUILDER
+// ═══════════════════════════════════════════════════════════════════════════
+
+let _abSlotCounter = 0;
+let _accMode = 'auto';
+
+function _ensureAbInit() {
+  const container = document.getElementById('ab-scripts-container');
+  if (container && !container.querySelector('.ab-slot')) addAbScript();
+}
+
+function addAbScript(text, mediaPath) {
+  const container = document.getElementById('ab-scripts-container');
+  if (!container) return;
+  const slots = container.querySelectorAll('.ab-slot');
+  if (slots.length >= 10) { beErr('الحد الأقصى 10 سكريبتات في الحملة الواحدة'); return; }
+  const i = _abSlotCounter++;
+  const num = slots.length + 1;
+  const div = document.createElement('div');
+  div.className = 'ab-slot';
+  div.id = 'ab-slot-' + i;
+  div.style.cssText = 'background:rgba(var(--ar),.04);border:1px solid rgba(var(--ar),.1);border-radius:10px;padding:12px;margin-bottom:10px';
+  div.innerHTML = `
+    <div class="flex ic jb mb8">
+      <span class="ab-label f11 fw6 ta" style="font-family:\'Orbitron\',sans-serif;letter-spacing:1px">▸ سكريبت ${num}</span>
+      ${num > 1 ? `<button class="btn bd bsm" style="padding:3px 9px" onclick="removeAbSlot('ab-slot-${i}')">🗑️</button>` : '<span></span>'}
+    </div>
+    <textarea class="fc ab-text" style="min-height:60px;margin-bottom:8px;resize:vertical" placeholder="اكتب نص الرسالة هنا...">${text ? String(text).replace(/</g,'&lt;') : ''}</textarea>
+    <div class="flex gap6 ic">
+      <input class="fc fi f11 ab-media" type="text" placeholder="لا يوجد مرفق لهذا السكريبت" readonly style="direction:ltr;font-size:10px;padding:6px 10px">
+      <button class="btn bo bsm" style="padding:5px 8px" onclick="pickAbSlotMedia(this)" title="اختيار ملف">📎</button>
+      <button class="btn bd bsm" style="padding:5px 8px" onclick="clearAbSlotMedia(this)" title="مسح المرفق">✕</button>
+    </div>`;
+  if (mediaPath) div.querySelector('.ab-media').value = mediaPath;
+  container.appendChild(div);
+}
+
+function removeAbSlot(slotId) {
+  const container = document.getElementById('ab-scripts-container');
+  if (!container) return;
+  if (container.querySelectorAll('.ab-slot').length <= 1) { beErr('يجب أن يكون هناك سكريبت واحد على الأقل'); return; }
+  const slot = document.getElementById(slotId);
+  if (slot) {
+    slot.remove();
+    // Renumber labels
+    container.querySelectorAll('.ab-slot .ab-label').forEach((lbl, idx) => {
+      lbl.textContent = `▸ سكريبت ${idx + 1}`;
+    });
+  }
+}
+
+async function pickAbSlotMedia(btn) {
+  if (!IS_ELECTRON) { beOk('اختيار ملف متاح في النسخة الكاملة فقط'); return; }
+  const slot  = btn.closest('.ab-slot');
+  const input = slot?.querySelector('.ab-media');
+  if (!input) return;
+  const fp = await BE.openFile({ filters:[{ name: 'Media', extensions: ['jpg','jpeg','png','gif','mp4','pdf','doc','docx'] }] });
+  if (fp) input.value = fp;
+}
+
+function clearAbSlotMedia(btn) {
+  const slot  = btn.closest('.ab-slot');
+  const input = slot?.querySelector('.ab-media');
+  if (input) input.value = '';
+}
+
+function getAbScripts() {
+  const scripts = [];
+  document.querySelectorAll('#ab-scripts-container .ab-slot').forEach(slot => {
+    const text      = (slot.querySelector('.ab-text')?.value  || '').trim();
+    const mediaPath = (slot.querySelector('.ab-media')?.value || '').trim();
+    if (text) scripts.push({ text, mediaPath: mediaPath || null });
+  });
+  return scripts;
+}
+
+// Account selection
+function setAccMode(mode) {
+  _accMode = mode;
+  document.getElementById('acc-mode-auto')?.classList.toggle('active', mode === 'auto');
+  document.getElementById('acc-mode-select')?.classList.toggle('active', mode === 'select');
+  const list = document.getElementById('acc-check-list');
+  if (list) list.style.display = mode === 'select' ? 'block' : 'none';
+}
+
+function refreshAccCheckList(sessions) {
+  const list = document.getElementById('acc-check-list');
+  if (!list) return;
+  if (!sessions || !sessions.length) {
+    list.innerHTML = '<div class="f11 ts" style="padding:10px;text-align:center;opacity:.6">لا توجد أجهزة متصلة حالياً</div>';
+    return;
+  }
+  list.innerHTML = sessions.map(s => {
+    const isReady = s.state === 'ready';
+    const dot = isReady ? 'bg:rgba(0,255,136,1)' : 'background:#ff3344';
+    return `<label class="flex ic gap8 mb6" style="cursor:pointer;padding:3px 0">
+      <input type="checkbox" class="acc-check" value="${s.id}" ${isReady ? 'checked' : ''} style="accent-color:var(--acc);width:14px;height:14px;cursor:pointer">
+      <span style="width:7px;height:7px;border-radius:50%;flex-shrink:0;${isReady ? 'background:#00ff88;box-shadow:0 0 5px #00ff88' : 'background:#ff3344'}"></span>
+      <span class="f12 fi">${s.name}</span>
+      <span class="f10 ts">${s.phone ? '+'+s.phone : ''}</span>
+    </label>`;
+  }).join('');
+}
+
+// A/B Results
+async function loadAbResults() {
+  openM('m-ab-results');
+  const content = document.getElementById('ab-results-content');
+  if (content) content.innerHTML = '<div style="padding:40px;text-align:center;opacity:.5"><span class="spinner"></span> جارٍ التحميل...</div>';
+
+  if (!IS_ELECTRON) {
+    renderAbResults({ campaigns: [] }); return;
+  }
+  const r = await BE.wa.ab.results();
+  if (!r.ok) { if (content) content.innerHTML = `<div class="f12 ts" style="padding:24px">خطأ: ${r.error}</div>`; return; }
+  renderAbResults(r.data);
+}
+
+function renderAbResults(data) {
+  const content = document.getElementById('ab-results-content');
+  if (!content) return;
+  const campaigns = data.campaigns || [];
+  if (!campaigns.length) {
+    content.innerHTML = '<div style="padding:40px;text-align:center"><div style="font-size:40px;margin-bottom:12px;opacity:.3">📊</div><div class="f12 ts">لا توجد حملات A/B بعد<br>ابدأ حملة بسكريبتات متعددة لترى النتائج هنا</div></div>';
+    return;
+  }
+
+  let html = '';
+  for (const camp of campaigns) {
+    html += `
+    <div style="margin-bottom:18px;border:1px solid rgba(var(--ar),.1);border-radius:12px;overflow:hidden">
+      <div class="flex ic jb" style="padding:12px 16px;background:rgba(var(--ar),.04);border-bottom:1px solid rgba(var(--ar),.08)">
+        <div>
+          <div class="fw7 f13">${esc(camp.name)}</div>
+          <div class="f10 ts mt4">📤 ${camp.sent||0} مُرسَل  ❌ ${camp.failed||0} فاشل  📅 ${(camp.created_at||'').slice(0,10)}</div>
+        </div>
+        <button class="btn bo bsm" onclick="loadAbCampaignDetail('${camp.id}',this)">تفاصيل ▾</button>
+      </div>
+      <div class="ab-camp-detail" id="abd-${camp.id}" style="display:none;padding:14px"></div>
+    </div>`;
+  }
+  content.innerHTML = html;
+}
+
+async function loadAbCampaignDetail(campaignId, btn) {
+  const detDiv = document.getElementById('abd-' + campaignId);
+  if (!detDiv) return;
+  if (detDiv.style.display !== 'none') { detDiv.style.display = 'none'; btn.textContent = 'تفاصيل ▾'; return; }
+  btn.textContent = '⏳';
+  if (!IS_ELECTRON) { detDiv.innerHTML = '<div class="f11 ts" style="padding:12px">متاح في النسخة الكاملة فقط</div>'; detDiv.style.display = ''; btn.textContent = 'إغلاق ▴'; return; }
+
+  const r = await BE.wa.ab.results(campaignId);
+  if (!r.ok) { detDiv.innerHTML = `<div class="f11 ts">${r.error}</div>`; detDiv.style.display = ''; btn.textContent = 'إغلاق ▴'; return; }
+
+  const scripts = r.data.scripts || [];
+  if (!scripts.length) { detDiv.innerHTML = '<div class="f11 ts" style="padding:8px;text-align:center">لا توجد بيانات سكريبتات لهذه الحملة</div>'; detDiv.style.display = ''; btn.textContent = 'إغلاق ▴'; return; }
+
+  // Find winner (highest reply rate)
+  const maxReplied = Math.max(...scripts.map(s => s.replied_count || 0));
+  const totalSent  = scripts.reduce((a, s) => a + (s.sent_count || 0), 0) || 1;
+
+  let html = '';
+  for (const s of scripts) {
+    const sent    = s.sent_count    || 0;
+    const failed  = s.failed_count  || 0;
+    const replied = s.replied_count || 0;
+    const pct     = totalSent > 0 ? Math.round(sent / totalSent * 100) : 0;
+    const repRate = sent > 0 ? ((replied / sent) * 100).toFixed(1) : '0.0';
+    const isWinner = maxReplied > 0 && replied === maxReplied;
+    html += `
+    <div style="margin-bottom:14px;padding:12px;background:rgba(var(--ar),.03);border:1px solid rgba(var(--ar),${isWinner ? '.35' : '.07'});border-radius:10px">
+      <div class="flex ic jb mb8">
+        <span class="fw7 f12 ta" style="font-family:'Orbitron',sans-serif;font-size:10px">سكريبت ${s.script_index + 1}</span>
+        ${isWinner ? '<span class="bge bg-g f10">🏆 الأعلى استجابة</span>' : ''}
+      </div>
+      <div class="f12 mb10" style="color:var(--tx);line-height:1.6;background:rgba(0,0,0,.2);border-radius:7px;padding:8px 10px;max-height:60px;overflow:hidden">${esc((s.script_text||'').slice(0,120))}${(s.script_text||'').length > 120 ? '...' : ''}</div>
+      <div class="pb mb8"><div class="pf" style="width:${pct}%"></div></div>
+      <div class="flex gap16 f11" style="color:var(--ts)">
+        <span>📤 <b class="ta">${sent}</b> مُرسَل</span>
+        <span>❌ <b style="color:#ff3344">${failed}</b> فاشل</span>
+        <span>💬 <b class="ta">${replied}</b> ردّ</span>
+        <span class="fi"></span>
+        <span class="fw7 ta" style="font-family:'Orbitron',sans-serif;font-size:11px">${repRate}% استجابة</span>
+      </div>
+    </div>`;
+  }
+  detDiv.innerHTML = html;
+  detDiv.style.display = '';
+  btn.textContent = 'إغلاق ▴';
+}
+
 async function generateEngineVariants() {
   if (!IS_ELECTRON) {
-    document.getElementById('eng-body-1').value = 'أهلاً! عرض حصري لك اليوم 🎉';
-    document.getElementById('eng-body-2').value = 'مرحباً! لا تفوت هذا العرض المميز 🔥';
-    document.getElementById('eng-body-3').value = 'السلام عليكم! فرصة ذهبية بانتظارك ⚡';
+    const demos = ['أهلاً! عرض حصري لك اليوم 🎉','مرحباً! لا تفوت هذا العرض المميز 🔥','السلام عليكم! فرصة ذهبية بانتظارك ⚡','تسوق الآن واحصل على أفضل الأسعار 🛍️','نحن هنا لخدمتك — عروض لا تُفوَّت ✨'];
+    const container = document.getElementById('ab-scripts-container');
+    if (!container) return;
+    container.querySelectorAll('.ab-slot .ab-text').forEach((ta, i) => { if (demos[i]) ta.value = demos[i]; });
     beOk('تم التوليد (وضع العرض)'); return;
   }
-  showN('AI', 'جاري توليد 5 نسخ...', '🤖');
-  const product  = document.getElementById('eng-body-1').value.slice(0,100) || 'منتجاتنا';
-  const r = await BE.ai.generateVariants({
-    type:'promotional', product, audience:'عملاء واتساب',
-    tone:'friendly', language:'ar'
-  });
+  showN('AI', 'جارٍ توليد 5 نسخ بالذكاء الاصطناعي...', '🤖');
+  const firstText = document.querySelector('#ab-scripts-container .ab-text')?.value?.slice(0,100) || 'منتجاتنا';
+  const r = await BE.ai.generateVariants({ type:'promotional', product: firstText, audience:'عملاء واتساب', tone:'friendly', language:'ar' });
   if (!r.ok) { beErr(r.error); return; }
-  const v = r.data.variants || [];
-  ['eng-body-1','eng-body-2','eng-body-3'].forEach((id,i) => {
-    if (v[i]) document.getElementById(id).value = v[i];
+  const variants = r.data.variants || [];
+  const container = document.getElementById('ab-scripts-container');
+  if (!container) return;
+  const slots = container.querySelectorAll('.ab-slot');
+  variants.forEach((text, i) => {
+    if (i < slots.length) {
+      slots[i].querySelector('.ab-text').value = text;
+    } else if (slots.length + (i - slots.length + 1) <= 10) {
+      addAbScript(text);
+    }
   });
-  beOk(`تم توليد ${v.length} نسخة بالـ AI`);
+  beOk(`✅ تم توليد ${variants.length} سكريبت بالـ AI`);
 }
 
 async function startBulkSend() {
   const raw = document.getElementById('eng-recipients').value;
-  const recipients = raw.split(/[\n,]+/).map(s=>s.trim().replace(/\D/g,'')).filter(s=>s.length>=7);
+  const recipients = raw.split(/[\n,]+/).map(s => {
+    s = s.trim();
+    if (s.includes('@')) return s;           // group JID or contact JID — keep as-is
+    return s.replace(/\D/g, '');             // phone number — strip to digits
+  }).filter(s => s.length >= 7);
 
   if (!recipients.length) { beErr('أدخل أرقام المستهدفين أولاً'); return; }
 
-  const b1 = document.getElementById('eng-body-1').value.trim();
-  if (!b1) { beErr('أدخل نص الرسالة الأولى على الأقل'); return; }
+  // Collect scripts from dynamic A/B slots
+  const scripts_data = getAbScripts();
+  if (!scripts_data.length || !scripts_data[0].text) {
+    beErr('أدخل نص الرسالة الأولى على الأقل'); return;
+  }
 
-  const scripts = ['eng-body-1','eng-body-2','eng-body-3']
-    .map(id => document.getElementById(id).value.trim())
-    .filter(Boolean);
+  // Determine allowed sessions based on account mode
+  let allowedSessions = null;
+  if (_accMode === 'select') {
+    const checked = [...document.querySelectorAll('#acc-check-list input.acc-check:checked')];
+    allowedSessions = checked.map(cb => cb.value).filter(Boolean);
+    if (!allowedSessions.length) { beErr('اختر حساباً واحداً على الأقل'); return; }
+  }
 
   const delayMin = parseInt(document.getElementById('eng-delay-min').value, 10) * 1000;
   const delayMax = parseInt(document.getElementById('eng-delay-max').value, 10) * 1000;
-  const sessionId = document.getElementById('eng-session').value || '';
-  const mediaPath = document.getElementById('eng-media-path').value || '';
+  const globalMedia = (document.getElementById('eng-media-path')?.value || '').trim();
   const name = document.getElementById('eng-name').value.trim() || 'حملة ' + new Date().toLocaleDateString('ar');
 
   if (!IS_ELECTRON) {
@@ -2754,10 +4231,13 @@ async function startBulkSend() {
   }
 
   const r = await BE.wa.send.bulk({
-    recipients, scripts, campaignName: name,
-    sessionId: sessionId || null,
-    mediaPath: mediaPath || null,
-    delayMin, delayMax,
+    recipients,
+    scripts_data,
+    campaignName: name,
+    allowedSessions,
+    mediaPath: globalMedia || null,
+    delayMin,
+    delayMax,
   });
 
   if (r.ok) {
@@ -2778,20 +4258,50 @@ setInterval(() => {
 // INBOX — incoming messages
 // ═══════════════════════════════════════════════════════════════════════════
 
+let _inboxTab = 'all';
+
+function switchInboxTab(tab) {
+  _inboxTab = tab;
+  ['all','unreplied','replied'].forEach(t => {
+    const btn = document.getElementById('inbox-tab-'+t);
+    if (!btn) return;
+    const active = t === tab;
+    btn.style.borderBottomColor = active ? 'var(--hp)' : 'transparent';
+    btn.style.color = active ? 'var(--hp)' : 'var(--ts)';
+  });
+  loadInbox();
+}
+
+function bodyText(m) {
+  if (m.body) return m.body;
+  const t = m.msg_type || '';
+  if (t==='image')              return '[صورة 🖼️]';
+  if (t==='audio' || t==='ptt') return '[مقطع صوتي 🎵]';
+  if (t==='video')              return '[فيديو 🎥]';
+  if (t==='document')           return '[ملف 📎]';
+  if (t==='sticker')            return '[ملصق 🎭]';
+  if (t==='location')           return '[موقع 📍]';
+  return '[رسالة وسائط 📎]';
+}
+
 async function loadInbox() {
   const sessionId = document.getElementById('inbox-filter')?.value || '';
   if (!IS_ELECTRON) return;
 
-  const [msgR, unreadR] = await Promise.all([
-    BE.wa.inbox.list(sessionId || null),
+  const filter = _inboxTab === 'all' ? null : _inboxTab;
+  const [msgR, unreadR, unrepliedR] = await Promise.all([
+    BE.wa.inbox.list({ sessionId: sessionId || null, filter, limit: 300 }),
     BE.wa.inbox.unread(sessionId || null),
+    BE.wa.inbox.unreplied(sessionId || null),
   ]);
 
-  const msgs   = msgR.ok  ? msgR.data  : [];
-  const unread = unreadR.ok ? unreadR.data : 0;
+  const msgs      = msgR.ok      ? msgR.data      : [];
+  const unread    = unreadR.ok   ? unreadR.data   : 0;
+  const unreplied = unrepliedR.ok ? unrepliedR.data : 0;
 
-  document.getElementById('inbox-unread').textContent      = unread;
-  document.getElementById('inbox-total-count').textContent = msgs.length + ' إجمالي';
+  document.getElementById('inbox-unread').textContent          = unread;
+  document.getElementById('inbox-unreplied-count').textContent = unreplied;
+  document.getElementById('inbox-total-count').textContent     = msgs.length + ' إجمالي';
 
   const badge = document.getElementById('nb-inbox');
   if (badge) { badge.textContent = unread; badge.style.display = unread > 0 ? '' : 'none'; }
@@ -2799,17 +4309,45 @@ async function loadInbox() {
   const tbody = document.getElementById('inbox-tbody');
   if (!tbody) return;
 
-  tbody.innerHTML = msgs.length ? msgs.map(m => `
-    <tr style="${m.read ? '' : 'background:rgba(var(--ar),.04)'}">
-      <td class="f11 ts">${esc(m.session_id||'').slice(0,8)}</td>
-      <td class="fm f11">+${esc(m.from_number||'')}</td>
-      <td style="max-width:280px;word-break:break-word">${esc((m.body||'').slice(0,120))}${(m.body||'').length>120?'…':''}</td>
-      <td>${m.is_group ? '<span class="bge bg-b f11">مجموعة</span>' : '—'}</td>
+  tbody.innerHTML = msgs.length ? msgs.map(m => {
+    const bodySnippet  = esc(bodyText(m).slice(0,100));
+    const sessionLabel = esc(m.session_name || m.session_id || '').slice(0,16);
+    // جروب → اسم الجروب + badge؛  فردي → اسم جهة الاتصال أو الرقم
+    const fromName = m.is_group
+      ? `<span class="bge bg-b f11">جروب</span> ${esc(m.group_name || m.from_number || '—')}`
+      : esc(m.contact_name ? m.contact_name : ('+' + (m.from_number || '')));
+    const statusBadge = m.replied
+      ? '<span class="bge bg-g f11">تم الرد</span>'
+      : (m.read ? '<span class="bge f11">مقروء</span>' : '<span class="bge bg-y f11">جديد</span>');
+    const actions = [
+      !m.read ? `<button class="btn bo bsm" onclick="markMsgRead('${m.id}',this)" title="تحديد كمقروء">✔</button>` : '',
+      `<button class="btn bp bsm" onclick="openReplyModal('${m.id}','${esc(m.from_number||'')}','${bodySnippet.replace(/'/g,'')}','${sessionLabel}')" title="رد">↩️ رد</button>`,
+    ].join(' ');
+    return `<tr style="${!m.read ? 'background:rgba(var(--ar),.04)' : ''}">
+      <td class="f11 ts" style="white-space:nowrap">${sessionLabel}</td>
+      <td class="f11">${fromName}</td>
+      <td style="max-width:260px;word-break:break-word">${bodySnippet}${bodyText(m).length>100?'…':''}</td>
       <td class="f11 ts" style="white-space:nowrap">${m.received_at ? m.received_at.slice(0,16) : '—'}</td>
-      <td>${m.read ? '<span class="bge f11">مقروء</span>' : '<span class="bge bg-y f11">جديد</span>'}</td>
-      <td>${m.read ? '' : `<button class="btn bo bsm" onclick="markMsgRead('${m.id}',this)">✔</button>`}</td>
-    </tr>`).join('')
-  : '<tr><td colspan="7" style="text-align:center;padding:32px;opacity:.5">لا توجد رسائل</td></tr>';
+      <td>${statusBadge}</td>
+      <td style="white-space:nowrap">${actions}</td>
+    </tr>`;
+  }).join('')
+  : '<tr><td colspan="6" style="text-align:center;padding:32px;opacity:.5">لا توجد رسائل</td></tr>';
+
+  // Populate session filter dropdown if empty
+  const filterSel = document.getElementById('inbox-filter');
+  if (filterSel && filterSel.options.length <= 1) {
+    const sessR = await BE.wa.sessions.list();
+    if (sessR.ok) {
+      sessR.data.forEach(s => {
+        if (!filterSel.querySelector(`option[value="${s.id}"]`)) {
+          const o = document.createElement('option');
+          o.value = s.id; o.textContent = '📱 ' + (s.name || s.id);
+          filterSel.appendChild(o);
+        }
+      });
+    }
+  }
 }
 
 async function markMsgRead(id, btn) {
@@ -2821,11 +4359,60 @@ async function markMsgRead(id, btn) {
 
 async function markAllRead() {
   if (!IS_ELECTRON) return;
-  const r = await BE.wa.inbox.list('');
+  const r = await BE.wa.inbox.list({ sessionId: null, filter: null, limit: 1000 });
   if (!r.ok) return;
   await Promise.all(r.data.filter(m=>!m.read).map(m => BE.wa.inbox.markRead(m.id)));
   beOk('تم تحديد الكل كمقروء');
   loadInbox();
+}
+
+// ── Reply modal ────────────────────────────────────────────────────────────
+let _replyMsgId = null;
+
+async function openReplyModal(msgId, fromNumber, origBody, sessionLabel) {
+  _replyMsgId = msgId;
+  document.getElementById('reply-from-info').textContent = 'من: +' + fromNumber + (sessionLabel ? '  —  جلسة: ' + sessionLabel : '');
+  document.getElementById('reply-orig-body').textContent = origBody || '—';
+  document.getElementById('reply-body-input').value = '';
+
+  // Populate session selector
+  const sel = document.getElementById('reply-session-sel');
+  sel.innerHTML = '<option value="">اختر جلسة...</option>';
+  if (IS_ELECTRON) {
+    const r = await BE.wa.sessions.list();
+    if (r.ok) r.data.filter(s=>s.state==='ready').forEach(s => {
+      const o = document.createElement('option'); o.value = s.id;
+      o.textContent = '📱 ' + (s.name||s.id); sel.appendChild(o);
+    });
+  }
+  openM('m-inbox-reply');
+  setTimeout(() => document.getElementById('reply-body-input').focus(), 120);
+}
+
+async function sendInboxReply() {
+  if (!IS_ELECTRON || !_replyMsgId) return;
+  const replyBody = document.getElementById('reply-body-input').value.trim();
+  const sessionId = document.getElementById('reply-session-sel').value;
+  if (!replyBody) { beErr('اكتب نص الرد'); return; }
+
+  const btn = document.getElementById('btn-send-reply');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ جاري الإرسال...'; }
+
+  try {
+    const r = await BE.wa.inbox.reply({ id: _replyMsgId, replyBody, sessionId: sessionId || undefined });
+    if (r && r.ok) {
+      beOk('تم إرسال الرد بنجاح');
+      closeM('m-inbox-reply');
+      _replyMsgId = null;
+      loadInbox();
+    } else {
+      beErr((r && r.error) || 'فشل الإرسال');
+    }
+  } catch(e) {
+    beErr(e.message || 'خطأ في الإرسال');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '↩️ إرسال الرد'; }
+  }
 }
 
 // ── Utility ────────────────────────────────────────────────────────────────
@@ -2846,9 +4433,10 @@ window.nav = function(page) {
   else if (page==='reports')    { loadReportStats(); loadReports(); }
   else if (page==='settings')   loadSettings();
   else if (page==='devices')    loadDevices();
-  else if (page==='engine')     { loadDevices(); loadEngineStats(); }
+  else if (page==='engine')     { loadDevices(); loadEngineStats(); _ensureAbInit(); }
   else if (page==='inbox')      loadInbox();
   else if (page==='groups')     loadGroupsPage();
+  else if (page==='antiban')    loadAntiBan();
 };
 
 // ── Boot: load engine status in header immediately ───────────────────────
@@ -3598,6 +5186,11 @@ if (IS_ELECTRON) {
   // Update error
   BE.on('update:error', ({ message }) => {
     console.warn('[Update error]', message);
+    // Re-show download button so user can retry
+    _updModal('upd-dl-wrap').style.display  = 'none';
+    _updModal('upd-actions').style.display  = 'flex';
+    _updModal('upd-dl-btn').disabled        = false;
+    showN('خطأ في التحديث ⚠️', message || 'فشل تحميل التحديث', '❌');
   });
 }
 
@@ -3612,6 +5205,208 @@ if (IS_ELECTRON) {
   nav('dashboard');
   await loadDashboard();
 })();
+
+// ══════════════════════════════════════════════════════════════════════════
+// ANTI-BAN PAGE
+// ══════════════════════════════════════════════════════════════════════════
+
+function _abToggle(checkboxId, trackId, thumbId, on) {
+  const cb = document.getElementById(checkboxId);
+  if (cb) cb.checked = on;
+  const tr = document.getElementById(trackId);
+  const th = document.getElementById(thumbId);
+  if (tr) tr.style.background = on ? 'rgba(var(--ar),.5)' : 'rgba(var(--ar),.15)';
+  if (th) { th.style.background = on ? 'var(--acc)' : 'var(--ts)'; th.style.right = on ? 'calc(100% - 19px)' : '3px'; }
+}
+
+function toggleABEnabled(cb) { _abToggle('ab-enabled','ab-enabled-track','ab-enabled-thumb', cb.checked); }
+function toggleABWindow(cb)  { _abToggle('ab-window-enabled','ab-window-track','ab-window-thumb', cb.checked); }
+function toggleABTyping(cb)  { _abToggle('ab-typing-sim','ab-typing-track','ab-typing-thumb', cb.checked); }
+
+async function loadAntiBan() {
+  if (!IS_ELECTRON) return;
+
+  // Load settings
+  const sr = await BE.antiBan.getSettings();
+  const s  = sr?.data || sr || {};
+  _abToggle('ab-enabled',      'ab-enabled-track',  'ab-enabled-thumb',  s.enabled !== false);
+  _abToggle('ab-window-enabled','ab-window-track',  'ab-window-thumb',   !!s.timeWindowEnabled);
+  _abToggle('ab-typing-sim',   'ab-typing-track',   'ab-typing-thumb',   s.typingSimEnabled !== false);
+  const profile = document.getElementById('ab-delay-profile');
+  if (profile) profile.value = s.delayProfile || 'normal';
+  const setV = (id, v) => { const el = document.getElementById(id); if (el && v !== undefined) el.value = v; };
+  setV('ab-daily-limit',   s.dailyLimit    ?? 500);
+  setV('ab-hourly-limit',  s.hourlyLimit   ?? 60);
+  setV('ab-window-start',  s.timeWindowStart ?? 9);
+  setV('ab-window-end',    s.timeWindowEnd   ?? 21);
+  setV('ab-typing-min',    s.typingMinMs ?? 1000);
+  setV('ab-typing-max',    s.typingMaxMs ?? 3000);
+
+  // Load session stats
+  const sesr = await BE.antiBan.getSessions();
+  const sessions = Array.isArray(sesr) ? sesr : (sesr?.data || []);
+  renderABSessions(sessions);
+
+  // Load events
+  const evr = await BE.antiBan.getEvents(50);
+  const events = Array.isArray(evr) ? evr : (evr?.data || []);
+  renderABEvents(events);
+}
+
+function renderABSessions(sessions) {
+  let healthy = 0, suspended = 0, banned = 0, warmup = 0;
+  const tbody = document.getElementById('ab-sessions-list');
+  if (!sessions.length) {
+    tbody.innerHTML = '<div style="text-align:center;padding:32px;opacity:.5">لا توجد جلسات — أضف جلسة أولاً</div>';
+    ['ab-stat-healthy','ab-stat-suspended','ab-stat-banned','ab-stat-warmup'].forEach(id => { const el=document.getElementById(id); if(el) el.textContent='0'; });
+    return;
+  }
+
+  tbody.innerHTML = sessions.map(s => {
+    const h        = s.healthScore ?? 80;
+    const hColor   = h >= 70 ? '#00ff88' : h >= 40 ? '#ffcc00' : '#ff3344';
+    const hLabel   = h >= 70 ? 'سليمة' : h >= 40 ? 'ضعيفة' : 'خطر';
+    const barWidth = h + '%';
+    const isBanned = s.banDetected;
+    const isSusp   = s.suspended && !isBanned;
+    if (isBanned)   banned++;
+    else if (isSusp) suspended++;
+    else            healthy++;
+    if (s.warmupMode) warmup++;
+
+    const dailyPct = s.dailyLimit > 0 ? Math.min(100, Math.round(s.dailyCount / s.dailyLimit * 100)) : 0;
+    const dailyColor = dailyPct >= 90 ? '#ff3344' : dailyPct >= 70 ? '#ffcc00' : '#00ff88';
+
+    return `<div style="padding:12px;background:rgba(var(--ar),.04);border-radius:10px;border:1px solid rgba(var(--ar),.1)">
+      <div class="flex ic jb mb8">
+        <div class="flex ic gap8">
+          <span class="f13 fw6">${esc(s.name)}</span>
+          ${s.phone ? `<span class="f11 ts">${esc(s.phone)}</span>` : ''}
+          ${isBanned  ? `<span class="bge bg-r">🚫 محظور</span>` : ''}
+          ${isSusp    ? `<span class="bge bg-y">⏸️ موقوف</span>` : ''}
+          ${s.warmupMode ? `<span class="bge bg-b">🔥 إحماء يوم ${s.warmupDay}</span>` : ''}
+        </div>
+        <div class="flex gap6">
+          ${s.warmupMode
+            ? `<button class="btn bo bsm" onclick="abDisableWarmup('${s.id}')">إيقاف الإحماء</button>`
+            : `<button class="btn bo bsm" onclick="abEnableWarmup('${s.id}')">تفعيل الإحماء</button>`}
+          <button class="btn bo bsm" onclick="abResetSession('${s.id}')">🔄 إعادة ضبط</button>
+        </div>
+      </div>
+      <div class="flex gap16 f11" style="flex-wrap:wrap">
+        <div style="flex:1;min-width:140px">
+          <div class="ts mb4">صحة الجلسة — <span style="color:${hColor}">${hLabel} (${h}%)</span></div>
+          <div style="height:6px;background:rgba(var(--ar),.1);border-radius:3px">
+            <div style="height:100%;width:${barWidth};background:${hColor};border-radius:3px;transition:width .4s"></div>
+          </div>
+        </div>
+        <div style="flex:1;min-width:140px">
+          <div class="ts mb4">اليوم — <span style="color:${dailyColor}">${s.dailyCount} / ${s.dailyLimit}</span></div>
+          <div style="height:6px;background:rgba(var(--ar),.1);border-radius:3px">
+            <div style="height:100%;width:${dailyPct}%;background:${dailyColor};border-radius:3px;transition:width .4s"></div>
+          </div>
+        </div>
+        <div class="ts">الساعة: <b>${s.hourlyCount}/${s.hourlyLimit}</b></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  const setS = (id, v) => { const el=document.getElementById(id); if(el) el.textContent = v; };
+  setS('ab-stat-healthy', healthy);
+  setS('ab-stat-suspended', suspended);
+  setS('ab-stat-banned', banned);
+  setS('ab-stat-warmup', warmup);
+}
+
+function renderABEvents(events) {
+  const tbody = document.getElementById('ab-events-tbody');
+  if (!events.length) {
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:24px;opacity:.5">لا توجد أحداث مسجلة</td></tr>';
+    return;
+  }
+  const typeLabel = {
+    ban_detected:   '<span class="bge bg-r">🚫 بان</span>',
+    auth_failure:   '<span class="bge bg-r">🔐 Auth Fail</span>',
+    send_error:     '<span class="bge bg-y">⚠️ خطأ إرسال</span>',
+    disconnected:   '<span class="bge bg-y">🔌 قطع اتصال</span>',
+    daily_reset:    '<span class="bge bg-b">🔄 تصفير يومي</span>',
+    warmup_start:   '<span class="bge bg-b">🔥 بدء إحماء</span>',
+    warmup_stop:    '<span class="bge bg-p">✋ إيقاف إحماء</span>',
+    warmup_complete:'<span class="bge bg-g">✅ إحماء مكتمل</span>',
+    manual_reset:   '<span class="bge bg-p">🔧 إعادة يدوية</span>',
+  };
+  tbody.innerHTML = events.map(e => `
+    <tr>
+      <td>${esc(e.session_name || e.session_id || '—')}</td>
+      <td>${typeLabel[e.event_type] || `<span class="bge bg-b">${esc(e.event_type)}</span>`}</td>
+      <td class="ts f11">${esc(e.detail || '—')}</td>
+      <td class="ts f11">${e.created_at ? new Date(e.created_at).toLocaleString('ar') : '—'}</td>
+    </tr>`).join('');
+}
+
+async function saveAntiBanSettings() {
+  if (!IS_ELECTRON) return;
+  const g = id => document.getElementById(id);
+  const data = {
+    enabled:           g('ab-enabled')?.checked,
+    delayProfile:      g('ab-delay-profile')?.value,
+    dailyLimit:        parseInt(g('ab-daily-limit')?.value  || '500', 10),
+    hourlyLimit:       parseInt(g('ab-hourly-limit')?.value || '60',  10),
+    timeWindowEnabled: g('ab-window-enabled')?.checked,
+    timeWindowStart:   parseInt(g('ab-window-start')?.value || '9',  10),
+    timeWindowEnd:     parseInt(g('ab-window-end')?.value   || '21', 10),
+    typingSimEnabled:  g('ab-typing-sim')?.checked,
+    typingMinMs:       parseInt(g('ab-typing-min')?.value || '1000', 10),
+    typingMaxMs:       parseInt(g('ab-typing-max')?.value || '3000', 10),
+  };
+  const r = await BE.antiBan.setSettings(data);
+  if (r?.ok || r?.data?.ok) beOk('✅ تم حفظ إعدادات Anti-Ban');
+  else beErr('فشل حفظ الإعدادات');
+}
+
+async function abResetSession(id) {
+  if (!confirm('إعادة ضبط الجلسة: يُصفَّر health score + العدادات. متأكد؟')) return;
+  const r = await BE.antiBan.resetSession(id);
+  if (r?.ok || r?.data?.ok) { beOk('✅ تم إعادة ضبط الجلسة'); loadAntiBan(); }
+  else beErr('فشل إعادة الضبط');
+}
+
+async function abEnableWarmup(id) {
+  const r = await BE.antiBan.enableWarmup(id);
+  if (r?.ok || r?.data?.ok) { beOk('🔥 تم تفعيل الإحماء'); loadAntiBan(); }
+  else beErr('فشل تفعيل الإحماء');
+}
+
+async function abDisableWarmup(id) {
+  const r = await BE.antiBan.disableWarmup(id);
+  if (r?.ok || r?.data?.ok) { beOk('✅ تم إيقاف الإحماء'); loadAntiBan(); }
+  else beErr('فشل إيقاف الإحماء');
+}
+
+async function clearABEvents() {
+  if (!confirm('مسح الأحداث القديمة (أكثر من 30 يوم)؟')) return;
+  await BE.antiBan.clearEvents();
+  loadAntiBan();
+  beOk('🗑️ تم مسح الأحداث القديمة');
+}
+
+// Listen for real-time anti-ban push events
+if (IS_ELECTRON) {
+  BE.on('antiban:banned', ({ sessionId }) => {
+    showN('تحذير بان', `🚫 تم حظر الجلسة ${sessionId} — راجع صفحة Anti-Ban`, 'error');
+    if (document.getElementById('p-antiban')?.classList.contains('on')) loadAntiBan();
+  });
+  BE.on('antiban:suspended', ({ sessionId, health }) => {
+    showN('جلسة موقوفة', `⏸️ جلسة ${sessionId} موقوفة — health: ${health}`, 'warning');
+    if (document.getElementById('p-antiban')?.classList.contains('on')) loadAntiBan();
+  });
+  BE.on('antiban:warmup:complete', ({ sessionId }) => {
+    showN('إحماء مكتمل', `✅ انتهى الإحماء للجلسة ${sessionId}`, 'success');
+    if (document.getElementById('p-antiban')?.classList.contains('on')) loadAntiBan();
+  });
+}
+
+// ── Boot ──────────────────────────────────────────────────────────────────
 </script>
 </body>
 </html>

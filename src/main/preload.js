@@ -61,12 +61,14 @@ contextBridge.exposeInMainWorld('ftwa', {
 
   // ── Scheduler ─────────────────────────────────────────────────────────────
   scheduler: {
-    list:    ()      => ipcRenderer.invoke('scheduler:list'),
-    create:  (data)  => ipcRenderer.invoke('scheduler:create', data),
-    update:  (data)  => ipcRenderer.invoke('scheduler:update', data),
-    remove:  (id)    => ipcRenderer.invoke('scheduler:remove', id),
-    pause:   (id)    => ipcRenderer.invoke('scheduler:pause',  id),
-    resume:  (id)    => ipcRenderer.invoke('scheduler:resume', id),
+    list:     ()      => ipcRenderer.invoke('scheduler:list'),
+    create:   (data)  => ipcRenderer.invoke('scheduler:create',  data),
+    update:   (data)  => ipcRenderer.invoke('scheduler:update',  data),
+    remove:   (id)    => ipcRenderer.invoke('scheduler:remove',  id),
+    pause:    (id)    => ipcRenderer.invoke('scheduler:pause',   id),
+    resume:   (id)    => ipcRenderer.invoke('scheduler:resume',  id),
+    runNow:   (id)    => ipcRenderer.invoke('scheduler:runNow',  id),
+    presets:  ()      => ipcRenderer.invoke('scheduler:presets'),
   },
 
   // ── Templates ─────────────────────────────────────────────────────────────
@@ -88,10 +90,13 @@ contextBridge.exposeInMainWorld('ftwa', {
 
   // ── CRM ───────────────────────────────────────────────────────────────────
   crm: {
-    getConfig:  ()       => ipcRenderer.invoke('crm:getConfig'),
-    saveConfig: (data)   => ipcRenderer.invoke('crm:saveConfig', data),
-    syncLeads:  (source) => ipcRenderer.invoke('crm:syncLeads',  source),
-    getLeads:   ()       => ipcRenderer.invoke('crm:getLeads'),
+    getConfig:      ()          => ipcRenderer.invoke('crm:getConfig'),
+    saveConfig:     (data)      => ipcRenderer.invoke('crm:saveConfig',      data),
+    testConnection: (type)      => ipcRenderer.invoke('crm:testConnection',  type),
+    syncLeads:      (source)    => ipcRenderer.invoke('crm:syncLeads',       source),
+    getLeads:       ()          => ipcRenderer.invoke('crm:getLeads'),
+    triggerWebhook: (payload)   => ipcRenderer.invoke('crm:triggerWebhook',  payload),
+    pushContacts:   (crmType)   => ipcRenderer.invoke('crm:pushContacts',    crmType),
   },
 
   // ── Reports ───────────────────────────────────────────────────────────────
@@ -139,13 +144,20 @@ contextBridge.exposeInMainWorld('ftwa', {
     },
     // Direct send
     send: {
-      text:       (data)       => ipcRenderer.invoke('wa:send:text',       data),
-      media:      (data)       => ipcRenderer.invoke('wa:send:media',      data),
-      bulk:       (opts)       => ipcRenderer.invoke('wa:send:bulk',       opts),
-      queueStats: ()           => ipcRenderer.invoke('wa:send:queueStats'),
-      pause:      ()           => ipcRenderer.invoke('wa:send:pause'),
-      resume:     ()           => ipcRenderer.invoke('wa:send:resume'),
-      clearDone:  ()           => ipcRenderer.invoke('wa:send:clearDone'),
+      text:             (data)   => ipcRenderer.invoke('wa:send:text',           data),
+      media:            (data)   => ipcRenderer.invoke('wa:send:media',          data),
+      bulk:             (opts)   => ipcRenderer.invoke('wa:send:bulk',           opts),
+      queueStats:       ()       => ipcRenderer.invoke('wa:send:queueStats'),
+      pause:            ()       => ipcRenderer.invoke('wa:send:pause'),
+      resume:           ()       => ipcRenderer.invoke('wa:send:resume'),
+      clearDone:        ()       => ipcRenderer.invoke('wa:send:clearDone'),
+      importFromFile:   (path)   => ipcRenderer.invoke('send:importFromFile',    path),
+      importFromSheets: (url)    => ipcRenderer.invoke('send:importFromSheets',  url),
+    },
+    // A/B Testing results
+    ab: {
+      results:        (campaignId) => ipcRenderer.invoke('wa:ab:results',        campaignId),
+      attributeReply: (phone)      => ipcRenderer.invoke('wa:ab:attributeReply', phone),
     },
     // Data extraction / scraping
     scraper: {
@@ -160,9 +172,12 @@ contextBridge.exposeInMainWorld('ftwa', {
     },
     // Inbox (incoming messages)
     inbox: {
-      list:     (sessionId)   => ipcRenderer.invoke('wa:inbox:list',     sessionId),
-      markRead: (id)          => ipcRenderer.invoke('wa:inbox:markRead', id),
-      unread:   (sessionId)   => ipcRenderer.invoke('wa:inbox:unread',   sessionId),
+      list:       (opts)       => ipcRenderer.invoke('wa:inbox:list',       opts),
+      markRead:   (id)         => ipcRenderer.invoke('wa:inbox:markRead',   id),
+      unread:     (sessionId)  => ipcRenderer.invoke('wa:inbox:unread',     sessionId),
+      unreplied:  (sessionId)  => ipcRenderer.invoke('wa:inbox:unreplied',  sessionId),
+      replyStats: ()           => ipcRenderer.invoke('wa:inbox:replyStats'),
+      reply:      (data)       => ipcRenderer.invoke('wa:inbox:reply',      data),
     },
     // Group member management
     groups: {
@@ -171,6 +186,18 @@ contextBridge.exposeInMainWorld('ftwa', {
       readPhonesFromExcel: (filePath) => ipcRenderer.invoke('wa:groups:readPhonesFromExcel', filePath),
       exportList:          (groups)   => ipcRenderer.invoke('wa:groups:exportList',          groups),
     },
+  },
+
+  // ── Anti-Ban ──────────────────────────────────────────────────────────────
+  antiBan: {
+    getSettings:     ()            => ipcRenderer.invoke('antiban:getSettings'),
+    setSettings:     (data)        => ipcRenderer.invoke('antiban:setSettings',     data),
+    getSessions:     ()            => ipcRenderer.invoke('antiban:getSessions'),
+    getEvents:       (limit)       => ipcRenderer.invoke('antiban:getEvents',        limit),
+    resetSession:    (id)          => ipcRenderer.invoke('antiban:resetSession',     id),
+    enableWarmup:    (id)          => ipcRenderer.invoke('antiban:enableWarmup',     id),
+    disableWarmup:   (id)          => ipcRenderer.invoke('antiban:disableWarmup',    id),
+    clearEvents:     ()            => ipcRenderer.invoke('antiban:clearEvents'),
   },
 
   // ── License ───────────────────────────────────────────────────────────────
@@ -217,6 +244,12 @@ contextBridge.exposeInMainWorld('ftwa', {
       'update:progress',
       'update:downloaded',
       'update:error',
+      'wakelock:state',
+      // Anti-ban events
+      'antiban:blocked',
+      'antiban:banned',
+      'antiban:suspended',
+      'antiban:warmup:complete',
     ];
     if (allowed.includes(channel)) {
       // Wrap cb so we can remove it by reference via off()

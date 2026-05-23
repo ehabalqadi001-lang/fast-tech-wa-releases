@@ -22,10 +22,11 @@ class AiService {
     };
   }
 
-  saveKeys({ geminiKey, claudeKey, provider }) {
-    if (geminiKey  !== undefined) this._db.settingSet('ai_gemini_key', geminiKey);
-    if (claudeKey  !== undefined) this._db.settingSet('ai_claude_key', claudeKey);
-    if (provider   !== undefined) this._db.settingSet('ai_provider',   provider);
+  saveKeys({ geminiKey, claudeKey, provider, geminiModel }) {
+    if (geminiKey   !== undefined) this._db.settingSet('ai_gemini_key',   geminiKey);
+    if (claudeKey   !== undefined) this._db.settingSet('ai_claude_key',   claudeKey);
+    if (provider    !== undefined) this._db.settingSet('ai_provider',      provider);
+    if (geminiModel !== undefined) this._db.settingSet('ai_gemini_model',  geminiModel);
     return { ok: true };
   }
 
@@ -161,17 +162,30 @@ Requirements:
   async _geminiChat(messages, apiKey, systemPrompt) {
     if (!apiKey) throw new Error('مفتاح Gemini API غير محدد. يرجى إضافته في الإعدادات.');
 
+    const geminiModel = this._db.settingGet('ai_gemini_model') || 'gemini-2.0-flash';
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({
-      model: 'gemini-1.5-flash',
+      model: geminiModel,
       systemInstruction: systemPrompt || undefined,
     });
 
-    // Convert messages to Gemini format
-    const history = messages.slice(0, -1).map(m => ({
+    // Convert messages to Gemini format, ensuring alternating user/model roles
+    const rawHistory = messages.slice(0, -1).map(m => ({
       role: m.role === 'assistant' ? 'model' : 'user',
       parts: [{ text: m.content }],
     }));
+
+    // Fix consecutive same-role messages (Gemini requires strict alternation)
+    const history = [];
+    for (const msg of rawHistory) {
+      if (history.length > 0 && history[history.length - 1].role === msg.role) {
+        // Insert a placeholder for the missing opposite role
+        const placeholder = msg.role === 'user' ? 'model' : 'user';
+        history.push({ role: placeholder, parts: [{ text: '...' }] });
+      }
+      history.push(msg);
+    }
+
     const lastMsg = messages[messages.length - 1];
 
     const chat = model.startChat({ history });

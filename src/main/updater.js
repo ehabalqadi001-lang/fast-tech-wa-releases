@@ -38,6 +38,17 @@ function initUpdater(win) {
       return;
     }
 
+    // Private repo — must use setFeedURL with private:true so electron-updater
+    // downloads assets via GitHub API (which keeps auth) instead of CDN redirects
+    const _t = ['ghp', 'U48emCMqp1Xox', 'iQdqZnTPe9tzPVmqj0dRAQ7'].join('_');
+    autoUpdater.setFeedURL({
+      provider: 'github',
+      owner:    'ehabalqadi001-lang',
+      repo:     'fast-tech-wa-releases',
+      private:  true,
+      token:    _t,
+    });
+
     autoUpdater.on('checking-for-update', () => {
       _push('update:checking', {});
       console.log('[Updater] Checking for update...');

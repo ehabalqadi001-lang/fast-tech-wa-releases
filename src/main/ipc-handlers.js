@@ -13,7 +13,45 @@ const fs   = require('fs');
 function ok(data)  { return { ok: true,  data }; }
 function err(e)    { return { ok: false, error: String(e?.message || e) }; }
 
-function register(ipcMain, { db, waApi, waSvc, engine, scraper, scheduler, aiSvc, excel, adapter, webhookSrv }) {
+function register(ipcMain, { db, waApi, waSvc, engine, scraper, scheduler, aiSvc, excel, adapter, webhookSrv, antiBanSvc }) {
+
+  // ── Wake lock (prevent sleep during active campaigns) ─────────────────────
+  const { powerSaveBlocker, BrowserWindow } = require('electron');
+  let _wakeLockId = null;
+
+  function _pushAll(channel, data) {
+    BrowserWindow.getAllWindows().forEach(w => w.webContents.send(channel, data));
+  }
+  function _enableWakeLock() {
+    if (_wakeLockId !== null && powerSaveBlocker.isStarted(_wakeLockId)) return;
+    _wakeLockId = powerSaveBlocker.start('prevent-app-suspension');
+    _pushAll('wakelock:state', { active: true });
+    console.log('[WakeLock] Enabled — preventing sleep');
+  }
+  function _disableWakeLock() {
+    if (_wakeLockId !== null) {
+      if (powerSaveBlocker.isStarted(_wakeLockId)) powerSaveBlocker.stop(_wakeLockId);
+      _wakeLockId = null;
+      _pushAll('wakelock:state', { active: false });
+      console.log('[WakeLock] Disabled — sleep allowed');
+    }
+  }
+
+  // Hook into engine events
+  engine.on('queue:drained', () => _disableWakeLock());
+  engine.on('antiban:blocked', ({ sessionId, reason }) => {
+    _pushAll('antiban:blocked', { sessionId, reason });
+  });
+
+  // Hook WhatsApp Web auth_failure into AntiBanService
+  if (waSvc && antiBanSvc) {
+    waSvc.on('auth_failure_internal', (sessionId) => {
+      antiBanSvc.recordAuthFailure(sessionId);
+    });
+    antiBanSvc.on('session:banned',    (d) => _pushAll('antiban:banned',    d));
+    antiBanSvc.on('session:suspended', (d) => _pushAll('antiban:suspended', d));
+    antiBanSvc.on('warmup:complete',   (d) => _pushAll('antiban:warmup:complete', d));
+  }
 
   function handle(channel, fn) {
     ipcMain.handle(channel, async (event, ...args) => {
@@ -183,12 +221,14 @@ function register(ipcMain, { db, waApi, waSvc, engine, scraper, scheduler, aiSvc
   // ══════════════════════════════════════════════════════════════════════════
   // SCHEDULER
   // ══════════════════════════════════════════════════════════════════════════
-  handle('scheduler:list',   ()     => scheduler.list());
-  handle('scheduler:create', (data) => scheduler.create(data));
-  handle('scheduler:update', (data) => scheduler.update(data));
-  handle('scheduler:remove', (id)   => scheduler.remove(id));
-  handle('scheduler:pause',  (id)   => scheduler.pause(id));
-  handle('scheduler:resume', (id)   => scheduler.resume(id));
+  handle('scheduler:list',     ()     => scheduler.list());
+  handle('scheduler:create',   (data) => scheduler.create(data));
+  handle('scheduler:update',   (data) => scheduler.update(data));
+  handle('scheduler:remove',   (id)   => scheduler.remove(id));
+  handle('scheduler:pause',    (id)   => scheduler.pause(id));
+  handle('scheduler:resume',   (id)   => scheduler.resume(id));
+  handle('scheduler:runNow',   (id)   => scheduler.runNow(id));
+  handle('scheduler:presets',  ()     => require('./scheduler').presets());
 
   // ══════════════════════════════════════════════════════════════════════════
   // TEMPLATES
@@ -217,26 +257,46 @@ function register(ipcMain, { db, waApi, waSvc, engine, scraper, scheduler, aiSvc
   handle('ai:saveKeys', (keys) => aiSvc.saveKeys(keys));
 
   // ══════════════════════════════════════════════════════════════════════════
-  // CRM
   // ══════════════════════════════════════════════════════════════════════════
-  handle('crm:getConfig',  () => {
+  // CRM INTEGRATION — HubSpot, Pipedrive, Airtable, Webhook, Google Sheets
+  // ══════════════════════════════════════════════════════════════════════════
+
+  handle('crm:getConfig', () => {
     const s = db.settingsGetAll();
     return {
-      hubspot_api_key:   s.crm_hubspot_key       || '',
-      hubspot_portal_id: s.crm_hubspot_portal_id  || '',
-      webhook_url:       s.crm_webhook_url         || '',
-      sync_freq:         s.crm_sync_freq           || '0',
-      on_reply_action:   s.crm_on_reply_action     || 'notify',
+      hubspot_key:        s.crm_hubspot_key        || '',
+      hubspot_portal_id:  s.crm_hubspot_portal_id  || '',
+      hubspot_sync_freq:  s.crm_hubspot_sync_freq  || '0',
+      pipedrive_key:      s.crm_pipedrive_key       || '',
+      airtable_key:       s.crm_airtable_key        || '',
+      airtable_base:      s.crm_airtable_base       || '',
+      airtable_table:     s.crm_airtable_table      || '',
+      webhook_url:        s.crm_webhook_url          || '',
+      webhook_secret:     s.crm_webhook_secret       || '',
+      webhook_on_send:    s.crm_webhook_on_send     || '1',
+      webhook_on_reply:   s.crm_webhook_on_reply    || '1',
+      gsheets_url:        s.crm_gsheets_url          || '',
+      gsheets_phone_col:  s.crm_gsheets_phone_col   || 'phone',
+      gsheets_name_col:   s.crm_gsheets_name_col    || 'name',
     };
   });
 
   handle('crm:saveConfig', (data) => {
     const map = {
-      hubspot_api_key:   'crm_hubspot_key',
-      hubspot_portal_id: 'crm_hubspot_portal_id',
-      webhook_url:       'crm_webhook_url',
-      sync_freq:         'crm_sync_freq',
-      on_reply_action:   'crm_on_reply_action',
+      hubspot_key:        'crm_hubspot_key',
+      hubspot_portal_id:  'crm_hubspot_portal_id',
+      hubspot_sync_freq:  'crm_hubspot_sync_freq',
+      pipedrive_key:      'crm_pipedrive_key',
+      airtable_key:       'crm_airtable_key',
+      airtable_base:      'crm_airtable_base',
+      airtable_table:     'crm_airtable_table',
+      webhook_url:        'crm_webhook_url',
+      webhook_secret:     'crm_webhook_secret',
+      webhook_on_send:    'crm_webhook_on_send',
+      webhook_on_reply:   'crm_webhook_on_reply',
+      gsheets_url:        'crm_gsheets_url',
+      gsheets_phone_col:  'crm_gsheets_phone_col',
+      gsheets_name_col:   'crm_gsheets_name_col',
     };
     for (const [k, dbKey] of Object.entries(map)) {
       if (data[k] !== undefined) db.settingSet(dbKey, data[k]);
@@ -244,31 +304,134 @@ function register(ipcMain, { db, waApi, waSvc, engine, scraper, scheduler, aiSvc
     return { ok: true };
   });
 
+  handle('crm:testConnection', async (crmType) => {
+    const s = db.settingsGetAll();
+    const axios = require('axios');
+
+    if (crmType === 'hubspot') {
+      if (!s.crm_hubspot_key) throw new Error('أدخل HubSpot API Key أولاً');
+      const res = await axios.get('https://api.hubapi.com/crm/v3/objects/contacts?limit=1&properties=firstname', {
+        headers: { Authorization: `Bearer ${s.crm_hubspot_key}` }, timeout: 10000,
+      });
+      return { info: `HubSpot ✅ — ${res.data.total || 0} جهة اتصال إجمالاً` };
+    }
+
+    if (crmType === 'pipedrive') {
+      if (!s.crm_pipedrive_key) throw new Error('أدخل Pipedrive API Token أولاً');
+      const res = await axios.get(`https://api.pipedrive.com/v1/users/me?api_token=${s.crm_pipedrive_key}`, { timeout: 10000 });
+      if (!res.data.success) throw new Error('Token غير صالح');
+      return { info: `Pipedrive ✅ — متصل كـ: ${res.data.data?.name || 'مستخدم'}` };
+    }
+
+    if (crmType === 'airtable') {
+      if (!s.crm_airtable_key) throw new Error('أدخل Airtable Personal Access Token أولاً');
+      if (!s.crm_airtable_base) throw new Error('أدخل Airtable Base ID أولاً');
+      const table = s.crm_airtable_table || 'Table 1';
+      const url = `https://api.airtable.com/v0/${s.crm_airtable_base}/${encodeURIComponent(table)}?maxRecords=1`;
+      const res = await axios.get(url, { headers: { Authorization: `Bearer ${s.crm_airtable_key}` }, timeout: 10000 });
+      return { info: `Airtable ✅ — الجدول "${table}" يحتوي سجلات` };
+    }
+
+    if (crmType === 'webhook') {
+      if (!s.crm_webhook_url) throw new Error('أدخل Webhook URL أولاً');
+      const headers = { 'Content-Type': 'application/json' };
+      if (s.crm_webhook_secret) headers['X-Webhook-Secret'] = s.crm_webhook_secret;
+      const res = await axios.post(s.crm_webhook_url,
+        { test: true, source: 'FAST TECH WA Manager', timestamp: new Date().toISOString() },
+        { headers, timeout: 10000 }
+      );
+      return { info: `Webhook ✅ — استجاب بـ HTTP ${res.status}` };
+    }
+
+    if (crmType === 'gsheets') {
+      if (!s.crm_gsheets_url) throw new Error('أدخل رابط Google Sheets أولاً');
+      const m = s.crm_gsheets_url.match(/\/d\/([a-zA-Z0-9-_]+)/);
+      if (!m) throw new Error('رابط Google Sheets غير صحيح');
+      const csvUrl = `https://docs.google.com/spreadsheets/d/${m[1]}/export?format=csv`;
+      const res = await axios.get(csvUrl, { timeout: 15000 });
+      const rows = res.data.split('\n').filter(Boolean).length;
+      return { info: `Google Sheets ✅ — ${rows} صف` };
+    }
+
+    throw new Error('نوع CRM غير معروف');
+  });
+
   handle('crm:syncLeads', async (source) => {
     const s = db.settingsGetAll();
+    const axios = require('axios');
     let leads = [];
 
     if (source === 'hubspot' && s.crm_hubspot_key) {
-      const axios = require('axios');
-      // Paginate through all HubSpot contacts (100 per page)
-      let after = undefined;
+      let after;
       do {
         const url = `https://api.hubapi.com/crm/v3/objects/contacts?limit=100&properties=firstname,lastname,phone,email,lifecyclestage${after ? `&after=${after}` : ''}`;
-        const res = await axios.get(url, {
-          headers: { Authorization: `Bearer ${s.crm_hubspot_key}` },
-        });
-        const page = (res.data.results || []).map(r => ({
-          id:       uuidv4(),
-          source:   'hubspot',
-          name:     `${r.properties.firstname || ''} ${r.properties.lastname || ''}`.trim(),
-          phone:    r.properties.phone   || '',
-          email:    r.properties.email   || '',
-          status:   r.properties.lifecyclestage || '',
-          raw_json: JSON.stringify(r),
-        }));
-        leads = leads.concat(page);
+        const res = await axios.get(url, { headers: { Authorization: `Bearer ${s.crm_hubspot_key}` } });
+        leads = leads.concat((res.data.results || []).map(r => ({
+          id: uuidv4(), source: 'hubspot',
+          name:  `${r.properties.firstname || ''} ${r.properties.lastname || ''}`.trim(),
+          phone: r.properties.phone || '', email: r.properties.email || '',
+          status: r.properties.lifecyclestage || '', raw_json: JSON.stringify(r),
+        })));
         after = res.data.paging?.next?.after;
       } while (after);
+    }
+
+    if (source === 'pipedrive' && s.crm_pipedrive_key) {
+      let start = 0, hasMore = true;
+      while (hasMore) {
+        const res = await axios.get(`https://api.pipedrive.com/v1/persons?api_token=${s.crm_pipedrive_key}&limit=100&start=${start}`);
+        leads = leads.concat((res.data.data || []).map(r => ({
+          id: uuidv4(), source: 'pipedrive',
+          name: r.name || '', phone: r.phone?.[0]?.value || '',
+          email: r.email?.[0]?.value || '', status: r.status || '', raw_json: JSON.stringify(r),
+        })));
+        hasMore = res.data.additional_data?.pagination?.more_items_in_collection;
+        start += 100;
+      }
+    }
+
+    if (source === 'airtable' && s.crm_airtable_key && s.crm_airtable_base) {
+      const table = s.crm_airtable_table || 'Table 1';
+      let offset;
+      do {
+        const url = `https://api.airtable.com/v0/${s.crm_airtable_base}/${encodeURIComponent(table)}?pageSize=100${offset ? `&offset=${offset}` : ''}`;
+        const res = await axios.get(url, { headers: { Authorization: `Bearer ${s.crm_airtable_key}` } });
+        leads = leads.concat((res.data.records || []).map(r => ({
+          id: uuidv4(), source: 'airtable',
+          name:  r.fields?.Name  || r.fields?.name  || r.fields?.الاسم  || '',
+          phone: String(r.fields?.Phone || r.fields?.phone || r.fields?.Mobile || r.fields?.الهاتف || ''),
+          email: r.fields?.Email || r.fields?.email || '',
+          status: r.fields?.Status || '', raw_json: JSON.stringify(r),
+        })));
+        offset = res.data.offset;
+      } while (offset);
+    }
+
+    if (source === 'gsheets' && s.crm_gsheets_url) {
+      const m = s.crm_gsheets_url.match(/\/d\/([a-zA-Z0-9-_]+)/);
+      if (m) {
+        const csvUrl = `https://docs.google.com/spreadsheets/d/${m[1]}/export?format=csv`;
+        const res = await axios.get(csvUrl, { timeout: 15000 });
+        const rows = res.data.split('\n').map(r => r.split(','));
+        const hdr = rows[0]?.map(h => h.trim().toLowerCase().replace(/"/g, '')) || [];
+        const phoneCol = s.crm_gsheets_phone_col?.toLowerCase() || 'phone';
+        const nameCol  = s.crm_gsheets_name_col?.toLowerCase()  || 'name';
+        const pi = hdr.findIndex(h => h.includes(phoneCol) || h.includes('phone') || h.includes('mobile'));
+        const ni = hdr.findIndex(h => h.includes(nameCol)  || h.includes('name'));
+        const ei = hdr.findIndex(h => h.includes('email'));
+        for (let i = 1; i < rows.length; i++) {
+          const row = rows[i];
+          const phone = (pi >= 0 ? row[pi] : '').replace(/["\s]/g, '');
+          if (phone && /\d{6,}/.test(phone)) {
+            leads.push({
+              id: uuidv4(), source: 'gsheets',
+              name: ni >= 0 ? row[ni]?.replace(/"/g, '').trim() : '',
+              phone, email: ei >= 0 ? row[ei]?.replace(/"/g, '').trim() : '',
+              status: '', raw_json: JSON.stringify(row),
+            });
+          }
+        }
+      }
     }
 
     if (leads.length) db.crmLeadBulkReplace(source, leads);
@@ -276,6 +439,64 @@ function register(ipcMain, { db, waApi, waSvc, engine, scraper, scheduler, aiSvc
   });
 
   handle('crm:getLeads', () => db.crmLeadList());
+
+  handle('crm:triggerWebhook', async (payload) => {
+    const s = db.settingsGetAll();
+    if (!s.crm_webhook_url) throw new Error('Webhook URL غير محدد');
+    const axios = require('axios');
+    const headers = { 'Content-Type': 'application/json' };
+    if (s.crm_webhook_secret) headers['X-Webhook-Secret'] = s.crm_webhook_secret;
+    const res = await axios.post(s.crm_webhook_url, payload, { headers, timeout: 15000 });
+    return { status: res.status };
+  });
+
+  handle('crm:pushContacts', async (crmType) => {
+    const s  = db.settingsGetAll();
+    const axios = require('axios');
+    const contacts = db.contactList({}).filter(c => c.phone);
+    let pushed = 0, errors = 0;
+
+    if (crmType === 'hubspot' && s.crm_hubspot_key) {
+      const batchSize = 10;
+      for (let i = 0; i < contacts.length; i += batchSize) {
+        const batch = contacts.slice(i, i + batchSize).map(c => ({
+          properties: { phone: c.phone, firstname: (c.name || '').split(' ')[0] || '', email: c.email || '' }
+        }));
+        try {
+          await axios.post('https://api.hubapi.com/crm/v3/objects/contacts/batch/create',
+            { inputs: batch }, { headers: { Authorization: `Bearer ${s.crm_hubspot_key}` } });
+          pushed += batch.length;
+        } catch (_) { errors += batch.length; }
+      }
+    }
+
+    if (crmType === 'pipedrive' && s.crm_pipedrive_key) {
+      for (const c of contacts) {
+        try {
+          await axios.post(`https://api.pipedrive.com/v1/persons?api_token=${s.crm_pipedrive_key}`,
+            { name: c.name || c.phone, phone: [{ value: c.phone, primary: true }], email: c.email ? [{ value: c.email }] : [] });
+          pushed++;
+        } catch (_) { errors++; }
+      }
+    }
+
+    if (crmType === 'airtable' && s.crm_airtable_key && s.crm_airtable_base) {
+      const table = s.crm_airtable_table || 'Table 1';
+      const url = `https://api.airtable.com/v0/${s.crm_airtable_base}/${encodeURIComponent(table)}`;
+      const batchSize = 10;
+      for (let i = 0; i < contacts.length; i += batchSize) {
+        const batch = contacts.slice(i, i + batchSize).map(c => ({
+          fields: { Name: c.name || c.phone, Phone: c.phone, Email: c.email || '' }
+        }));
+        try {
+          await axios.post(url, { records: batch }, { headers: { Authorization: `Bearer ${s.crm_airtable_key}` } });
+          pushed += batch.length;
+        } catch (_) { errors += batch.length; }
+      }
+    }
+
+    return { pushed, errors };
+  });
 
   // ══════════════════════════════════════════════════════════════════════════
   // REPORTS
@@ -420,32 +641,81 @@ function register(ipcMain, { db, waApi, waSvc, engine, scraper, scheduler, aiSvc
   handle('wa:send:bulk', (opts) => {
     if (!engine) throw new Error('Sending engine not available');
 
+    // scripts_data = [{text, mediaPath}] — new A/B format (may coexist with legacy scripts[])
+    const scriptsData    = opts.scripts_data || [];
+    const legacyScripts  = opts.scripts      || [];
+
+    // Normalise to object format — support both legacy string[] and new object[]
+    const allScripts = scriptsData.length
+      ? scriptsData
+      : legacyScripts.map(s => (typeof s === 'string' ? { text: s, mediaPath: null } : s));
+
+    const firstText  = allScripts[0]?.text || opts.body || '';
+    const firstMedia = allScripts[0]?.mediaPath || opts.mediaPath || null;
+
     const campaignId = uuidv4();
     db.campaignCreate({
       id:           campaignId,
       name:         opts.campaignName || `حملة ${new Date().toLocaleDateString('ar')}`,
       type:         'individual',
       account_id:   opts.sessionId || null,
-      message_body: opts.body || (opts.scripts?.[0] || ''),
-      media_path:   opts.mediaPath || null,
+      message_body: firstText,
+      media_path:   firstMedia,
       media_type:   null,
       delay_sec:    Math.round((opts.delayMin || 15000) / 1000),
       total:        opts.recipients?.length || 0,
     });
     db.campaignUpdateStatus(campaignId, 'running', { sent: 0, failed: 0 });
 
-    const items = (opts.recipients || []).map(r => ({
+    // Save per-script analytics rows
+    if (allScripts.length) {
+      try { db.campaignScriptsInsert(campaignId, allScripts); } catch (_) {}
+    }
+
+    // Distribute across allowed sessions (round-robin) or single session / auto
+    const allowedSessions = opts.allowedSessions?.length ? opts.allowedSessions : null;
+
+    const items = (opts.recipients || []).map((r, i) => ({
       recipient:   r,
-      body:        opts.body     || null,
-      scripts:     opts.scripts  || [],
-      sessionId:   opts.sessionId || null,
+      body:        opts.body || null,
+      scripts:     allScripts.length ? allScripts : null,
+      sessionId:   allowedSessions
+                     ? allowedSessions[i % allowedSessions.length]
+                     : (opts.sessionId || null),
       campaignId,
-      mediaPath:   opts.mediaPath || null,
+      mediaPath:   firstMedia,
       delayMin:    opts.delayMin || 15000,
       delayMax:    opts.delayMax || 45000,
     }));
 
-    return engine.enqueue(items);
+    const result = engine.enqueue(items);
+    if (items.length > 0) _enableWakeLock(); // prevent sleep during campaign
+    return result;
+  });
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // A/B TESTING RESULTS
+  // ══════════════════════════════════════════════════════════════════════════
+
+  handle('wa:ab:results', (campaignId) => {
+    if (campaignId) {
+      const campaign = db.campaignGet(campaignId);
+      const scripts  = db.campaignScriptsGet(campaignId);
+      return { campaign, scripts };
+    }
+    return { campaigns: db.abResultsList() };
+  });
+
+  // Reply attribution: when an incoming message arrives, link it to last-sent script
+  handle('wa:ab:attributeReply', (phone) => {
+    try {
+      const lastSent = db.queueGetLastSentForRecipient(phone);
+      if (lastSent?.campaign_id && lastSent.script_index >= 0) {
+        db.campaignScriptIncrReplied(lastSent.campaign_id, lastSent.script_index);
+        return { attributed: true, campaignId: lastSent.campaign_id, scriptIndex: lastSent.script_index };
+      }
+    } catch (_) {}
+    return { attributed: false };
   });
 
   handle('wa:send:queueStats', () => engine ? engine.stats() : null);
@@ -568,13 +838,112 @@ function register(ipcMain, { db, waApi, waSvc, engine, scraper, scheduler, aiSvc
     return { path: outPath, count: rows.length };
   });
 
+  // ── Send Engine — import helpers ─────────────────────────────────────────
+
+  // Read phone numbers from an Excel (.xlsx/.xls) or CSV file
+  handle('send:importFromFile', (filePath) => {
+    const ext = path.extname(filePath).toLowerCase();
+    const phones = [];
+
+    if (ext === '.csv') {
+      const fs   = require('fs');
+      const text = fs.readFileSync(filePath, 'utf8');
+      for (const row of text.split('\n')) {
+        for (const cell of row.split(',')) {
+          const s = cell.trim().replace(/["\s\-\+\(\)]/g, '');
+          if (/^\d{7,15}$/.test(s)) { phones.push(s); break; }
+        }
+      }
+    } else {
+      const XLSX = require('xlsx');
+      const wb   = XLSX.readFile(filePath);
+      const ws   = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
+      for (const row of rows) {
+        if (!row?.length) continue;
+        for (const cell of row) {
+          if (cell == null) continue;
+          const s = String(cell).trim().replace(/[\s\-\+\(\)]/g, '');
+          if (/^\d{7,15}$/.test(s)) { phones.push(s); break; }
+        }
+      }
+    }
+    return phones;
+  });
+
+  // Fetch phone numbers from a public Google Sheets URL (publish-to-web CSV)
+  handle('send:importFromSheets', async (url) => {
+    const https = require('https');
+    const http  = require('http');
+
+    // Convert edit/share URL → CSV export URL
+    const m = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
+    if (!m) throw new Error('رابط Google Sheets غير صحيح — يجب أن يحتوي على /d/{ID}');
+    const sheetId = m[1];
+    const gidM    = url.match(/[#&?]gid=(\d+)/);
+    const gid     = gidM ? gidM[1] : '0';
+    const csvUrl  = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}`;
+
+    const text = await new Promise((resolve, reject) => {
+      const get = (u, redirects = 0) => {
+        const mod = u.startsWith('https') ? https : http;
+        mod.get(u, { headers: { 'User-Agent': 'Mozilla/5.0' } }, (res) => {
+          if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location && redirects < 5) {
+            return get(res.headers.location, redirects + 1);
+          }
+          let data = '';
+          res.on('data', c => data += c);
+          res.on('end',  () => resolve(data));
+        }).on('error', reject);
+      };
+      get(csvUrl);
+    });
+
+    const phones = [];
+    for (const row of text.split('\n')) {
+      for (const cell of row.split(',')) {
+        const s = cell.trim().replace(/["\s\-\+\(\)]/g, '');
+        if (/^\d{7,15}$/.test(s)) { phones.push(s); break; }
+      }
+    }
+    return phones;
+  });
+
   // ══════════════════════════════════════════════════════════════════════════
   // WA WEB — INBOX (incoming messages)
   // ══════════════════════════════════════════════════════════════════════════
 
-  handle('wa:inbox:list',     (sessionId) => db.incomingMessageList(sessionId));
+  handle('wa:inbox:list',     (opts) => {
+    // Accept (sessionId string) OR ({ sessionId, filter, limit })
+    if (typeof opts === 'string' || opts === null || opts === undefined) {
+      return db.incomingMessageList(opts || null);
+    }
+    return db.incomingMessageList(opts.sessionId || null, opts.limit || 200, opts.filter || null);
+  });
   handle('wa:inbox:markRead', (id)        => { db.incomingMessageMarkRead(id); return { ok: true }; });
   handle('wa:inbox:unread',   (sessionId) => db.incomingUnreadCount(sessionId));
+  handle('wa:inbox:unreplied',(sessionId) => db.incomingUnrepliedCount(sessionId));
+  handle('wa:inbox:replyStats', ()        => db.incomingReplyStats());
+
+  handle('wa:inbox:reply', async ({ id, replyBody, sessionId: replySessionId }) => {
+    if (!waSvc) throw new Error('WhatsApp Web engine not available');
+    const msg = db.incomingMessageGet(id);
+    if (!msg) throw new Error('الرسالة غير موجودة');
+
+    // Use provided session or fall back to the session that received the message
+    const sid = replySessionId || msg.session_id;
+    if (!sid) throw new Error('لا توجد جلسة محددة للرد');
+
+    // For group messages reply to the group; for direct messages reply to the sender
+    const target = msg.is_group && msg.from_number.includes('@g.us')
+      ? msg.from_number                        // group JID
+      : msg.from_number;                       // individual phone
+
+    const res = await waSvc.sendText(sid, target, replyBody);
+    db.incomingMessageMarkReplied(id, { replyBody, repliedBy: sid });
+    db.incomingMessageMarkRead(id);
+    return { ok: true, waId: res.waId };
+  });
 
   // ══════════════════════════════════════════════════════════════════════════
   // AI — GENERATE 5 VARIANTS
@@ -625,6 +994,68 @@ function register(ipcMain, { db, waApi, waSvc, engine, scraper, scheduler, aiSvc
     verifyToken: db.settingGet('webhook_verify_token') || 'ftwa-verify',
     running:     webhookSrv?.isRunning() || false,
   }));
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // ANTI-BAN SERVICE
+  // ══════════════════════════════════════════════════════════════════════════
+
+  handle('antiban:getSettings', () => {
+    if (!antiBanSvc) return {};
+    return antiBanSvc.getSettings();
+  });
+
+  handle('antiban:setSettings', (data) => {
+    const allowed = {
+      antiban_enabled:         data.enabled          !== undefined ? String(data.enabled ? 1 : 0) : undefined,
+      antiban_delay_profile:   data.delayProfile,
+      antiban_daily_limit:     data.dailyLimit    !== undefined ? String(data.dailyLimit)    : undefined,
+      antiban_hourly_limit:    data.hourlyLimit   !== undefined ? String(data.hourlyLimit)   : undefined,
+      antiban_window_enabled:  data.timeWindowEnabled !== undefined ? String(data.timeWindowEnabled ? 1 : 0) : undefined,
+      antiban_window_start:    data.timeWindowStart !== undefined ? String(data.timeWindowStart) : undefined,
+      antiban_window_end:      data.timeWindowEnd   !== undefined ? String(data.timeWindowEnd)   : undefined,
+      antiban_typing_sim:      data.typingSimEnabled !== undefined ? String(data.typingSimEnabled ? 1 : 0) : undefined,
+      antiban_typing_min_ms:   data.typingMinMs  !== undefined ? String(data.typingMinMs)  : undefined,
+      antiban_typing_max_ms:   data.typingMaxMs  !== undefined ? String(data.typingMaxMs)  : undefined,
+    };
+    for (const [k, v] of Object.entries(allowed)) {
+      if (v !== undefined) db.settingSet(k, v);
+    }
+    if (antiBanSvc) antiBanSvc.reloadSettings();
+    return { ok: true };
+  });
+
+  handle('antiban:getSessions', () => {
+    if (!antiBanSvc) return db.sessionListAntiBan ? db.sessionListAntiBan() : [];
+    return antiBanSvc.getAllSessionStats();
+  });
+
+  handle('antiban:getEvents', (limit) => {
+    if (!antiBanSvc) return [];
+    return antiBanSvc.getRecentEvents(limit || 100);
+  });
+
+  handle('antiban:resetSession', (sessionId) => {
+    if (!antiBanSvc) throw new Error('Anti-ban service not available');
+    antiBanSvc.resetSession(sessionId);
+    return { ok: true };
+  });
+
+  handle('antiban:enableWarmup', (sessionId) => {
+    if (!antiBanSvc) throw new Error('Anti-ban service not available');
+    antiBanSvc.enableWarmup(sessionId);
+    return { ok: true };
+  });
+
+  handle('antiban:disableWarmup', (sessionId) => {
+    if (!antiBanSvc) throw new Error('Anti-ban service not available');
+    antiBanSvc.disableWarmup(sessionId);
+    return { ok: true };
+  });
+
+  handle('antiban:clearEvents', () => {
+    db.antiBanEventClear();
+    return { ok: true };
+  });
 
 }
 

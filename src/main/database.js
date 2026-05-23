@@ -278,6 +278,122 @@ class Db {
       this.settingSet('db_version', '4');
       v = 4;
     }
+
+    if (v < 5) {
+      // Anti-ban tracking columns on wa_sessions (additive — safe for existing rows)
+      const existingCols = this._db.pragma('table_info(wa_sessions)').map(c => c.name);
+      const addCol = (col, def) => {
+        if (!existingCols.includes(col))
+          this._db.exec(`ALTER TABLE wa_sessions ADD COLUMN ${col} ${def}`);
+      };
+      addCol('daily_count',       'INTEGER DEFAULT 0');
+      addCol('daily_reset_at',    'TEXT');
+      addCol('hourly_count',      'INTEGER DEFAULT 0');
+      addCol('hourly_reset_at',   'TEXT');
+      addCol('health_score',      'INTEGER DEFAULT 80');
+      addCol('ban_detected_at',   'TEXT');
+      addCol('warmup_mode',       'INTEGER DEFAULT 0');
+      addCol('warmup_day',        'INTEGER DEFAULT 0');
+      addCol('warmup_daily_limit','INTEGER DEFAULT 0');
+
+      // Anti-ban event log
+      this._db.exec(`
+        CREATE TABLE IF NOT EXISTS anti_ban_events (
+          id          TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(8)))),
+          session_id  TEXT,
+          event_type  TEXT NOT NULL,
+          detail      TEXT,
+          created_at  TEXT DEFAULT (datetime('now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_abe_session
+          ON anti_ban_events(session_id, created_at DESC);
+      `);
+
+      this.settingSet('db_version', '5');
+      v = 5;
+    }
+
+    if (v < 6) {
+      // Incoming messages: add group_name + reply tracking columns
+      const imCols = this._db.pragma('table_info(incoming_messages)').map(c => c.name);
+      const addIM = (col, def) => {
+        if (!imCols.includes(col))
+          this._db.exec(`ALTER TABLE incoming_messages ADD COLUMN ${col} ${def}`);
+      };
+      addIM('group_name',  'TEXT');
+      addIM('replied',     'INTEGER DEFAULT 0');
+      addIM('reply_body',  'TEXT');
+      addIM('replied_at',  'TEXT');
+      addIM('replied_by',  'TEXT');  // session_id used to reply
+
+      this._db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_incoming_replied
+          ON incoming_messages(replied, received_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_incoming_from
+          ON incoming_messages(from_number, received_at DESC);
+      `);
+
+      this.settingSet('db_version', '6');
+      v = 6;
+    }
+
+    if (v < 7) {
+      // Scheduler: add message content + recipients + timezone to scheduled_tasks
+      const stCols = this._db.pragma('table_info(scheduled_tasks)').map(c => c.name);
+      const addST = (col, def) => {
+        if (!stCols.includes(col))
+          this._db.exec(`ALTER TABLE scheduled_tasks ADD COLUMN ${col} ${def}`);
+      };
+      addST('message_body',      'TEXT');
+      addST('media_path',        'TEXT');
+      addST('media_type',        'TEXT');
+      addST('recipients_type',   "TEXT DEFAULT 'all'");
+      addST('recipients_json',   'TEXT');
+      addST('session_id',        'TEXT');
+      addST('timezone',          "TEXT DEFAULT 'Asia/Riyadh'");
+      addST('template_id',       'TEXT');
+
+      this._db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_tasks_active
+          ON scheduled_tasks(active, next_run);
+      `);
+
+      this.settingSet('db_version', '7');
+      v = 7;
+    }
+
+    if (v < 8) {
+      // A/B Testing — per-script tracking
+      const sqCols  = this._db.pragma('table_info(send_queue)').map(c => c.name);
+      const addSQ   = (col, def) => {
+        if (!sqCols.includes(col))
+          this._db.exec(`ALTER TABLE send_queue ADD COLUMN ${col} ${def}`);
+      };
+      addSQ('script_index', 'INTEGER DEFAULT -1');
+      addSQ('picked_body',  'TEXT');
+
+      const cmpCols = this._db.pragma('table_info(campaigns)').map(c => c.name);
+      if (!cmpCols.includes('scripts_json'))
+        this._db.exec(`ALTER TABLE campaigns ADD COLUMN scripts_json TEXT`);
+
+      this._db.exec(`
+        CREATE TABLE IF NOT EXISTS campaign_scripts (
+          id            TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(8)))),
+          campaign_id   TEXT NOT NULL,
+          script_index  INTEGER NOT NULL,
+          script_text   TEXT NOT NULL,
+          media_path    TEXT,
+          sent_count    INTEGER DEFAULT 0,
+          failed_count  INTEGER DEFAULT 0,
+          replied_count INTEGER DEFAULT 0,
+          UNIQUE(campaign_id, script_index)
+        );
+        CREATE INDEX IF NOT EXISTS idx_cs_campaign ON campaign_scripts(campaign_id);
+      `);
+
+      this.settingSet('db_version', '8');
+      v = 8;
+    }
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -480,15 +596,25 @@ class Db {
 
   taskCreate(t) {
     return this._db.prepare(`
-      INSERT INTO scheduled_tasks (id,name,campaign_id,cron_expr,next_run,active)
-      VALUES (@id,@name,@campaign_id,@cron_expr,@next_run,@active)
+      INSERT INTO scheduled_tasks
+        (id, name, campaign_id, cron_expr, next_run, active,
+         message_body, media_path, media_type,
+         recipients_type, recipients_json, session_id, timezone, template_id)
+      VALUES
+        (@id, @name, @campaign_id, @cron_expr, @next_run, @active,
+         @message_body, @media_path, @media_type,
+         @recipients_type, @recipients_json, @session_id, @timezone, @template_id)
     `).run(t);
   }
 
   taskUpdate(t) {
     return this._db.prepare(`
-      UPDATE scheduled_tasks SET name=@name, cron_expr=@cron_expr,
-        next_run=@next_run, active=@active WHERE id=@id
+      UPDATE scheduled_tasks SET
+        name=@name, cron_expr=@cron_expr, next_run=@next_run, active=@active,
+        message_body=@message_body, media_path=@media_path, media_type=@media_type,
+        recipients_type=@recipients_type, recipients_json=@recipients_json,
+        session_id=@session_id, timezone=@timezone, template_id=@template_id
+      WHERE id=@id
     `).run(t);
   }
 
@@ -739,6 +865,125 @@ class Db {
     ).run();
   }
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ANTI-BAN TRACKING
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /** Returns all anti-ban fields for a session */
+  sessionGetAntiBan(id) {
+    return this._db.prepare(`
+      SELECT id, name, phone, status,
+             daily_count, daily_reset_at,
+             hourly_count, hourly_reset_at,
+             health_score, ban_detected_at,
+             warmup_mode, warmup_day, warmup_daily_limit,
+             msg_count, last_seen
+      FROM wa_sessions WHERE id=?
+    `).get(id);
+  }
+
+  /** Bulk-fetch anti-ban stats for all sessions */
+  sessionListAntiBan() {
+    return this._db.prepare(`
+      SELECT id, name, phone, status,
+             daily_count, daily_reset_at,
+             hourly_count, hourly_reset_at,
+             health_score, ban_detected_at,
+             warmup_mode, warmup_day, warmup_daily_limit,
+             msg_count, last_seen
+      FROM wa_sessions ORDER BY created_at DESC
+    `).all();
+  }
+
+  /** Atomically bump daily + hourly counters and update reset timestamps */
+  sessionBumpAntiBanCounters(id) {
+    const now     = new Date();
+    const todayStr  = now.toISOString().slice(0, 10); // YYYY-MM-DD
+    const hourStr   = now.toISOString().slice(0, 13); // YYYY-MM-DDTHH
+
+    const row = this._db.prepare(
+      'SELECT daily_reset_at, hourly_reset_at FROM wa_sessions WHERE id=?'
+    ).get(id);
+    if (!row) return;
+
+    const sameDay  = row.daily_reset_at  && row.daily_reset_at.startsWith(todayStr);
+    const sameHour = row.hourly_reset_at && row.hourly_reset_at.startsWith(hourStr);
+
+    this._db.prepare(`
+      UPDATE wa_sessions SET
+        daily_count      = CASE WHEN ? THEN daily_count+1 ELSE 1 END,
+        daily_reset_at   = CASE WHEN ? THEN daily_reset_at ELSE ? END,
+        hourly_count     = CASE WHEN ? THEN hourly_count+1 ELSE 1 END,
+        hourly_reset_at  = CASE WHEN ? THEN hourly_reset_at ELSE ? END
+      WHERE id=?
+    `).run(
+      sameDay  ? 1 : 0, sameDay  ? 1 : 0, now.toISOString(),
+      sameHour ? 1 : 0, sameHour ? 1 : 0, now.toISOString(),
+      id
+    );
+  }
+
+  sessionUpdateHealthScore(id, score) {
+    const clamped = Math.max(0, Math.min(100, score));
+    this._db.prepare('UPDATE wa_sessions SET health_score=? WHERE id=?').run(clamped, id);
+  }
+
+  sessionSetBanDetected(id) {
+    this._db.prepare(`
+      UPDATE wa_sessions SET ban_detected_at=datetime('now'), health_score=0 WHERE id=?
+    `).run(id);
+  }
+
+  sessionSetWarmup(id, mode, day, dailyLimit) {
+    this._db.prepare(`
+      UPDATE wa_sessions SET warmup_mode=?, warmup_day=?, warmup_daily_limit=? WHERE id=?
+    `).run(mode ? 1 : 0, day, dailyLimit, id);
+  }
+
+  sessionResetDailyCounters() {
+    const todayStr = new Date().toISOString().slice(0, 10);
+    return this._db.prepare(`
+      UPDATE wa_sessions
+      SET daily_count=0, daily_reset_at=datetime('now')
+      WHERE daily_reset_at IS NULL
+         OR substr(daily_reset_at,1,10) < ?
+    `).run(todayStr).changes;
+  }
+
+  sessionResetHourlyCounters() {
+    const hourStr = new Date().toISOString().slice(0, 13);
+    return this._db.prepare(`
+      UPDATE wa_sessions
+      SET hourly_count=0, hourly_reset_at=datetime('now')
+      WHERE hourly_reset_at IS NULL
+         OR substr(hourly_reset_at,1,13) < ?
+    `).run(hourStr).changes;
+  }
+
+  antiBanEventLog({ session_id, event_type, detail }) {
+    return this._db.prepare(`
+      INSERT INTO anti_ban_events (session_id, event_type, detail)
+      VALUES (?, ?, ?)
+    `).run(session_id || null, event_type, detail || null);
+  }
+
+  antiBanEventList(limit = 100) {
+    return this._db.prepare(`
+      SELECT abe.*, ws.name as session_name
+      FROM anti_ban_events abe
+      LEFT JOIN wa_sessions ws ON ws.id = abe.session_id
+      ORDER BY abe.created_at DESC
+      LIMIT ?
+    `).all(limit);
+  }
+
+  antiBanEventClear() {
+    return this._db.prepare(`
+      DELETE FROM anti_ban_events
+      WHERE created_at < datetime('now', '-30 days')
+    `).run();
+  }
+
   // ─── Campaign increments (used by sending engine) ─────────────────────────
   campaignIncrSent(id) {
     this._db.prepare(
@@ -753,28 +998,131 @@ class Db {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // CAMPAIGN SCRIPTS (A/B Testing per-variant tracking)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  campaignScriptsInsert(campaignId, scripts) {
+    const stmt = this._db.prepare(`
+      INSERT OR REPLACE INTO campaign_scripts
+        (campaign_id, script_index, script_text, media_path)
+      VALUES (?, ?, ?, ?)
+    `);
+    const tx = this._db.transaction(() => {
+      scripts.forEach((s, i) => {
+        const text      = typeof s === 'string' ? s : (s.text      || '');
+        const mediaPath = typeof s === 'string' ? null : (s.mediaPath || null);
+        stmt.run(campaignId, i, text, mediaPath);
+      });
+    });
+    tx();
+  }
+
+  campaignScriptsGet(campaignId) {
+    return this._db.prepare(
+      'SELECT * FROM campaign_scripts WHERE campaign_id=? ORDER BY script_index ASC'
+    ).all(campaignId);
+  }
+
+  campaignScriptIncrSent(campaignId, scriptIndex) {
+    this._db.prepare(
+      'UPDATE campaign_scripts SET sent_count=sent_count+1 WHERE campaign_id=? AND script_index=?'
+    ).run(campaignId, scriptIndex);
+  }
+
+  campaignScriptIncrFailed(campaignId, scriptIndex) {
+    this._db.prepare(
+      'UPDATE campaign_scripts SET failed_count=failed_count+1 WHERE campaign_id=? AND script_index=?'
+    ).run(campaignId, scriptIndex);
+  }
+
+  campaignScriptIncrReplied(campaignId, scriptIndex) {
+    this._db.prepare(
+      'UPDATE campaign_scripts SET replied_count=replied_count+1 WHERE campaign_id=? AND script_index=?'
+    ).run(campaignId, scriptIndex);
+  }
+
+  // ─── send_queue: store chosen variant index ────────────────────────────────
+  queueSetScriptIndex(id, scriptIndex, pickedBody) {
+    this._db.prepare(
+      'UPDATE send_queue SET script_index=?, picked_body=? WHERE id=?'
+    ).run(scriptIndex, pickedBody || null, id);
+  }
+
+  /** Get last successfully-sent queue item for a phone (reply attribution) */
+  queueGetLastSentForRecipient(phone) {
+    return this._db.prepare(`
+      SELECT * FROM send_queue
+      WHERE recipient=? AND status IN ('sent','delivered','read')
+        AND script_index >= 0 AND campaign_id IS NOT NULL
+      ORDER BY processed_at DESC
+      LIMIT 1
+    `).get(phone);
+  }
+
+  /** A/B results: campaigns that have per-script data */
+  abResultsList() {
+    return this._db.prepare(`
+      SELECT c.id, c.name, c.status, c.total, c.sent, c.failed,
+             c.created_at, c.finished_at
+      FROM campaigns c
+      WHERE EXISTS (SELECT 1 FROM campaign_scripts cs WHERE cs.campaign_id = c.id)
+      ORDER BY c.created_at DESC
+      LIMIT 30
+    `).all();
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // INCOMING MESSAGES (whatsapp-web.js replies / inbox)
   // ═══════════════════════════════════════════════════════════════════════════
 
   incomingMessageSave(m) {
     return this._db.prepare(`
       INSERT INTO incoming_messages
-        (session_id, from_number, body, msg_type, has_media, is_group, timestamp)
+        (session_id, from_number, body, msg_type, has_media, is_group, group_name, timestamp)
       VALUES
-        (@session_id, @from_number, @body, @msg_type, @has_media, @is_group, @timestamp)
+        (@session_id, @from_number, @body, @msg_type, @has_media, @is_group, @group_name, @timestamp)
     `).run(m);
   }
 
-  incomingMessageList(sessionId, limit = 200) {
-    const sql = sessionId
-      ? 'SELECT * FROM incoming_messages WHERE session_id=? ORDER BY received_at DESC LIMIT ?'
-      : 'SELECT * FROM incoming_messages ORDER BY received_at DESC LIMIT ?';
-    const params = sessionId ? [sessionId, limit] : [limit];
+  /** List with session_name joined from wa_sessions, optional replied filter */
+  incomingMessageList(sessionId, limit = 200, repliedFilter = null) {
+    let sql = `
+      SELECT im.*,
+             ws.name AS session_name,
+             c.name  AS contact_name
+      FROM incoming_messages im
+      LEFT JOIN wa_sessions ws ON ws.id = im.session_id
+      LEFT JOIN contacts     c  ON c.phone = im.from_number
+      WHERE 1=1
+    `;
+    const params = [];
+    if (sessionId) { sql += ' AND im.session_id=?'; params.push(sessionId); }
+    if (repliedFilter === 'replied')    { sql += ' AND im.replied=1'; }
+    if (repliedFilter === 'unreplied')  { sql += ' AND im.replied=0'; }
+    sql += ' ORDER BY im.received_at DESC LIMIT ?';
+    params.push(limit);
     return this._db.prepare(sql).all(...params);
+  }
+
+  incomingMessageGet(id) {
+    return this._db.prepare(`
+      SELECT im.*, ws.name AS session_name
+      FROM incoming_messages im
+      LEFT JOIN wa_sessions ws ON ws.id = im.session_id
+      WHERE im.id = ?
+    `).get(id);
   }
 
   incomingMessageMarkRead(id) {
     return this._db.prepare('UPDATE incoming_messages SET read=1 WHERE id=?').run(id);
+  }
+
+  incomingMessageMarkReplied(id, { replyBody, repliedBy }) {
+    return this._db.prepare(`
+      UPDATE incoming_messages
+      SET replied=1, reply_body=?, replied_by=?, replied_at=datetime('now'), read=1
+      WHERE id=?
+    `).run(replyBody || null, repliedBy || null, id);
   }
 
   incomingUnreadCount(sessionId) {
@@ -783,6 +1131,53 @@ class Db {
       : 'SELECT COUNT(*) as n FROM incoming_messages WHERE read=0';
     const params = sessionId ? [sessionId] : [];
     return this._db.prepare(sql).get(...params).n;
+  }
+
+  incomingUnrepliedCount(sessionId) {
+    const sql = sessionId
+      ? 'SELECT COUNT(*) as n FROM incoming_messages WHERE session_id=? AND replied=0'
+      : 'SELECT COUNT(*) as n FROM incoming_messages WHERE replied=0';
+    const params = sessionId ? [sessionId] : [];
+    return this._db.prepare(sql).get(...params).n;
+  }
+
+  incomingReplyStats() {
+    return this._db.prepare(`
+      SELECT
+        COUNT(*)                                                  AS total,
+        SUM(CASE WHEN replied=1 THEN 1 ELSE 0 END)               AS replied_count,
+        SUM(CASE WHEN replied=0 THEN 1 ELSE 0 END)               AS unreplied_count,
+        SUM(CASE WHEN is_group=1 THEN 1 ELSE 0 END)              AS from_groups,
+        SUM(CASE WHEN is_group=0 THEN 1 ELSE 0 END)              AS from_direct
+      FROM incoming_messages
+    `).get();
+  }
+
+  /** reportReplies with full session name + reply status */
+  reportReplies() {
+    return this._db.prepare(`
+      SELECT
+        im.id,
+        im.from_number,
+        im.body,
+        im.msg_type,
+        im.is_group,
+        im.group_name,
+        im.session_id,
+        im.received_at,
+        im.read,
+        im.replied,
+        im.reply_body,
+        im.replied_at,
+        im.replied_by,
+        ws.name  AS session_name,
+        c.name   AS from_name
+      FROM incoming_messages im
+      LEFT JOIN wa_sessions ws ON ws.id = im.session_id
+      LEFT JOIN contacts    c  ON c.phone = im.from_number
+      ORDER BY im.received_at DESC
+      LIMIT 200
+    `).all();
   }
 }
 

@@ -11,13 +11,13 @@ const { v4: uuidv4 } = require('uuid');
 class Scheduler {
   /**
    * @param {import('./database')}        db
-   * @param {import('./engine-adapter')}  adapter  — unified send adapter (replaces waApi)
+   * @param {import('./engine-adapter')}  adapter  — unified send adapter
    */
   constructor(db, adapter) {
     this._db      = db;
     this._adapter = adapter;
     this._jobs    = new Map();   // taskId → cron job
-    this._running = new Set();   // taskIds currently executing — prevents overlapping runs
+    this._running = new Set();   // taskIds currently executing
   }
 
   // ─── Boot: load active tasks from DB ─────────────────────────────────────
@@ -35,12 +35,20 @@ class Scheduler {
       throw new Error(`Invalid cron expression: ${data.cron_expr}`);
     }
     const task = {
-      id:          uuidv4(),
-      name:        data.name,
-      campaign_id: data.campaign_id || null,
-      cron_expr:   data.cron_expr,
-      next_run:    this._nextRun(data.cron_expr),
-      active:      1,
+      id:               uuidv4(),
+      name:             data.name,
+      campaign_id:      data.campaign_id      || null,
+      cron_expr:        data.cron_expr,
+      next_run:         this._nextRun(data.cron_expr),
+      active:           1,
+      message_body:     data.message_body     || null,
+      media_path:       data.media_path       || null,
+      media_type:       data.media_type       || null,
+      recipients_type:  data.recipients_type  || 'all',
+      recipients_json:  data.recipients_json  || null,
+      session_id:       data.session_id       || null,
+      timezone:         data.timezone         || 'Asia/Riyadh',
+      template_id:      data.template_id      || null,
     };
     this._db.taskCreate(task);
     this._schedule(task);
@@ -81,8 +89,24 @@ class Scheduler {
   list() {
     return this._db.taskList().map(t => ({
       ...t,
-      running: this._jobs.has(t.id),
+      running: this._running.has(t.id),
     }));
+  }
+
+  /** Trigger a task immediately regardless of schedule */
+  async runNow(id) {
+    const task = this._db.taskGet(id);
+    if (!task) throw new Error('Task not found');
+    if (this._running.has(id)) throw new Error('Task is already running');
+
+    console.log(`[Scheduler] Manual trigger: ${task.name} (${id})`);
+    this._running.add(id);
+    try {
+      await this._fireTask(task);
+    } finally {
+      this._running.delete(id);
+    }
+    return { ok: true };
   }
 
   // ─── Internal scheduling ──────────────────────────────────────────────────
@@ -123,26 +147,49 @@ class Scheduler {
   // ─── Fire a task ──────────────────────────────────────────────────────────
   async _fireTask(task) {
     try {
-      if (task.campaign_id) {
-        const campaign = this._db.campaignGet(task.campaign_id);
-        if (!campaign) {
-          console.warn(`[Scheduler] Campaign ${task.campaign_id} not found, skipping.`);
+      // ── Path A: task has its own message_body (new style) ─────────────────
+      if (task.message_body) {
+        const recipients = await this._resolveRecipients(task);
+
+        if (recipients.length === 0) {
+          console.warn(`[Scheduler] No recipients for task: ${task.name}`);
+          this._db.taskBumpRun(task.id, this._nextRun(task.cron_expr));
           return;
         }
 
-        // Get recipients
+        console.log(`[Scheduler] Sending to ${recipients.length} recipients — task: ${task.name}`);
+        await this._adapter.sendBulk({
+          accountIds:   task.session_id ? [] : [],
+          sessionIds:   task.session_id ? [task.session_id] : [],
+          recipients,
+          messageBody:  task.message_body,
+          mediaPath:    task.media_path  || undefined,
+          mediaType:    task.media_type  || undefined,
+          delaySec:     15,
+          campaignId:   null,
+          campaignName: task.name,
+        });
+
+      // ── Path B: task is linked to a campaign (legacy style) ───────────────
+      } else if (task.campaign_id) {
+        const campaign = this._db.campaignGet(task.campaign_id);
+        if (!campaign) {
+          console.warn(`[Scheduler] Campaign ${task.campaign_id} not found, skipping.`);
+          this._db.taskBumpRun(task.id, this._nextRun(task.cron_expr));
+          return;
+        }
+
         const contacts = this._db.contactList({ label: campaign.name })
           .filter(c => c.opt_in)
           .map(c => c.phone);
 
         if (contacts.length === 0) {
           console.warn(`[Scheduler] No recipients for campaign ${campaign.name}`);
+          this._db.taskBumpRun(task.id, this._nextRun(task.cron_expr));
           return;
         }
 
-        // Update campaign total and status
         this._db.campaignUpdateStatus(campaign.id, 'running', { sent: 0, failed: 0 });
-
         await this._adapter.sendBulk({
           accountIds:   campaign.account_id ? [campaign.account_id] : [],
           recipients:   contacts,
@@ -153,29 +200,54 @@ class Scheduler {
           campaignId:   campaign.id,
           campaignName: campaign.name,
         });
+
+      } else {
+        console.warn(`[Scheduler] Task ${task.name} has no message_body or campaign_id — skipping.`);
       }
 
-      // Update task run stats
-      const nextRun = this._nextRun(task.cron_expr);
-      this._db.taskBumpRun(task.id, nextRun);
+      this._db.taskBumpRun(task.id, this._nextRun(task.cron_expr));
       console.log(`[Scheduler] Task complete: ${task.name}`);
     } catch (err) {
       console.error(`[Scheduler] Task error (${task.name}):`, err.message);
     }
   }
 
+  // ─── Resolve recipients from task config ──────────────────────────────────
+  async _resolveRecipients(task) {
+    const type = task.recipients_type || 'all';
+
+    if (type === 'manual') {
+      // recipients_json is a JSON array of phone numbers
+      try {
+        const phones = JSON.parse(task.recipients_json || '[]');
+        return Array.isArray(phones) ? phones.filter(Boolean) : [];
+      } catch (_) { return []; }
+    }
+
+    if (type === 'label') {
+      // recipients_json holds the label name
+      const label = task.recipients_json || '';
+      return this._db.contactList({ label })
+        .filter(c => c.opt_in)
+        .map(c => c.phone);
+    }
+
+    // 'all' — all opted-in contacts
+    return this._db.contactList({})
+      .filter(c => c.opt_in)
+      .map(c => c.phone);
+  }
+
   // ─── Next run — computed from cron expression ─────────────────────────────
   _nextRun(expr) {
     try {
-      // Parse the cron expression manually to find the next matching date/time
-      // node-cron doesn't expose next-run, so we iterate minute by minute
       const parts = expr.trim().split(/\s+/);
       if (parts.length < 5) return null;
       const [minExpr, hourExpr, domExpr, monExpr, dowExpr] = parts;
 
-      const matches = (val, expr) => {
-        if (expr === '*') return true;
-        return expr.split(',').some(part => {
+      const matches = (val, ex) => {
+        if (ex === '*') return true;
+        return ex.split(',').some(part => {
           if (part.includes('/')) {
             const [, step] = part.split('/');
             return val % parseInt(step, 10) === 0;
@@ -190,9 +262,9 @@ class Scheduler {
 
       const d = new Date();
       d.setSeconds(0, 0);
-      d.setMinutes(d.getMinutes() + 1);  // start from next minute
+      d.setMinutes(d.getMinutes() + 1);
 
-      for (let i = 0; i < 525960; i++) {  // max 1 year of minutes
+      for (let i = 0; i < 525960; i++) {
         if (
           matches(d.getMonth() + 1, monExpr) &&
           matches(d.getDate(),      domExpr) &&
@@ -215,12 +287,14 @@ class Scheduler {
 
   static presets() {
     return [
-      { label: 'كل يوم الساعة 9 صباحاً',    value: '0 9 * * *'     },
-      { label: 'كل يوم الساعة 6 مساءً',     value: '0 18 * * *'    },
-      { label: 'كل أحد الساعة 10 صباحاً',   value: '0 10 * * 0'    },
-      { label: 'أول كل شهر الساعة 9 صباحاً',value: '0 9 1 * *'     },
-      { label: 'كل ساعة',                   value: '0 * * * *'     },
-      { label: 'كل 30 دقيقة',               value: '*/30 * * * *'  },
+      { label: 'كل يوم الساعة 9 صباحاً',      value: '0 9 * * *'    },
+      { label: 'كل يوم الساعة 12 ظهراً',      value: '0 12 * * *'   },
+      { label: 'كل يوم الساعة 6 مساءً',       value: '0 18 * * *'   },
+      { label: 'الأحد–الخميس الساعة 9 صباحاً', value: '0 9 * * 0-4'  },
+      { label: 'كل أحد الساعة 10 صباحاً',     value: '0 10 * * 0'   },
+      { label: 'أول كل شهر الساعة 9 صباحاً',  value: '0 9 1 * *'    },
+      { label: 'كل ساعة',                     value: '0 * * * *'    },
+      { label: 'كل 30 دقيقة',                 value: '*/30 * * * *' },
     ];
   }
 }

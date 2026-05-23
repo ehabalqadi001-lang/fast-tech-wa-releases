@@ -1,6 +1,10 @@
-node_modules/
-dist-new/
+﻿node_modules/
 dist/
+dist-new/
 src/main-obfuscated/
-*.log
-.env
+*.rar
+*.zip
+*.exe
+*.blockmap
+.DS_Store
+Thumbs.db

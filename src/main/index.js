@@ -18,6 +18,7 @@ const WebhookServer  = require('./webhook-server');
 const IpcHandlers    = require('./ipc-handlers');
 const LicenseService = require('./license-service');
 const Updater        = require('./updater');
+const { AntiBanService } = require('./anti-ban-service');
 const EventEmitter   = require('events');
 
 // Internal bus — used to signal from IPC handlers to window lifecycle code
@@ -250,9 +251,11 @@ app.whenReady().then(async () => {
     const excel  = new Excel();
 
     // 3. WhatsApp Web engine (unofficial multi-session)
-    waSvc         = new WaWebService(db, DATA_DIR);
-    engine        = new SendingEngine(db, waSvc);
-    const scraper = new ScraperService(db, waSvc);
+    waSvc              = new WaWebService(db, DATA_DIR);
+    const antiBanSvc   = new AntiBanService(db);
+    antiBanSvc.start();
+    engine             = new SendingEngine(db, waSvc, antiBanSvc);
+    const scraper      = new ScraperService(db, waSvc);
 
     // 4. Engine adapter — unified routing (Cloud API or Web)
     const adapter = new EngineAdapter(db, waApi, waSvc, engine);
@@ -272,7 +275,7 @@ app.whenReady().then(async () => {
     // 7. IPC handlers (all services registered)
     IpcHandlers.register(ipcMain, {
       db, waApi, waSvc, engine, scraper, scheduler,
-      aiSvc, excel, adapter, webhookSrv,
+      aiSvc, excel, adapter, webhookSrv, antiBanSvc,
     });
 
     // 6. Window + tray
@@ -339,6 +342,7 @@ app.on('before-quit', async () => {
   engine?.stop();
   webhookSrv?.stop();
   await waSvc?.destroyAll().catch(() => {});
+  // antiBanSvc is local to bootstrap scope — cron jobs stop via node-cron's destroy
   db?.close();
 });
 
