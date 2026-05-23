@@ -86,45 +86,70 @@ class ExcelHandler {
   exportReport(data, outPath) {
     const wb = XLSX.utils.book_new();
 
-    // Summary sheet
+    // Sheet 1: Daily summary
     if (data.summary?.length) {
-      const summaryRows = data.summary.map(r => ({
-        'التاريخ':         r.day,
-        'إجمالي الرسائل': r.total,
-        'ناجحة':          r.success,
-        'فاشلة':          r.failed,
+      const rows = data.summary.map(r => ({
+        'التاريخ':          r.day,
+        'إجمالي الرسائل':   r.total,
+        'ناجحة':            r.success,
+        'فاشلة':            r.failed,
       }));
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summaryRows), 'ملخص');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'ملخص يومي');
     }
 
-    // Campaigns sheet
+    // Sheet 2: Sent messages detail (phone + name + body per message)
+    if (data.sentDetail?.length) {
+      const rows = data.sentDetail.map(r => ({
+        'رقم الهاتف':    r.recipient          || '',
+        'الاسم':         r.contact_name        || '',
+        'الرسالة':       r.body                || '',
+        'الحملة':        r.campaign_name       || '',
+        'الجهاز':        r.session_name        || r.session_id || '',
+        'الحالة':        this._statusAr(r.status),
+        'سبب الفشل':     r.error_msg           || '',
+        'وقت الإرسال':   r.processed_at        || r.created_at || '',
+      }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'الرسائل المرسلة');
+    }
+
+    // Sheet 3: Campaign performance
     if (data.campaigns?.length) {
-      const campRows = data.campaigns.map(c => ({
-        'الحملة':        c.name,
-        'النوع':         c.type,
-        'الإجمالي':      c.total,
-        'أُرسل':         c.sent,
-        'فشل':           c.failed,
-        'نسبة النجاح %': c.success_pct,
-        'الحالة':        c.status,
-        'التاريخ':       c.created_at,
+      const rows = data.campaigns.map(c => ({
+        'الحملة':          c.name,
+        'النوع':           c.type,
+        'الإجمالي':        c.total,
+        'أُرسل':           c.sent,
+        'فشل':             c.failed,
+        'نسبة النجاح %':   c.success_pct,
+        'الحالة':          c.status,
+        'تاريخ الإنشاء':   c.created_at,
+        'تاريخ الانتهاء':  c.finished_at || '',
       }));
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(campRows), 'الحملات');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'الحملات');
     }
 
-    // Replies sheet
+    // Sheet 4: Incoming replies (with correct field names)
     if (data.replies?.length) {
-      const replyRows = data.replies.map(r => ({
-        'الاسم':   r.contact_name || '',
-        'الهاتف':  r.recipient,
-        'الرسالة': r.body,
-        'التاريخ': r.sent_at,
+      const rows = data.replies.map(r => ({
+        'رقم الهاتف':   r.from_number         || '',
+        'الاسم':        r.from_name            || '',
+        'الجروب':       r.is_group ? (r.group_name || 'جروب') : '',
+        'الجهاز':       r.session_name         || r.session_id || '',
+        'الرسالة':      r.body                 || '',
+        'وقت الاستلام': r.received_at          || '',
+        'حالة الرد':    r.replied ? 'تم الرد' : 'لم يُرد',
+        'نص الرد':      r.reply_body           || '',
       }));
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(replyRows), 'الردود');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'الردود الواردة');
     }
 
     XLSX.writeFile(wb, outPath);
     return outPath;
+  }
+
+  _statusAr(status) {
+    const map = { sent:'مُرسل', delivered:'مُستلم', read:'مقروء', failed:'فشل', pending:'انتظار' };
+    return map[status] || status || '';
   }
 
   // ─── Generate contacts template ───────────────────────────────────────────

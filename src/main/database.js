@@ -721,19 +721,30 @@ class Db {
     `).all();
   }
 
-  reportReplies() {
+  reportSentDetail(days = 90) {
     return this._db.prepare(`
       SELECT
-        im.from_number,
-        im.body,
-        im.session_id,
-        im.received_at,
-        c.name as from_name
-      FROM incoming_messages im
-      LEFT JOIN contacts c ON c.phone = im.from_number
-      ORDER BY im.received_at DESC
-      LIMIT 100
-    `).all();
+        sq.recipient,
+        COALESCE(sq.picked_body, sq.body)      AS body,
+        sq.wa_msg_id,
+        sq.status,
+        sq.error_msg,
+        sq.processed_at,
+        sq.created_at,
+        sq.session_id,
+        sq.campaign_id,
+        c.name                                 AS contact_name,
+        ws.name                                AS session_name,
+        cam.name                               AS campaign_name
+      FROM send_queue sq
+      LEFT JOIN contacts   c   ON c.phone    = sq.recipient
+      LEFT JOIN wa_sessions ws  ON ws.id      = sq.session_id
+      LEFT JOIN campaigns   cam ON cam.id     = sq.campaign_id
+      WHERE sq.status IN ('sent','delivered','read','failed')
+        AND sq.processed_at >= datetime('now', ?)
+      ORDER BY sq.processed_at DESC
+      LIMIT 2000
+    `).all(`-${days} days`);
   }
 
   // ═══════════════════════════════════════════════════════════════════════════

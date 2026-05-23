@@ -508,10 +508,12 @@ function register(ipcMain, { db, waApi, waSvc, engine, scraper, scheduler, aiSvc
   handle('reports:exportExcel', async (range) => {
     const { app } = require('electron');
     const outPath = path.join(app.getPath('downloads'), `ftwa-report-${Date.now()}.xlsx`);
+    const days = range?.days || 30;
     const data = {
-      summary:   db.reportSummary(range?.days || 30),
-      campaigns: db.reportCampaignPerf(),
-      replies:   db.reportReplies(),
+      summary:    db.reportSummary(days),
+      campaigns:  db.reportCampaignPerf(),
+      replies:    db.reportReplies(),
+      sentDetail: db.reportSentDetail(days),
     };
     excel.exportReport(data, outPath);
     return { path: outPath };
