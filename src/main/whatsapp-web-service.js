@@ -468,14 +468,12 @@ class WhatsAppWebService extends EventEmitter {
 
     const result = await client.pupPage.evaluate((gid) => {
       try {
-        // Find the chat in the store without triggering server calls
         let chatStore = null;
         if (window.require) {
           try { chatStore = window.require('WAWebCollections').Chat; } catch (_) {}
         }
         if (!chatStore && window.Store) chatStore = window.Store.Chat;
 
-        // Try .get() first, then linear scan
         const chat = chatStore?.get?.(gid)
           || chatStore?.getModelsArray?.()?.find?.(c => c.id?._serialized === gid);
 
@@ -489,14 +487,28 @@ class WhatsAppWebService extends EventEmitter {
           ? gm.participants.getModelsArray()
           : (Array.isArray(gm.participants) ? gm.participants : []);
 
+        // toPn converts a LID wid → phone wid (needed since WA now stores participants as LIDs)
+        let toPn = null;
+        try { toPn = window.require('WAWebLidMigrationUtils').toPn; } catch (_) {}
+
         return list
           .filter(p => p && p.id && p.id._serialized)
-          .map(p => ({
-            id:           p.id._serialized,
-            phone:        p.id.user,
-            isAdmin:      !!p.isAdmin,
-            isSuperAdmin: !!p.isSuperAdmin,
-          }));
+          .map(p => {
+            let phoneUser = p.id.user;
+            // If ID is a LID (server === 'lid'), resolve to actual phone number
+            if (p.id.server === 'lid' && toPn) {
+              try {
+                const phoneWid = toPn(p.id);
+                if (phoneWid?.user) phoneUser = phoneWid.user;
+              } catch (_) {}
+            }
+            return {
+              id:           p.id._serialized,   // original (may be @lid) — needed for removal
+              phone:        phoneUser,           // actual phone number for matching
+              isAdmin:      !!p.isAdmin,
+              isSuperAdmin: !!p.isSuperAdmin,
+            };
+          });
       } catch (e) {
         return { __error: e.message };
       }
@@ -534,13 +546,47 @@ class WhatsAppWebService extends EventEmitter {
 
   async removeGroupMembers(sessionId, groupId, phones, dryRun = false) {
     const client = this._readyClient(sessionId);
-    const chat   = await client.getChatById(groupId);
-    if (!chat.isGroup) throw new Error('ليس محادثة مجموعة');
 
-    // Use getGroupParticipants for reliable LID-safe lookup
-    const members = await this.getGroupParticipants(sessionId, groupId);
-    const memberMap = new Map(); // normalized phone → serialized id
-    for (const m of members) {
+    // Build member map inside Puppeteer to avoid IPC serialisation issues with LIDs.
+    // Returns { members: [{id, phone}], error? }
+    const lookup = await client.pupPage.evaluate((gid) => {
+      try {
+        const chatStore = window.require('WAWebCollections').Chat;
+        const chat = chatStore?.get?.(gid)
+          || chatStore?.getModelsArray?.()?.find?.(c => c.id?._serialized === gid);
+        if (!chat) return { __error: 'المجموعة غير موجودة: ' + gid };
+
+        const gm = chat.groupMetadata;
+        if (!gm) return { __error: 'بيانات المجموعة غير محمّلة — افتح المجموعة في واتساب أولاً' };
+
+        const list = typeof gm.participants?.getModelsArray === 'function'
+          ? gm.participants.getModelsArray()
+          : (Array.isArray(gm.participants) ? gm.participants : []);
+
+        let toPn = null;
+        try { toPn = window.require('WAWebLidMigrationUtils').toPn; } catch (_) {}
+
+        return list
+          .filter(p => p && p.id && p.id._serialized)
+          .map(p => {
+            let phoneUser = p.id.user;
+            if (p.id.server === 'lid' && toPn) {
+              try { const w = toPn(p.id); if (w?.user) phoneUser = w.user; } catch (_) {}
+            }
+            return { id: p.id._serialized, phone: phoneUser };
+          });
+      } catch (e) {
+        return { __error: e.message };
+      }
+    }, groupId);
+
+    if (!Array.isArray(lookup)) {
+      throw new Error(lookup?.__error || 'فشل جلب أعضاء المجموعة');
+    }
+
+    // Build phone → original-id map
+    const memberMap = new Map();
+    for (const m of lookup) {
       const phone = String(m.phone || '').replace(/\D/g, '');
       if (phone) memberMap.set(phone, m.id);
     }
@@ -561,15 +607,27 @@ class WhatsAppWebService extends EventEmitter {
     }
 
     if (!found.length) {
-      return { removed: 0, found: [], notFound, warning: 'لم يُعثر على أي من الأرقام المدخلة ضمن أعضاء المجموعة' };
+      return {
+        removed: 0, found: [], notFound,
+        warning: 'لم يُعثر على أي من الأرقام المدخلة ضمن أعضاء المجموعة',
+        debug: `أعضاء الجروب المكتشفون (${lookup.length}): ${lookup.slice(0,10).map(m=>`${m.phone}(${m.id})`).join(', ')}`,
+      };
     }
 
+    // Direct removal via Backbone models — bypasses enforceLidAndPnRetrieval which fails for LIDs
     const BATCH = 5;
     let removed = 0;
     for (let i = 0; i < found.length; i += BATCH) {
-      const ids = found.slice(i, i + BATCH).map(f => f.id);
-      await chat.removeParticipants(ids);
-      removed += ids.length;
+      const batchIds = found.slice(i, i + BATCH).map(f => f.id);
+      await client.pupPage.evaluate(async (chatId, ids) => {
+        const chatModel = await window.WWebJS.getChat(chatId, { getAsModel: false });
+        const toRemove = ids
+          .map(id => chatModel.groupMetadata.participants.get(id))
+          .filter(Boolean);
+        if (!toRemove.length) throw new Error('الأعضاء غير موجودين في الـ store');
+        await window.require('WAWebModifyParticipantsGroupAction').removeParticipants(chatModel, toRemove);
+      }, groupId, batchIds);
+      removed += batchIds.length;
       if (i + BATCH < found.length) await new Promise(r => setTimeout(r, 1500));
     }
     return { removed, found: found.map(f => f.phone), notFound };

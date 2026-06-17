@@ -1812,7 +1812,13 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
 
     <div id="mm-progress" style="display:none;margin-top:12px">
       <div class="pb mb8"><div class="pf" id="mm-progress-bar" style="width:0%;transition:width .5s"></div></div>
-      <div id="mm-log" style="max-height:130px;overflow-y:auto;background:rgba(0,0,0,.35);border-radius:8px;padding:10px;font-size:11px;font-family:monospace;line-height:1.8"></div>
+      <div id="mm-log" style="max-height:150px;overflow-y:auto;background:rgba(0,0,0,.35);border-radius:8px;padding:10px;font-size:11px;font-family:monospace;line-height:1.8"></div>
+    </div>
+
+    <!-- Debug / error box — shown only when there's a problem -->
+    <div id="mm-debug-box" style="display:none;margin-top:10px;background:rgba(255,80,80,.1);border:1px solid rgba(255,80,80,.35);border-radius:8px;padding:10px">
+      <div style="font-size:11px;font-weight:700;color:#ff6060;margin-bottom:6px">⚠️ تفاصيل المشكلة</div>
+      <div id="mm-debug-msg" style="font-size:11px;font-family:monospace;color:#ffaaaa;white-space:pre-wrap;word-break:break-all;max-height:100px;overflow-y:auto"></div>
     </div>
 
     <div class="md-cl">
@@ -4988,6 +4994,8 @@ function _initMembersModal() {
   document.getElementById('mm-phones').value = '';
   document.getElementById('mm-excel-info').textContent = '';
   document.getElementById('mm-submit-btn').disabled = false;
+  document.getElementById('mm-debug-box').style.display = 'none';
+  document.getElementById('mm-debug-msg').textContent = '';
   _mmExcelPhones = null;
 
   // Show target groups
@@ -5056,15 +5064,21 @@ async function submitMembersMgr(dryRun = false) {
   const prog    = document.getElementById('mm-progress');
   const bar     = document.getElementById('mm-progress-bar');
 
+  const debugBox = document.getElementById('mm-debug-box');
+  const debugMsg = document.getElementById('mm-debug-msg');
+
   btn.disabled = true;
   if (testBtn) testBtn.disabled = true;
   prog.style.display = 'block';
+  debugBox.style.display = 'none';
+  debugMsg.textContent = '';
   logEl.innerHTML = '';
   bar.style.width = '0%';
 
   const ipcFn = _mmAction === 'add' ? 'addMembers' : 'removeMembers';
   const verb   = _mmAction === 'add' ? 'إضافة' : 'حذف';
   const modeLabel = dryRun ? '🔍 اختبار' : '🚀 تنفيذ';
+  const debugLines = [];
   let done = 0;
   GP.show(`${modeLabel} — ${verb} أعضاء...`, 0, `0/${_mmGroups.length}`);
 
@@ -5080,37 +5094,58 @@ async function submitMembersMgr(dryRun = false) {
       const r = await BE.wa.groups[ipcFn](payload);
       if (r.ok) {
         const d = r.data || {};
+
         if (dryRun && _mmAction === 'remove') {
           const foundList    = (d.found    || []).join(', ') || '—';
           const notFoundList = (d.notFound || []).join(', ') || '—';
           logEl.innerHTML +=
-            `<div style="color:var(--acc)">🔍 ${escH(group.name)}: موجود في الجروب (${(d.found||[]).length}): <span style="color:#8ff">${escH(foundList)}</span></div>` +
-            (d.notFound?.length ? `<div style="color:#f93">⚠️ غير موجود (${d.notFound.length}): <span style="color:#fbb">${escH(notFoundList)}</span></div>` : '');
+            `<div style="color:var(--acc)">🔍 ${escH(group.name)}: موجود في الجروب (${(d.found||[]).length}): <span style="color:#8ff">${escH(foundList)}</span></div>`;
+          if (d.notFound?.length) {
+            logEl.innerHTML += `<div style="color:#f93">⚠️ غير موجود (${d.notFound.length}): <span style="color:#fbb">${escH(notFoundList)}</span></div>`;
+            if (d.debug) debugLines.push(`[${group.name}] ${d.debug}`);
+          }
+
         } else if (_mmAction === 'remove') {
-          const cnt = d.removed ?? 0;
+          const cnt      = d.removed ?? 0;
           const notFound = d.notFound || [];
-          const warn = d.warning ? `<div style="color:#f93">⚠️ ${escH(d.warning)}</div>` : '';
-          logEl.innerHTML +=
-            `<div style="color:var(--acc)">✅ ${escH(group.name)}: تم حذف ${cnt} عضو</div>` + warn +
-            (notFound.length ? `<div style="color:#f93">⚠️ لم يُعثر عليهم (${notFound.length}): <span style="color:#fbb">${escH(notFound.join(', '))}</span></div>` : '');
+          logEl.innerHTML += `<div style="color:var(--acc)">✅ ${escH(group.name)}: تم حذف ${cnt} عضو</div>`;
+          if (d.warning) {
+            logEl.innerHTML += `<div style="color:#f93">⚠️ ${escH(d.warning)}</div>`;
+          }
+          if (notFound.length) {
+            logEl.innerHTML += `<div style="color:#f93">⚠️ لم يُعثر عليهم (${notFound.length}): <span style="color:#fbb">${escH(notFound.join(', '))}</span></div>`;
+          }
+          if (d.debug) debugLines.push(`[${group.name}] ${d.debug}`);
+
         } else {
           logEl.innerHTML += `<div style="color:var(--acc)">✅ ${escH(group.name)}: نجح (${d.added ?? phones.length} أرقام)</div>`;
         }
       } else {
         logEl.innerHTML += `<div style="color:#ff3344">❌ ${escH(group.name)}: ${escH(r.error)}</div>`;
+        debugLines.push(`[${group.name}] خطأ: ${r.error}`);
       }
     } catch (e) {
       logEl.innerHTML += `<div style="color:#ff3344">❌ ${escH(group.name)}: ${escH(e.message)}</div>`;
+      debugLines.push(`[${group.name}] استثناء: ${e.message}`);
     }
     done++;
     logEl.scrollTop = logEl.scrollHeight;
   }
 
   bar.style.width = '100%';
-  const summary = dryRun ? `اكتمل الاختبار — ${done}/${_mmGroups.length} مجموعة` : `اكتملت العملية — ${done}/${_mmGroups.length} مجموعة`;
+  const summary = dryRun
+    ? `اكتمل الاختبار — ${done}/${_mmGroups.length} مجموعة`
+    : `اكتملت العملية — ${done}/${_mmGroups.length} مجموعة`;
   logEl.innerHTML += `<div style="color:var(--acc);margin-top:6px;font-weight:700">✅ ${summary}</div>`;
   logEl.scrollTop = logEl.scrollHeight;
   GP.done(summary);
+
+  // Show debug box if there's diagnostic info
+  if (debugLines.length) {
+    debugMsg.textContent = debugLines.join('\n');
+    debugBox.style.display = 'block';
+  }
+
   btn.disabled = false;
   if (testBtn) testBtn.disabled = false;
 }
