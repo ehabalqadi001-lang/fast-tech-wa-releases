@@ -532,20 +532,47 @@ class WhatsAppWebService extends EventEmitter {
     return { added };
   }
 
-  async removeGroupMembers(sessionId, groupId, phones) {
+  async removeGroupMembers(sessionId, groupId, phones, dryRun = false) {
     const client = this._readyClient(sessionId);
     const chat   = await client.getChatById(groupId);
     if (!chat.isGroup) throw new Error('ليس محادثة مجموعة');
 
+    // Use getGroupParticipants for reliable LID-safe lookup
+    const members = await this.getGroupParticipants(sessionId, groupId);
+    const memberMap = new Map(); // normalized phone → serialized id
+    for (const m of members) {
+      const phone = String(m.phone || '').replace(/\D/g, '');
+      if (phone) memberMap.set(phone, m.id);
+    }
+
+    const found    = [];
+    const notFound = [];
+    for (const raw of phones) {
+      const clean = String(raw).replace(/\D/g, '');
+      if (memberMap.has(clean)) {
+        found.push({ phone: clean, id: memberMap.get(clean) });
+      } else {
+        notFound.push(clean);
+      }
+    }
+
+    if (dryRun) {
+      return { dryRun: true, found: found.map(f => f.phone), notFound, removed: 0 };
+    }
+
+    if (!found.length) {
+      return { removed: 0, found: [], notFound, warning: 'لم يُعثر على أي من الأرقام المدخلة ضمن أعضاء المجموعة' };
+    }
+
     const BATCH = 5;
     let removed = 0;
-    for (let i = 0; i < phones.length; i += BATCH) {
-      const ids = phones.slice(i, i + BATCH).map(p => this._toChatId(p));
+    for (let i = 0; i < found.length; i += BATCH) {
+      const ids = found.slice(i, i + BATCH).map(f => f.id);
       await chat.removeParticipants(ids);
       removed += ids.length;
-      if (i + BATCH < phones.length) await new Promise(r => setTimeout(r, 1500));
+      if (i + BATCH < found.length) await new Promise(r => setTimeout(r, 1500));
     }
-    return { removed };
+    return { removed, found: found.map(f => f.phone), notFound };
   }
 
   async getPhoneContacts(sessionId) {

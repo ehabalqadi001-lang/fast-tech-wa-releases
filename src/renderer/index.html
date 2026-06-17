@@ -1817,7 +1817,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
 
     <div class="md-cl">
       <button class="btn bo" onclick="closeM('m-group-members')">إغلاق</button>
-      <button id="mm-submit-btn" class="btn bp" onclick="submitMembersMgr()">🚀 تنفيذ</button>
+      <button id="mm-test-btn" class="btn" style="background:var(--acc2,#6c4ecb);color:#fff" onclick="submitMembersMgr(true)">🔍 اختبار</button>
+      <button id="mm-submit-btn" class="btn bp" onclick="submitMembersMgr(false)">🚀 تنفيذ</button>
     </div>
   </div>
 </div>
@@ -5006,10 +5007,12 @@ function _initMembersModal() {
 
 function setMembersAction(action) {
   _mmAction = action;
-  const btnAdd = document.getElementById('mm-btn-add');
-  const btnRem = document.getElementById('mm-btn-remove');
+  const btnAdd  = document.getElementById('mm-btn-add');
+  const btnRem  = document.getElementById('mm-btn-remove');
+  const testBtn = document.getElementById('mm-test-btn');
   btnAdd.className = `btn bsm ${action === 'add'    ? 'bp' : 'bo'}`;
   btnRem.className = `btn bsm ${action === 'remove' ? 'bd' : 'bo'}`;
+  if (testBtn) testBtn.style.display = action === 'remove' ? '' : 'none';
 }
 
 function setMembersMethod(method) {
@@ -5030,7 +5033,7 @@ async function pickMembersExcel() {
   document.getElementById('mm-excel-info').textContent = `✅ ${r.data.length} رقم هاتف من الملف`;
 }
 
-async function submitMembersMgr() {
+async function submitMembersMgr(dryRun = false) {
   if (!IS_ELECTRON) { beOk('تم التنفيذ (وضع العرض)'); return; }
   const sessionId = document.getElementById('mm-session-sel').value;
   if (!sessionId) { beErr('اختر جلسة أولاً'); return; }
@@ -5047,31 +5050,52 @@ async function submitMembersMgr() {
   }
   if (!phones.length) { beErr('لم يتم إدخال أي أرقام هاتف صالحة'); return; }
 
-  const btn  = document.getElementById('mm-submit-btn');
-  const logEl = document.getElementById('mm-log');
-  const prog  = document.getElementById('mm-progress');
-  const bar   = document.getElementById('mm-progress-bar');
+  const btn     = document.getElementById('mm-submit-btn');
+  const testBtn = document.getElementById('mm-test-btn');
+  const logEl   = document.getElementById('mm-log');
+  const prog    = document.getElementById('mm-progress');
+  const bar     = document.getElementById('mm-progress-bar');
 
   btn.disabled = true;
+  if (testBtn) testBtn.disabled = true;
   prog.style.display = 'block';
   logEl.innerHTML = '';
   bar.style.width = '0%';
 
   const ipcFn = _mmAction === 'add' ? 'addMembers' : 'removeMembers';
   const verb   = _mmAction === 'add' ? 'إضافة' : 'حذف';
+  const modeLabel = dryRun ? '🔍 اختبار' : '🚀 تنفيذ';
   let done = 0;
-  GP.show(`${verb} أعضاء...`, 0, `0/${_mmGroups.length}`);
+  GP.show(`${modeLabel} — ${verb} أعضاء...`, 0, `0/${_mmGroups.length}`);
 
   for (const group of _mmGroups) {
     const pct = Math.round((done / _mmGroups.length) * 100);
     bar.style.width = pct + '%';
     GP.step(`${verb} في: ${group.name}`, done, _mmGroups.length, `${done+1}/${_mmGroups.length}`);
-    logEl.innerHTML += `<div>⏳ ${escH(group.name)} — ${verb} ${phones.length} رقم...</div>`;
+    logEl.innerHTML += `<div>⏳ ${escH(group.name)} — ${modeLabel}: ${phones.length} رقم...</div>`;
     logEl.scrollTop = logEl.scrollHeight;
     try {
-      const r = await BE.wa.groups[ipcFn]({ sessionId, groupId: group.id, phones });
+      const payload = { sessionId, groupId: group.id, phones };
+      if (_mmAction === 'remove') payload.dryRun = dryRun;
+      const r = await BE.wa.groups[ipcFn](payload);
       if (r.ok) {
-        logEl.innerHTML += `<div style="color:var(--acc)">✅ ${escH(group.name)}: نجح (${r.data?.added || r.data?.removed || phones.length} أرقام)</div>`;
+        const d = r.data || {};
+        if (dryRun && _mmAction === 'remove') {
+          const foundList    = (d.found    || []).join(', ') || '—';
+          const notFoundList = (d.notFound || []).join(', ') || '—';
+          logEl.innerHTML +=
+            `<div style="color:var(--acc)">🔍 ${escH(group.name)}: موجود في الجروب (${(d.found||[]).length}): <span style="color:#8ff">${escH(foundList)}</span></div>` +
+            (d.notFound?.length ? `<div style="color:#f93">⚠️ غير موجود (${d.notFound.length}): <span style="color:#fbb">${escH(notFoundList)}</span></div>` : '');
+        } else if (_mmAction === 'remove') {
+          const cnt = d.removed ?? 0;
+          const notFound = d.notFound || [];
+          const warn = d.warning ? `<div style="color:#f93">⚠️ ${escH(d.warning)}</div>` : '';
+          logEl.innerHTML +=
+            `<div style="color:var(--acc)">✅ ${escH(group.name)}: تم حذف ${cnt} عضو</div>` + warn +
+            (notFound.length ? `<div style="color:#f93">⚠️ لم يُعثر عليهم (${notFound.length}): <span style="color:#fbb">${escH(notFound.join(', '))}</span></div>` : '');
+        } else {
+          logEl.innerHTML += `<div style="color:var(--acc)">✅ ${escH(group.name)}: نجح (${d.added ?? phones.length} أرقام)</div>`;
+        }
       } else {
         logEl.innerHTML += `<div style="color:#ff3344">❌ ${escH(group.name)}: ${escH(r.error)}</div>`;
       }
@@ -5083,10 +5107,12 @@ async function submitMembersMgr() {
   }
 
   bar.style.width = '100%';
-  logEl.innerHTML += `<div style="color:var(--acc);margin-top:6px;font-weight:700">✅ اكتملت العملية — ${done}/${_mmGroups.length} مجموعة</div>`;
+  const summary = dryRun ? `اكتمل الاختبار — ${done}/${_mmGroups.length} مجموعة` : `اكتملت العملية — ${done}/${_mmGroups.length} مجموعة`;
+  logEl.innerHTML += `<div style="color:var(--acc);margin-top:6px;font-weight:700">✅ ${summary}</div>`;
   logEl.scrollTop = logEl.scrollHeight;
-  GP.done(`اكتملت العملية — ${done}/${_mmGroups.length} مجموعة`);
+  GP.done(summary);
   btn.disabled = false;
+  if (testBtn) testBtn.disabled = false;
 }
 
 // ══════════════════════════════════════════════════════════════════════════

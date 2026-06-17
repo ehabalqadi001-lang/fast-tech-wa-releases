@@ -795,9 +795,9 @@ function register(ipcMain, { db, waApi, waSvc, engine, scraper, scheduler, aiSvc
     return waSvc.addGroupMembers(sessionId, groupId, phones);
   });
 
-  handle('wa:groups:removeMembers', async ({ sessionId, groupId, phones }) => {
+  handle('wa:groups:removeMembers', async ({ sessionId, groupId, phones, dryRun }) => {
     if (!waSvc) throw new Error('Web service not available');
-    return waSvc.removeGroupMembers(sessionId, groupId, phones);
+    return waSvc.removeGroupMembers(sessionId, groupId, phones, !!dryRun);
   });
 
   handle('wa:groups:readPhonesFromExcel', (filePath) => {
