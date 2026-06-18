@@ -1,0 +1,186 @@
+<div id="p-crm" class="page">
+  <div class="ph">
+    <div class="ph-l"><div class="ph-ic">🔗</div><div><h1>CRM INTEGRATION</h1><p>ربط البرنامج بأنظمة إدارة علاقات العملاء</p></div></div>
+    <button class="btn bo bsm" onclick="loadCRM()">🔄 تحديث</button>
+  </div>
+
+  <!-- CRM cards grid -->
+  <div class="g4 mb18">
+    <div class="crm-c" id="crm-card-hubspot" onclick="crmSelect('hubspot')">
+      <div class="crm-lg" style="background:rgba(255,122,0,.15)">🟠</div>
+      <div class="fw7 f13">HubSpot</div><div class="f11 ts">CRM متكامل</div>
+      <span class="bge bg-r" id="crm-st-hubspot">غير متصل</span>
+    </div>
+    <div class="crm-c" id="crm-card-pipedrive" onclick="crmSelect('pipedrive')">
+      <div class="crm-lg" style="background:rgba(99,102,241,.15)">🟣</div>
+      <div class="fw7 f13">Pipedrive</div><div class="f11 ts">Sales CRM</div>
+      <span class="bge bg-r" id="crm-st-pipedrive">غير متصل</span>
+    </div>
+    <div class="crm-c" id="crm-card-airtable" onclick="crmSelect('airtable')">
+      <div class="crm-lg" style="background:rgba(255,204,0,.15)">🟡</div>
+      <div class="fw7 f13">Airtable</div><div class="f11 ts">قاعدة البيانات</div>
+      <span class="bge bg-r" id="crm-st-airtable">غير متصل</span>
+    </div>
+    <div class="crm-c" id="crm-card-webhook" onclick="crmSelect('webhook')">
+      <div class="crm-lg" style="background:rgba(var(--ar),.15)">🔗</div>
+      <div class="fw7 f13">Webhook</div><div class="f11 ts">تكامل مخصص</div>
+      <span class="bge bg-r" id="crm-st-webhook">غير متصل</span>
+    </div>
+    <div class="crm-c" id="crm-card-gsheets" onclick="crmSelect('gsheets')">
+      <div class="crm-lg" style="background:rgba(255,51,68,.15)">📊</div>
+      <div class="fw7 f13">Google Sheets</div><div class="f11 ts">جداول جوجل</div>
+      <span class="bge bg-r" id="crm-st-gsheets">غير متصل</span>
+    </div>
+    <div class="crm-c" style="opacity:.5">
+      <div class="crm-lg" style="background:rgba(0,161,224,.15)">🔵</div>
+      <div class="fw7 f13">Salesforce</div><div class="f11 ts">Enterprise CRM</div>
+      <span class="bge bg-y">OAuth — قريباً</span>
+    </div>
+    <div class="crm-c" style="opacity:.5">
+      <div class="crm-lg" style="background:rgba(34,197,94,.15)">🟢</div>
+      <div class="fw7 f13">Zoho CRM</div><div class="f11 ts">Cloud CRM</div>
+      <span class="bge bg-y">OAuth — قريباً</span>
+    </div>
+    <div class="crm-c" style="opacity:.5">
+      <div class="crm-lg" style="background:rgba(var(--ar),.1)">➕</div>
+      <div class="fw7 f13">قريباً</div><div class="f11 ts">تكاملات إضافية</div>
+      <span class="bge bg-p">قادم</span>
+    </div>
+  </div>
+
+  <!-- Dynamic settings panel -->
+  <div class="card" id="crm-settings-panel" style="display:none">
+
+    <!-- HubSpot -->
+    <div id="crm-panel-hubspot" style="display:none">
+      <div class="ct">🟠 إعدادات HubSpot</div>
+      <div class="g2">
+        <div>
+          <div class="fg"><label class="fl">API Key / Access Token</label><input id="crm-hub-key" class="fc" type="password" placeholder="pat-na-xxxxxxxx-xxxx"></div>
+          <div class="fg"><label class="fl">Portal ID <span class="f11 ts">(اختياري)</span></label><input id="crm-hub-portal" class="fc" placeholder="1234567"></div>
+          <div class="fg"><label class="fl">تردد المزامنة التلقائية</label><select id="crm-hub-freq" class="fc"><option value="0">يدوي فقط</option><option value="60">كل ساعة</option><option value="360">كل 6 ساعات</option><option value="1440">يومياً</option></select></div>
+        </div>
+        <div>
+          <div class="f11 ts mb12">🔑 احصل على API Key من: HubSpot → Settings → Integrations → Private Apps</div>
+          <div id="crm-test-result-hubspot" class="f12 mb12" style="min-height:20px"></div>
+          <div class="flex gap8 flex-wrap">
+            <button class="btn bo bsm" onclick="crmTest('hubspot')">🔌 اختبار الاتصال</button>
+            <button class="btn bp bsm fi" onclick="crmSave('hubspot')">💾 حفظ</button>
+          </div>
+          <div class="flex gap8 flex-wrap mt10">
+            <button class="btn bo bsm fi" onclick="crmSync('hubspot')">⬇️ استيراد جهات اتصال HubSpot</button>
+            <button class="btn bo bsm fi" onclick="crmPush('hubspot')">⬆️ تصدير جهاتنا → HubSpot</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pipedrive -->
+    <div id="crm-panel-pipedrive" style="display:none">
+      <div class="ct">🟣 إعدادات Pipedrive</div>
+      <div class="g2">
+        <div>
+          <div class="fg"><label class="fl">API Token</label><input id="crm-pipe-key" class="fc" type="password" placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"></div>
+          <div class="f11 ts mt8">🔑 من Pipedrive → Settings → Personal preferences → API</div>
+        </div>
+        <div>
+          <div id="crm-test-result-pipedrive" class="f12 mb12" style="min-height:20px"></div>
+          <div class="flex gap8 flex-wrap">
+            <button class="btn bo bsm" onclick="crmTest('pipedrive')">🔌 اختبار الاتصال</button>
+            <button class="btn bp bsm fi" onclick="crmSave('pipedrive')">💾 حفظ</button>
+          </div>
+          <div class="flex gap8 flex-wrap mt10">
+            <button class="btn bo bsm fi" onclick="crmSync('pipedrive')">⬇️ استيراد جهات اتصال Pipedrive</button>
+            <button class="btn bo bsm fi" onclick="crmPush('pipedrive')">⬆️ تصدير جهاتنا → Pipedrive</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Airtable -->
+    <div id="crm-panel-airtable" style="display:none">
+      <div class="ct">🟡 إعدادات Airtable</div>
+      <div class="g2">
+        <div>
+          <div class="fg"><label class="fl">Personal Access Token</label><input id="crm-air-key" class="fc" type="password" placeholder="patXXXXXX.XXXXXXXX"></div>
+          <div class="fg"><label class="fl">Base ID</label><input id="crm-air-base" class="fc" placeholder="appXXXXXXXXXXXXXX" style="direction:ltr"></div>
+          <div class="fg"><label class="fl">Table Name</label><input id="crm-air-table" class="fc" placeholder="Contacts" style="direction:ltr"></div>
+          <div class="f11 ts mt8">🔑 من airtable.com → Account → Developer Hub → Personal Access Tokens</div>
+        </div>
+        <div>
+          <div id="crm-test-result-airtable" class="f12 mb12" style="min-height:20px"></div>
+          <div class="flex gap8 flex-wrap">
+            <button class="btn bo bsm" onclick="crmTest('airtable')">🔌 اختبار الاتصال</button>
+            <button class="btn bp bsm fi" onclick="crmSave('airtable')">💾 حفظ</button>
+          </div>
+          <div class="flex gap8 flex-wrap mt10">
+            <button class="btn bo bsm fi" onclick="crmSync('airtable')">⬇️ استيراد سجلات Airtable</button>
+            <button class="btn bo bsm fi" onclick="crmPush('airtable')">⬆️ تصدير جهاتنا → Airtable</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Webhook -->
+    <div id="crm-panel-webhook" style="display:none">
+      <div class="ct">🔗 إعدادات Webhook</div>
+      <div class="g2">
+        <div>
+          <div class="fg"><label class="fl">Webhook URL</label><input id="crm-wh-url" class="fc" type="url" placeholder="https://your-server.com/webhook" style="direction:ltr"></div>
+          <div class="fg"><label class="fl">Secret Header <span class="f11 ts">(اختياري)</span></label><input id="crm-wh-secret" class="fc" placeholder="X-Webhook-Secret value"></div>
+          <div class="flex gap10 mt10">
+            <label class="f12 ic gap6"><input type="checkbox" id="crm-wh-on-send" checked> إرسال عند إكمال حملة</label>
+            <label class="f12 ic gap6"><input type="checkbox" id="crm-wh-on-reply" checked> إرسال عند وصول رد</label>
+          </div>
+        </div>
+        <div>
+          <div class="f11 ts mb12">📨 سيتم إرسال POST بصيغة JSON عند كل حدث. يشمل: بيانات الحملة، الأرقام، الحالة.</div>
+          <div id="crm-test-result-webhook" class="f12 mb12" style="min-height:20px"></div>
+          <div class="flex gap8 flex-wrap">
+            <button class="btn bo bsm" onclick="crmTest('webhook')">🔌 اختبار — إرسال Ping</button>
+            <button class="btn bp bsm fi" onclick="crmSave('webhook')">💾 حفظ</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Google Sheets -->
+    <div id="crm-panel-gsheets" style="display:none">
+      <div class="ct">📊 إعدادات Google Sheets</div>
+      <div class="g2">
+        <div>
+          <div class="fg"><label class="fl">رابط الجدول</label><input id="crm-gs-url" class="fc" type="url" placeholder="https://docs.google.com/spreadsheets/d/..." style="direction:ltr"></div>
+          <div class="fg"><label class="fl">اسم عمود الهاتف</label><input id="crm-gs-phone-col" class="fc" placeholder="phone" style="direction:ltr"></div>
+          <div class="fg"><label class="fl">اسم عمود الاسم</label><input id="crm-gs-name-col" class="fc" placeholder="name" style="direction:ltr"></div>
+          <div class="f11 ts mt8">⚠️ يجب أن يكون الجدول مشاركاً (anyone with link can view)</div>
+        </div>
+        <div>
+          <div id="crm-test-result-gsheets" class="f12 mb12" style="min-height:20px"></div>
+          <div class="flex gap8 flex-wrap">
+            <button class="btn bo bsm" onclick="crmTest('gsheets')">🔌 اختبار الاتصال</button>
+            <button class="btn bp bsm fi" onclick="crmSave('gsheets')">💾 حفظ</button>
+          </div>
+          <div class="flex gap8 mt10">
+            <button class="btn bo bsm fi" onclick="crmSync('gsheets')">⬇️ استيراد جهات الاتصال من الجدول</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Imported leads table -->
+  <div class="card mt18" id="crm-leads-card" style="display:none">
+    <div class="ct flex ic jb">
+      <span>📋 جهات الاتصال المستوردة من CRM</span>
+      <button class="btn bo bsm" onclick="loadCRMLeads()">🔄</button>
+    </div>
+    <table class="dt">
+      <thead><tr><th>المصدر</th><th>الاسم</th><th>الهاتف</th><th>البريد</th><th>الحالة</th></tr></thead>
+      <tbody id="crm-leads-tbody">
+        <tr><td colspan="5" style="text-align:center;padding:24px;opacity:.5">لا توجد بيانات — قم بمزامنة CRM أولاً</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ══ REPORTS ══ -->

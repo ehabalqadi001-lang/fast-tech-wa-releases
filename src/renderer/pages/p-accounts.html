@@ -1,0 +1,87 @@
+<div id="p-accounts" class="page">
+  <div class="ph">
+    <div class="ph-l"><div class="ph-ic">📱</div><div><h1>ACCOUNTS</h1><p id="accounts-subtitle">حسابات WhatsApp Business</p></div></div>
+    <div class="flex gap8" id="acct-ph-btns">
+      <button class="btn bp" id="btn-acct-add" onclick="openM('m-add-acc')">➕ إضافة حساب Cloud</button>
+    </div>
+  </div>
+
+  <!-- Engine status badge -->
+  <div class="card mb18" id="engine-status-card">
+    <div class="flex ic gap12" style="flex-wrap:wrap">
+      <div class="flex ic gap8">
+        <span class="f12 ts">محرك الإرسال النشط:</span>
+        <span id="engine-mode-badge" class="bge bg-b f12" style="min-width:90px;text-align:center">جارٍ التحميل...</span>
+      </div>
+      <div class="flex ic gap6">
+        <span class="f11 ts">🌐 Cloud API:</span>
+        <span id="engine-cloud-count" class="bge bg-g f11">0 حساب</span>
+        <span class="f11 ts" style="margin-right:8px">📱 Web:</span>
+        <span id="engine-web-count" class="bge bg-b f11">0 جلسة</span>
+      </div>
+      <div class="flex ic gap6" style="margin-right:auto">
+        <label class="fl" style="margin:0;white-space:nowrap">وضع التشغيل:</label>
+        <select class="fc" id="engine-mode-sel" style="min-width:140px" onchange="setEngineMode(this.value)">
+          <option value="auto">🔄 تلقائي (Auto)</option>
+          <option value="cloud">🌐 Cloud API فقط</option>
+          <option value="web">📱 Web فقط</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="flex gap0 mb0" id="acct-tabs" style="border-bottom:2px solid rgba(var(--ar),.1);margin-bottom:18px">
+    <button class="tab-btn active" id="tab-cloud" onclick="switchAcctTab('cloud')" style="padding:10px 24px;background:none;border:none;border-bottom:2px solid var(--hp);color:var(--hp);cursor:pointer;font-size:13px;font-weight:600;margin-bottom:-2px">🌐 Cloud API</button>
+    <button class="tab-btn" id="tab-web" onclick="switchAcctTab('web')" style="padding:10px 24px;background:none;border:none;border-bottom:2px solid transparent;color:var(--ts);cursor:pointer;font-size:13px;font-weight:600;margin-bottom:-2px">📱 Web Sessions</button>
+  </div>
+
+  <!-- Cloud API Tab -->
+  <div id="acct-tab-cloud">
+    <div class="card mb14" style="padding:12px 18px;background:rgba(var(--ar),.03)">
+      <div class="f12 ts">حسابات <b>WhatsApp Business Cloud API</b> الرسمية من Meta. تتطلب: رمز الوصول (Token) + Phone Number ID + Business Account ID</div>
+    </div>
+    <div class="card">
+      <table class="dt">
+        <thead><tr><th>الاسم</th><th>رقم الهاتف</th><th>الحالة</th><th>الرسائل</th><th>آخر استخدام</th><th>إجراءات</th></tr></thead>
+        <tbody id="accounts-tbody">
+          <tr><td colspan="6" class="ta f12 ts" style="padding:32px">لا توجد حسابات Cloud API — أضف حساباً جديداً</td></tr>
+        </tbody>
+      </table>
+      <div class="mt14" style="border-top:1px solid rgba(var(--ar),.08);padding-top:14px">
+        <div class="ac" onclick="openM('m-add-acc')" style="border-style:dashed;flex-direction:column;align-items:center;justify-content:center;gap:8px;min-height:80px;cursor:pointer">
+          <div style="font-size:24px;opacity:.25">➕</div><div class="f12 ts">إضافة حساب Cloud API جديد</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Web Sessions Tab -->
+  <div id="acct-tab-web" style="display:none">
+    <div class="card mb14" style="padding:12px 18px;background:rgba(var(--ar),.03)">
+      <div class="f12 ts">جلسات <b>whatsapp-web.js</b> (مسح QR). لا تتطلب حساب Meta رسمياً. مناسبة للإرسال والاستقبال وسحب المجموعات.</div>
+    </div>
+    <div class="card mb18">
+      <div class="flex ic jb mb12">
+        <div class="ct" style="margin:0">الجلسات النشطة <span id="web-sessions-count" class="bge bg-b f11 ml6">0</span></div>
+        <button class="btn bp bsm" onclick="createWebSession()">➕ إضافة جلسة</button>
+      </div>
+      <table class="dt">
+        <thead><tr><th>الاسم</th><th>رقم الهاتف</th><th>الحالة</th><th>الرسائل</th><th>إجراءات</th></tr></thead>
+        <tbody id="web-sessions-tbody">
+          <tr><td colspan="5" class="ta f12 ts" style="padding:32px">لا توجد جلسات — أضف جلسة جديدة وامسح QR</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <!-- QR Modal inline -->
+    <div id="acct-qr-section" style="display:none" class="card">
+      <div class="ct">📱 مسح QR Code</div>
+      <div class="flex ic jc" style="flex-direction:column;gap:12px;padding:24px">
+        <div id="acct-qr-img" style="font-size:64px;text-align:center">⏳</div>
+        <div class="f12 ts ta" id="acct-qr-msg">في انتظار QR Code...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ CONTACTS ══ -->

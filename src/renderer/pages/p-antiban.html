@@ -1,0 +1,162 @@
+<div id="p-antiban" class="page">
+  <div class="ph">
+    <div class="ph-l"><div class="ph-ic">🛡️</div><div><h1>ANTI-BAN</h1><p>حماية الحسابات من الحظر — إدارة الحدود والإحماء والصحة</p></div></div>
+    <div class="flex gap8 ic">
+      <button class="btn bo bsm" onclick="loadAntiBan()">🔄 تحديث</button>
+      <button class="btn bp bsm" onclick="saveAntiBanSettings()">💾 حفظ الإعدادات</button>
+    </div>
+  </div>
+
+  <!-- Stats row -->
+  <div class="sg" id="ab-stats-row" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px">
+    <div class="sc"><div class="sn ta fm" id="ab-stat-healthy">0</div><div class="sl">جلسات سليمة</div><div class="si">✅</div></div>
+    <div class="sc"><div class="sn ta fm" id="ab-stat-suspended">0</div><div class="sl">جلسات موقوفة</div><div class="si">⏸️</div></div>
+    <div class="sc"><div class="sn ta fm" id="ab-stat-banned">0</div><div class="sl">محظورة</div><div class="si">🚫</div></div>
+    <div class="sc"><div class="sn ta fm" id="ab-stat-warmup">0</div><div class="sl">في وضع الإحماء</div><div class="si">🔥</div></div>
+  </div>
+
+  <div class="g2" style="gap:18px;margin-bottom:18px">
+    <!-- Settings card -->
+    <div class="card">
+      <div class="ct">⚙️ إعدادات الحماية</div>
+
+      <div class="fg" style="display:flex;align-items:center;justify-content:space-between;padding:10px;background:rgba(var(--ar),.05);border-radius:8px;margin-bottom:14px">
+        <div>
+          <div class="fw6 f13">تفعيل نظام Anti-Ban</div>
+          <div class="f11 ts">يراقب الحدود ويوقف الإرسال تلقائياً</div>
+        </div>
+        <label style="position:relative;display:inline-block;width:44px;height:24px">
+          <input type="checkbox" id="ab-enabled" style="opacity:0;width:0;height:0" onchange="toggleABEnabled(this)">
+          <span id="ab-enabled-track" style="position:absolute;inset:0;border-radius:24px;background:rgba(var(--ar),.15);border:1px solid rgba(var(--ar),.3);cursor:pointer;transition:var(--tr)"></span>
+          <span id="ab-enabled-thumb" style="position:absolute;top:3px;right:3px;width:16px;height:16px;border-radius:50%;background:var(--ts);cursor:pointer;transition:var(--tr)"></span>
+        </label>
+      </div>
+
+      <div class="fg">
+        <label class="fl">ملف التأخير بين الرسائل</label>
+        <select id="ab-delay-profile" class="fc">
+          <option value="stealth">🔕 STEALTH — 2 إلى 5 دقائق (أأمن)</option>
+          <option value="slow">🐢 SLOW — دقيقة إلى دقيقتين</option>
+          <option value="normal" selected>⚡ NORMAL — 15 إلى 45 ثانية (افتراضي)</option>
+          <option value="fast">🚀 FAST — 5 إلى 15 ثانية (خطر)</option>
+        </select>
+      </div>
+
+      <div class="g2">
+        <div class="fg">
+          <label class="fl">الحد اليومي (رسالة/يوم)</label>
+          <input id="ab-daily-limit" class="fc" type="number" min="1" max="5000" value="500">
+        </div>
+        <div class="fg">
+          <label class="fl">الحد الساعي (رسالة/ساعة)</label>
+          <input id="ab-hourly-limit" class="fc" type="number" min="1" max="500" value="60">
+        </div>
+      </div>
+
+      <div class="fg" style="padding:10px;background:rgba(var(--ar),.05);border-radius:8px">
+        <div class="flex ic jb mb8">
+          <div>
+            <div class="fw6 f12">نافذة وقت الإرسال</div>
+            <div class="f11 ts">لا يُرسل خارج هذه الساعات</div>
+          </div>
+          <label style="position:relative;display:inline-block;width:44px;height:24px">
+            <input type="checkbox" id="ab-window-enabled" style="opacity:0;width:0;height:0" onchange="toggleABWindow(this)">
+            <span id="ab-window-track" style="position:absolute;inset:0;border-radius:24px;background:rgba(var(--ar),.15);border:1px solid rgba(var(--ar),.3);cursor:pointer;transition:var(--tr)"></span>
+            <span id="ab-window-thumb" style="position:absolute;top:3px;right:3px;width:16px;height:16px;border-radius:50%;background:var(--ts);cursor:pointer;transition:var(--tr)"></span>
+          </label>
+        </div>
+        <div class="g2">
+          <div class="fg mb0">
+            <label class="fl">من (ساعة)</label>
+            <input id="ab-window-start" class="fc" type="number" min="0" max="23" value="9">
+          </div>
+          <div class="fg mb0">
+            <label class="fl">إلى (ساعة)</label>
+            <input id="ab-window-end" class="fc" type="number" min="0" max="23" value="21">
+          </div>
+        </div>
+      </div>
+
+      <div class="fg mt14" style="padding:10px;background:rgba(var(--ar),.05);border-radius:8px">
+        <div class="flex ic jb mb8">
+          <div>
+            <div class="fw6 f12">محاكاة الكتابة</div>
+            <div class="f11 ts">يُظهر "يكتب..." قبل إرسال كل رسالة</div>
+          </div>
+          <label style="position:relative;display:inline-block;width:44px;height:24px">
+            <input type="checkbox" id="ab-typing-sim" style="opacity:0;width:0;height:0" onchange="toggleABTyping(this)">
+            <span id="ab-typing-track" style="position:absolute;inset:0;border-radius:24px;background:rgba(var(--ar),.15);border:1px solid rgba(var(--ar),.3);cursor:pointer;transition:var(--tr)"></span>
+            <span id="ab-typing-thumb" style="position:absolute;top:3px;right:3px;width:16px;height:16px;border-radius:50%;background:var(--ts);cursor:pointer;transition:var(--tr)"></span>
+          </label>
+        </div>
+        <div class="g2">
+          <div class="fg mb0">
+            <label class="fl">مدة الكتابة الدنيا (ms)</label>
+            <input id="ab-typing-min" class="fc" type="number" min="500" max="10000" value="1000">
+          </div>
+          <div class="fg mb0">
+            <label class="fl">مدة الكتابة القصوى (ms)</label>
+            <input id="ab-typing-max" class="fc" type="number" min="500" max="15000" value="3000">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sessions health card -->
+    <div class="card">
+      <div class="ct flex ic jb"><span>📊 صحة الجلسات</span><button class="btn bo bsm" onclick="loadAntiBan()">🔄</button></div>
+      <div id="ab-sessions-list" style="display:flex;flex-direction:column;gap:10px">
+        <div style="text-align:center;padding:32px;opacity:.5">لا توجد جلسات — أضف جلسة أولاً</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Warmup guide -->
+  <div class="card mb18">
+    <div class="ct">🔥 جدول الإحماء التلقائي — لأرقام جديدة</div>
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;text-align:center">
+      <div style="padding:12px;background:rgba(var(--ar),.05);border-radius:8px;border:1px solid rgba(var(--ar),.1)">
+        <div class="fm f16 ta" class="ta">10</div>
+        <div class="f11 ts mt4">رسالة/يوم</div>
+        <div class="f10 ts">أيام 1–3</div>
+      </div>
+      <div style="padding:12px;background:rgba(var(--ar),.05);border-radius:8px;border:1px solid rgba(var(--ar),.1)">
+        <div class="fm f16 ta" class="ta">25</div>
+        <div class="f11 ts mt4">رسالة/يوم</div>
+        <div class="f10 ts">أيام 4–7</div>
+      </div>
+      <div style="padding:12px;background:rgba(var(--ar),.05);border-radius:8px;border:1px solid rgba(var(--ar),.1)">
+        <div class="fm f16 ta" style="color:#f59e0b">50</div>
+        <div class="f11 ts mt4">رسالة/يوم</div>
+        <div class="f10 ts">أيام 8–14</div>
+      </div>
+      <div style="padding:12px;background:rgba(var(--ar),.05);border-radius:8px;border:1px solid rgba(var(--ar),.1)">
+        <div class="fm f16 ta" style="color:#f59e0b">100</div>
+        <div class="f11 ts mt4">رسالة/يوم</div>
+        <div class="f10 ts">أيام 15–21</div>
+      </div>
+      <div style="padding:12px;background:rgba(var(--ar),.05);border-radius:8px;border:1px solid rgba(var(--ar),.1)">
+        <div class="fm f16 ta" style="color:#ff6600">200</div>
+        <div class="f11 ts mt4">رسالة/يوم</div>
+        <div class="f10 ts">أيام 22–30</div>
+      </div>
+    </div>
+    <div class="f11 ts mt10" style="text-align:center">بعد اليوم 30 يُرفع الإحماء تلقائياً ويطبق الحد اليومي العام</div>
+  </div>
+
+  <!-- Events log -->
+  <div class="card">
+    <div class="ct flex ic jb">
+      <span>📋 سجل الأحداث</span>
+      <button class="btn bd bsm" onclick="clearABEvents()">🗑️ مسح القديم</button>
+    </div>
+    <table class="dt">
+      <thead><tr><th>الجلسة</th><th>الحدث</th><th>التفاصيل</th><th>الوقت</th></tr></thead>
+      <tbody id="ab-events-tbody">
+        <tr><td colspan="4" style="text-align:center;padding:24px;opacity:.5">لا توجد أحداث مسجلة</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ══ MEDIA LIBRARY ══ -->

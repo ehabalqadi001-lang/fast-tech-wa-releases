@@ -1,0 +1,35 @@
+<div id="p-contacts" class="page">
+  <div class="ph">
+    <div class="ph-l"><div class="ph-ic">👥</div><div><h1>CONTACTS</h1><p id="contacts-subtitle">إدارة جهات الاتصال</p></div></div>
+    <div class="flex gap8"><button class="btn bo bsm" onclick="importContactsExcel()">📂 استيراد Excel</button><button class="btn bp bsm" onclick="openM('m-add-contact')">➕ إضافة</button></div>
+  </div>
+  <div class="card mb18">
+    <div class="ct">🌍 تصحيح أكواد الدول تلقائياً</div>
+    <div class="g3">
+      <div class="fg"><label class="fl">الدولة الافتراضية</label><select id="contact-fix-country" class="fc"><option value="966">🇸🇦 السعودية (+966)</option><option value="971">🇦🇪 الإمارات (+971)</option><option value="20">🇪🇬 مصر (+20)</option><option value="962">🇯🇴 الأردن (+962)</option><option value="965">🇰🇼 الكويت (+965)</option><option value="974">🇶🇦 قطر (+974)</option><option value="973">🇧🇭 البحرين (+973)</option><option value="968">🇴🇲 عُمان (+968)</option><option value="961">🇱🇧 لبنان (+961)</option></select></div>
+      <div class="fg"><label class="fl">نوع التصحيح</label><select id="contact-fix-mode" class="fc"><option value="add_code">إضافة كود الدولة إذا مفقود</option><option value="replace_00">استبدال 00 بـ +</option><option value="remove_leading">إزالة الأصفار الأمامية</option><option value="full">تصحيح شامل</option></select></div>
+      <div class="fg"><label class="fl" style="visibility:hidden">_</label><button class="btn bp wf" onclick="fixCountryCode()">⚡ تطبيق التصحيح</button></div>
+    </div>
+    <div class="flex gap8 mt14">
+      <button class="btn bo bsm" onclick="deduplicateContacts()">🧹 إزالة تكرارات</button>
+      <button class="btn bo bsm" onclick="exportContactsExcel()">📊 تصدير Excel</button>
+      <button class="btn bd bsm" id="contacts-del-btn" onclick="deleteSelectedContacts()">🗑️ حذف المحدد</button>
+    </div>
+  </div>
+  <div class="flex gap12 mb18 ic">
+    <input class="fc fi" type="search" id="contacts-search" placeholder="🔍 البحث..." oninput="filterContacts()">
+  </div>
+  <div class="card">
+    <table class="dt">
+      <thead><tr><th><input type="checkbox" id="contacts-chk-all" onchange="toggleAllContacts(this)"></th><th>الاسم</th><th>رقم الهاتف</th><th>الدولة</th><th>المجموعة</th><th>الحالة</th><th>إجراءات</th></tr></thead>
+      <tbody id="contacts-tbody">
+        <tr><td colspan="7" class="ta f12 ts" style="padding:32px">لا توجد جهات اتصال — استورد ملف Excel أو أضف يدوياً</td></tr>
+      </tbody>
+    </table>
+    <div class="flex ic jb mt14" style="border-top:1px solid rgba(var(--ar),.08);padding-top:14px">
+      <span class="f11 ts" id="contacts-count-label">0 جهة اتصال</span>
+    </div>
+  </div>
+</div>
+
+<!-- ══ GROUPS ══ -->

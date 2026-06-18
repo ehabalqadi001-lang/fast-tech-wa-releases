@@ -1,0 +1,23 @@
+<div id="p-templates" class="page">
+  <div class="ph">
+    <div class="ph-l"><div class="ph-ic">📝</div><div><h1>TEMPLATES</h1><p id="templates-subtitle">قوالب الرسائل والمحتوى التسويقي</p></div></div>
+    <div class="flex gap8">
+      <button class="btn bo bsm" id="tpl-view-gallery" onclick="setTemplatesView('gallery')" style="border-color:var(--acc);color:var(--acc)">🖼️ معرض</button>
+      <button class="btn bo bsm" id="tpl-view-list" onclick="setTemplatesView('list')">☰ قائمة</button>
+      <button class="btn bp" onclick="openM('m-new-template')">➕ قالب جديد</button>
+    </div>
+  </div>
+  <div id="templates-list" class="g3">
+    <div class="card" onclick="nav('ai')" style="border-style:dashed;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:28px;cursor:pointer">
+      <div style="font-size:30px">🤖</div><div class="fw6 f12">إنشاء بالـ AI</div>
+      <div class="f11 ts" style="text-align:center">أخبر الـ AI بفكرتك وسيكتب القالب لك</div>
+      <button class="btn bp bsm mt8">⚡ ابدأ الآن</button>
+    </div>
+    <div class="card" onclick="openM('m-new-template')" style="border-style:dashed;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:28px;cursor:pointer">
+      <div style="font-size:30px;opacity:.25">➕</div><div class="fw6 f12">قالب جديد</div>
+      <div class="f11 ts" style="text-align:center">أضف قالباً مخصصاً</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ AI ASSISTANT ══ -->

@@ -1,0 +1,105 @@
+<div id="p-settings" class="page">
+  <div class="ph">
+    <div class="ph-l"><div class="ph-ic">⚙️</div><div><h1>SETTINGS</h1><p>إعدادات النظام والتفضيلات</p></div></div>
+    <button class="btn bp" onclick="saveAllSettings()">💾 حفظ الكل</button>
+  </div>
+  <div class="g2">
+    <div>
+      <!-- Engine Mode -->
+      <div class="card mb18">
+        <div class="ct">⚡ محرك الإرسال</div>
+        <div class="fg">
+          <label class="fl">وضع التشغيل</label>
+          <select class="fc" id="set-engine-mode" onchange="setEngineMode(this.value)">
+            <option value="auto">🔄 تلقائي — يستخدم Cloud API إذا متاح، وإلا Web</option>
+            <option value="cloud">🌐 Cloud API فقط — الرسمي من Meta</option>
+            <option value="web">📱 Web فقط — whatsapp-web.js (QR)</option>
+          </select>
+        </div>
+        <div class="flex ic gap12 mt10" style="padding:12px;background:rgba(var(--ar),.04);border-radius:8px">
+          <div class="flex ic gap6">
+            <span class="f12 ts">الحالة:</span>
+            <span id="set-engine-status-badge" class="bge bg-b f12">جارٍ التحميل...</span>
+          </div>
+          <div class="flex ic gap6">
+            <span class="f11 ts">Cloud:</span><span id="set-cloud-count" class="bge bg-g f11">0</span>
+            <span class="f11 ts" style="margin-right:6px">Web:</span><span id="set-web-count" class="bge bg-b f11">0</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cloud API Keys -->
+      <div class="card mb18">
+        <div class="ct">🌐 WhatsApp Business Cloud API</div>
+        <div class="f12 ts mb10">المفاتيح الافتراضية (الحساب الأول). يمكنك إضافة حسابات متعددة من صفحة <b>Accounts</b>.</div>
+        <div class="fg"><label class="fl">Access Token</label><input id="set-wa-token" class="fc" type="password" placeholder="EAA..."></div>
+        <div class="fg"><label class="fl">Phone Number ID</label><input id="set-wa-pid" class="fc" type="text" placeholder="1234567890"></div>
+        <div class="fg"><label class="fl">WhatsApp Business Account ID</label><input id="set-wa-bid" class="fc" type="text" placeholder="9876543210"></div>
+        <button class="btn bp wf bsm" onclick="saveAllSettings()">💾 حفظ</button>
+      </div>
+
+      <!-- AI Keys -->
+      <div class="card mb18">
+        <div class="ct">🤖 مفاتيح AI</div>
+        <div class="fg"><label class="fl">Google Gemini API Key</label><input id="set-gemini-key" class="fc" type="password" placeholder="AIza..."></div>
+        <div class="fg"><label class="fl">Anthropic Claude API Key</label><input id="set-claude-key" class="fc" type="password" placeholder="sk-ant-..."></div>
+      </div>
+    </div>
+
+    <div>
+      <!-- Webhook Server -->
+      <div class="card mb18">
+        <div class="ct">🔗 Webhook Server (Cloud API استقبال)</div>
+        <div class="f12 ts mb10">استقبال الرسائل الواردة وتحديثات التسليم من Cloud API. اضبط Callback URL في Meta Developer Console.</div>
+        <div class="fg">
+          <label class="fl">منفذ الاستقبال (Port)</label>
+          <input class="fc" type="number" id="set-webhook-port" placeholder="3001" value="3001">
+        </div>
+        <div class="fg">
+          <label class="fl">Verify Token</label>
+          <input class="fc" type="text" id="set-webhook-token" placeholder="ftwa-verify">
+        </div>
+        <div class="fg">
+          <label class="fl">Callback URL (للنسخ)</label>
+          <input class="fc" id="set-webhook-url" readonly style="cursor:default;color:var(--tm)" placeholder="http://YOUR-IP:3001/webhook">
+        </div>
+        <div class="flex ic gap8 mt10">
+          <button class="btn bp fi bsm" id="btn-webhook-start" onclick="toggleWebhook()">▶️ تشغيل</button>
+          <span id="webhook-status-badge" class="bge f11">متوقف</span>
+        </div>
+      </div>
+
+      <!-- Send Settings -->
+      <div class="card mb18">
+        <div class="ct">⚙️ إعدادات الإرسال</div>
+        <div class="si-row"><div><div class="fw6 f12">إيقاف الإرسال عند الرد بـ"لا"</div><div class="f11 ts">لا ترسل للعميل إذا رد برفض</div></div><div class="tg on" onclick="this.classList.toggle('on')"></div></div>
+        <div class="si-row"><div><div class="fw6 f12">الوضع الآمن (1000 رسالة/يوم)</div><div class="f11 ts">حد أقصى لكل حساب يومياً</div></div><div class="tg on" onclick="this.classList.toggle('on')"></div></div>
+        <div class="si-row"><div><div class="fw6 f12">إشعارات سطح المكتب</div></div><div class="tg on" onclick="this.classList.toggle('on')"></div></div>
+      </div>
+
+      <!-- Backup -->
+      <div class="card mb18">
+        <div class="ct">💾 النسخ الاحتياطي</div>
+        <div class="flex gap8" style="flex-wrap:wrap">
+          <button class="btn bp fi bsm" onclick="backupData()">💾 نسخ الآن</button>
+          <button class="btn bo fi bsm" onclick="restoreData()">📂 استعادة</button>
+          <button class="btn bo fi bsm" onclick="backupEncrypted()">🔐 نسخ مشفّر (AES-256)</button>
+        </div>
+      </div>
+
+      <!-- System Info -->
+      <div class="card">
+        <div class="ct">ℹ️ معلومات النظام</div>
+        <div class="si-row"><div class="f12">الإصدار</div><div class="ta fm f12" id="sys-version">جاري التحميل...</div></div>
+        <div class="si-row"><div class="f12">قاعدة البيانات</div><div class="ta fm f12">SQLite 3</div></div>
+        <div class="si-row"><div class="f12">الترخيص</div><div class="ta fm f12">Professional</div></div>
+        <div class="si-row"><div class="f12">تاريخ البناء</div><div class="ta fm f12" id="sys-date">—</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<!-- PAGE: DEVICES (whatsapp-web.js multi-session)                         -->
+<!-- ══════════════════════════════════════════════════════════════════════ -->

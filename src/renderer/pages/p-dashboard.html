@@ -1,0 +1,63 @@
+<div id="p-dashboard" class="page on">
+  <div class="ph">
+    <div class="ph-l"><div class="ph-ic">📊</div><div><h1>DASHBOARD</h1><p>نظرة عامة شاملة على النظام</p></div></div>
+    <div class="flex gap8"><button class="btn bo bsm" onclick="loadDashboard()">🔄 تحديث</button><button class="btn bp bsm" onclick="nav('engine')">⚡ إرسال جماعي</button></div>
+  </div>
+  <div class="sg" style="grid-template-columns:repeat(5,1fr)">
+    <div class="sc"><div class="si">📲</div><div class="sn" id="dash-s-accounts">0</div><div class="sl">أجهزة متصلة</div><svg class="sparkline" id="spark-accounts" viewBox="0 0 100 30" preserveAspectRatio="none"></svg></div>
+    <div class="sc" id="dash-card-sent"><div class="si">📤</div><div class="sn" id="dash-s-sent">0</div><div class="sl">رسائل مُرسلة</div><svg class="sparkline" id="spark-sent" viewBox="0 0 100 30" preserveAspectRatio="none"></svg></div>
+    <div class="sc"><div class="si">💬</div><div class="sn" id="dash-s-replies">0</div><div class="sl">ردود واردة</div></div>
+    <div class="sc" style="cursor:pointer" onclick="nav('inbox')"><div class="si">🔔</div><div class="sn ta fm" id="dash-s-unreplied">0</div><div class="sl">تنتظر رد</div></div>
+    <div class="sc"><div class="si">📅</div><div class="sn" id="dash-s-scheduled">0</div><div class="sl">مهام مجدولة</div></div>
+  </div>
+  <div class="g2 mb22">
+    <div class="card">
+      <div class="ct">🎯 أداء الإرسال الكلي</div>
+      <div class="flex ic gap20" style="padding:10px 0">
+        <div class="donut" id="dash-donut" style="background:conic-gradient(var(--acc) 0% 0%,rgba(var(--ar),.08) 0% 100%)">
+          <div class="dn-in"><div class="dn-v" id="dash-donut-pct">0%</div><div class="dn-l">استجابة</div></div>
+        </div>
+        <div class="fi">
+          <div class="flex ic jb mb14"><span class="f11 ts">✅ مُرسلة</span><span class="f11 ta fm" id="dash-p-sent">0</span></div>
+          <div class="pb mb14"><div class="pf" id="dash-pb-sent" style="width:0%"></div></div>
+          <div class="flex ic jb mb14"><span class="f11 ts">✔✔ مُستلَمة</span><span class="f11 fm" id="dash-p-read" style="color:#3b82f6">0</span></div>
+          <div class="pb mb14"><div class="pf" id="dash-pb-read" style="width:0%;background:#3b82f6"></div></div>
+          <div class="flex ic jb mb14"><span class="f11 ts">💬 ردود</span><span class="f11 fm" id="dash-p-rep" style="color:#bf00ff">0</span></div>
+          <div class="pb"><div class="pf" id="dash-pb-rep" style="width:0%;background:#bf00ff"></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="ct">📊 حالة محرك الإرسال</div>
+      <div id="dash-engine-summary" style="display:flex;flex-direction:column;gap:10px;padding:4px 0">
+        <div class="flex ic jb f12"><span class="ts">⏳ في الانتظار</span><span class="ta fm" id="dash-q-pending">—</span></div>
+        <div class="flex ic jb f12"><span class="ts">✅ مُرسَل</span><span class="ta fm" id="dash-q-sent">—</span></div>
+        <div class="flex ic jb f12"><span class="ts">❌ فشل</span><span style="color:#ef4444" class="fm" id="dash-q-failed">—</span></div>
+        <div class="flex ic jb f12"><span class="ts">📲 أجهزة جاهزة</span><span class="ta fm" id="dash-q-devices">—</span></div>
+        <button class="btn bo bsm wf mt8" onclick="nav('engine')">⚡ فتح محرك الإرسال</button>
+      </div>
+    </div>
+  </div>
+  <div class="card mb22">
+    <div class="ct flex ic jb"><span>📩 آخر الرسائل الواردة</span><button class="btn bo bsm" onclick="nav('inbox')">عرض الكل</button></div>
+    <table class="dt">
+      <thead><tr><th>من</th><th>المجموعة</th><th>الرسالة</th><th>الجلسة</th><th>الوقت</th><th></th></tr></thead>
+      <tbody id="dash-activity-tbody">
+        <tr><td colspan="6" class="ta f12 ts" style="padding:24px">لا توجد بيانات حتى الآن</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="card">
+    <div class="ct">⚡ إجراءات سريعة</div>
+    <div class="flex gap8" style="flex-wrap:wrap">
+      <button class="btn bo" onclick="nav('campaigns')">📢 حملة جديدة</button>
+      <button class="btn bo" onclick="nav('contacts')">📥 استيراد جهات اتصال</button>
+      <button class="btn bo" onclick="nav('templates')">📝 قالب جديد</button>
+      <button class="btn bo" onclick="nav('scheduler')">📅 جدولة رسالة</button>
+      <button class="btn bo" onclick="nav('reports')">📊 تصدير تقرير</button>
+      <button class="btn bo" onclick="nav('ai')">🤖 إنشاء محتوى AI</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ ACCOUNTS ══ -->

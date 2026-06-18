@@ -1,0 +1,53 @@
+<div id="p-campaigns" class="page">
+  <div class="ph">
+    <div class="ph-l"><div class="ph-ic">📢</div><div><h1>CAMPAIGNS</h1><p id="campaigns-subtitle">إنشاء وإدارة الحملات الإعلانية</p></div></div>
+    <button class="btn bp" onclick="nav('engine')">⚡ محرك الإرسال الجماعي</button>
+  </div>
+  <div class="card mb18">
+    <div class="ct">💡 الإرسال الجماعي</div>
+    <div class="flex" style="flex-direction:column;gap:10px">
+      <p class="f12 ts" style="line-height:1.8">لبدء حملة إرسال جماعي، استخدم <b class="ta">محرك الإرسال</b> الذي يدعم Anti-Ban الكامل مع تأخير عشوائي، A/B Testing، وتدوير الحسابات تلقائياً.</p>
+      <div class="flex gap8" style="flex-wrap:wrap">
+        <button class="btn bp" onclick="nav('engine')">🚀 فتح محرك الإرسال</button>
+        <button class="btn bo" onclick="nav('scheduler')">📅 جدولة حملة</button>
+        <button class="btn bo" onclick="nav('ai')">🤖 إنشاء نص بالـ AI</button>
+        <button class="btn bo" onclick="nav('contacts')">👥 إدارة جهات الاتصال</button>
+      </div>
+    </div>
+  </div>
+  <!-- Live progress bar (shown during active campaign) -->
+  <div id="campaign-progress-bar-wrap" class="card mb18" style="display:none">
+    <div class="ct flex ic jb">
+      <span>📤 إرسال جاري...</span>
+      <span class="f11 ta fm" id="camp-prog-eta">—</span>
+    </div>
+    <div style="background:rgba(var(--ar),.08);border-radius:6px;height:14px;overflow:hidden;margin-bottom:8px">
+      <div id="camp-prog-bar" style="height:100%;background:var(--acc);transition:width .4s ease;width:0%"></div>
+    </div>
+    <div class="flex ic jb f12">
+      <span class="ts" id="camp-prog-text">0 / 0</span>
+      <div class="flex gap8">
+        <button class="btn bo bsm" onclick="ftwa.wa.send.pause().then(()=>beOk('تم إيقاف الإرسال مؤقتاً'))">⏸️ إيقاف مؤقت</button>
+        <button class="btn bd bsm" onclick="ftwa.wa.send.resume().then(()=>beOk('تم استئناف الإرسال'))">▶️ استئناف</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="ct flex ic jb">
+      <span>📋 آخر الحملات المُرسَلة</span>
+      <div class="flex gap8">
+        <button class="btn bo bsm" id="campaigns-view-list" onclick="setCampaignsView('list')" style="border-color:var(--acc);color:var(--acc)">☰ قائمة</button>
+        <button class="btn bo bsm" id="campaigns-view-kanban" onclick="setCampaignsView('kanban')">📌 كانبان</button>
+        <button class="btn bo bsm" onclick="retryFailedMessages()">🔁 إعادة الفاشلة</button>
+        <button class="btn bo bsm" onclick="loadCampaigns()">🔄 تحديث</button>
+      </div>
+    </div>
+    <div id="campaigns-list">
+      <div style="text-align:center;padding:32px;opacity:.5" class="f12 ts">لا توجد حملات — ابدأ إرسالاً جماعياً من محرك الإرسال</div>
+    </div>
+    <div id="campaigns-kanban" class="kanban-board" style="display:none"></div>
+  </div>
+</div>
+
+<!-- ══ SCHEDULER ══ -->

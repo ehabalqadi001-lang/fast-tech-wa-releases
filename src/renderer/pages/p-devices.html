@@ -1,0 +1,32 @@
+<div id="p-devices" class="page">
+  <div class="ph">
+    <div class="ph-l"><div class="ph-ic">📲</div><div><h1>DEVICES</h1><p>الأجهزة المتصلة عبر QR — حتى 25 جلسة</p></div></div>
+    <button class="btn bp" onclick="promptAddDevice()">➕ ربط جهاز جديد</button>
+  </div>
+  <div class="sg mb18">
+    <div class="sc"><div class="si">📲</div><div class="sn" id="dev-total">0</div><div class="sl">إجمالي الأجهزة</div></div>
+    <div class="sc"><div class="si">🟢</div><div class="sn ta" id="dev-ready">0</div><div class="sl">متصل الآن</div></div>
+    <div class="sc"><div class="si">⏳</div><div class="sn" id="dev-qr" style="color:#f59e0b">0</div><div class="sl">ينتظر QR</div></div>
+    <div class="sc"><div class="si">🔴</div><div class="sn" id="dev-off" style="color:#ef4444">0</div><div class="sl">غير متصل</div></div>
+  </div>
+  <div class="g3 mb18" id="devices-grid">
+    <!-- injected by JS -->
+    <div class="ac" onclick="promptAddDevice()" style="border-style:dashed;flex-direction:column;align-items:center;justify-content:center;gap:10px;min-height:150px;cursor:pointer">
+      <div style="font-size:34px;opacity:.2">📱</div>
+      <div class="f12 ts">ربط جهاز جديد</div>
+      <div class="f11" style="color:var(--tm)">مسح QR من واتساب</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ct">ℹ️ خطوات الاتصال</div>
+    <div class="g3" style="text-align:center">
+      <div style="padding:14px"><div style="font-size:28px;margin-bottom:8px">1️⃣</div><div class="fw6 f12 mb4">إضافة جهاز</div><div class="f11 ts">اضغط "ربط جهاز جديد"</div></div>
+      <div style="padding:14px"><div style="font-size:28px;margin-bottom:8px">2️⃣</div><div class="fw6 f12 mb4">مسح QR</div><div class="f11 ts">واتساب ← القائمة ← الأجهزة المرتبطة ← مسح</div></div>
+      <div style="padding:14px"><div style="font-size:28px;margin-bottom:8px">3️⃣</div><div class="fw6 f12 mb4">إرسال</div><div class="f11 ts">انتقل لـ "محرك الإرسال" وابدأ حملتك</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<!-- PAGE: SEND ENGINE (anti-ban bulk queue)                               -->
+<!-- ══════════════════════════════════════════════════════════════════════ -->

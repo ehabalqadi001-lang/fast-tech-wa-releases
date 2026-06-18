@@ -1,0 +1,109 @@
+<div id="p-groups" class="page">
+  <div class="ph">
+    <div class="ph-l"><div class="ph-ic">🏘️</div><div><h1>GROUPS</h1><p id="groups-subtitle">سحب بيانات المجموعات من WhatsApp</p></div></div>
+    <div class="flex gap8">
+      <button class="btn bo bsm" onclick="exportGroupsExcel()">📊 تصدير Excel</button>
+      <button class="btn bp bsm" onclick="nav('campaigns')">📢 إرسال للمجموعات</button>
+    </div>
+  </div>
+
+  <!-- Method selector -->
+  <div class="card mb18">
+    <div class="ct">⚙️ طريقة إضافة المجموعات</div>
+    <div class="flex gap8" style="flex-wrap:wrap">
+      <button class="btn bo bsm" id="grp-method-web" onclick="switchGroupMethod('web')" style="border-color:var(--hp);color:var(--hp)">📱 سحب من جلسة Web</button>
+      <button class="btn bo bsm" id="grp-method-manual" onclick="switchGroupMethod('manual')">✏️ إدخال يدوي</button>
+      <button class="btn bo bsm" id="grp-method-excel" onclick="switchGroupMethod('excel')">📂 استيراد Excel</button>
+    </div>
+  </div>
+
+  <!-- Web scraping section -->
+  <div id="groups-web-section" class="card mb18">
+    <div class="ct">📱 سحب البيانات من جلسة Web</div>
+    <div class="g3">
+      <div class="fg">
+        <label class="fl">الجلسة النشطة</label>
+        <select class="fc" id="groups-session-sel">
+          <option value="">اختر جلسة...</option>
+        </select>
+      </div>
+      <div class="fg" style="display:flex;align-items:flex-end;gap:8px">
+        <button class="btn bp wf" id="btn-scrape-groups" onclick="scrapeGroups()">🔍 سحب المجموعات</button>
+      </div>
+      <div class="fg" style="display:flex;align-items:flex-end;gap:8px">
+        <button class="btn bo wf" id="btn-scrape-contacts" onclick="scrapeContacts()">👤 سحب جهات الاتصال</button>
+      </div>
+      <div class="fg" style="display:flex;align-items:flex-end;gap:8px">
+        <button class="btn" style="background:rgba(255,200,0,.1);border:1px solid rgba(255,200,0,.3);color:#f59e0b;width:100%" onclick="runScrapingDiagnosis()">🩺 تشخيص مشكلة السحب</button>
+      </div>
+    </div>
+    <div id="groups-progress" style="display:none;margin-top:12px">
+      <div class="pb"><div class="pf" id="groups-progress-bar" style="width:0%;transition:width .4s"></div></div>
+      <div class="f11 ts mt6" id="groups-progress-text">جارٍ السحب...</div>
+    </div>
+  </div>
+
+  <!-- Manual input section -->
+  <div id="groups-manual-section" class="card mb18" style="display:none">
+    <div class="ct">✏️ إضافة مجموعة يدوياً (Cloud API)</div>
+    <div class="f12 ts mb12">أدخل Group ID مباشرة. يمكن الحصول عليه من رابط المجموعة أو إعدادات WhatsApp.</div>
+    <div class="g3">
+      <div class="fg"><label class="fl">اسم المجموعة</label><input class="fc" id="grp-manual-name" placeholder="مثال: مجموعة العملاء"></div>
+      <div class="fg"><label class="fl">Group ID</label><input class="fc" id="grp-manual-id" placeholder="مثال: 120363XXXXXXXX@g.us"></div>
+      <div class="fg"><label class="fl">عدد الأعضاء (تقريبي)</label><input class="fc" type="number" id="grp-manual-members" placeholder="0"></div>
+    </div>
+    <button class="btn bp mt12" onclick="addGroupManually()">➕ إضافة المجموعة</button>
+  </div>
+
+  <!-- Excel import section -->
+  <div id="groups-excel-section" class="card mb18" style="display:none">
+    <div class="ct">📂 استيراد من Excel</div>
+    <div class="f12 ts mb12">يجب أن يحتوي الملف على أعمدة: <b>name</b> (اسم المجموعة) و <b>id</b> (Group ID). العمود <b>members</b> اختياري.</div>
+    <button class="btn bp" onclick="importGroupsExcel()">📂 اختر ملف Excel</button>
+  </div>
+
+  <!-- Groups table -->
+  <div class="card">
+    <div class="flex ic jb mb12">
+      <div class="ct" style="margin:0">قائمة المجموعات <span id="groups-count" class="bge bg-b f11 ml6">0</span></div>
+      <div class="flex gap6">
+        <button class="btn bo bsm" onclick="exportGroupsExcel()">📊 Excel</button>
+        <button class="btn bd bsm" onclick="clearGroups()">🗑️ مسح الكل</button>
+      </div>
+    </div>
+    <!-- Search bar -->
+    <div style="position:relative;margin-bottom:12px">
+      <span style="position:absolute;right:12px;top:50%;transform:translateY(-50%);color:var(--ts);font-size:14px;pointer-events:none">🔍</span>
+      <input id="grp-search" class="fc" type="text" placeholder="بحث باسم المجموعة أو Group ID..." oninput="filterGroupsTable(this.value)" style="padding-right:36px">
+    </div>
+    <!-- Bulk action bar — shown when 1+ groups selected -->
+    <div id="grp-bulk-bar" style="display:none;background:rgba(var(--ar),.06);border:1px solid rgba(var(--ar),.2);border-radius:10px;padding:10px 14px;margin-bottom:12px;flex-wrap:wrap;gap:8px" class="flex ic">
+      <span class="f12" style="color:var(--acc);font-weight:700">✅ <span id="grp-sel-count">0</span> مجموعة محددة</span>
+      <button class="btn bp bsm" onclick="bulkGetInviteLinks()">🔗 جلب الروابط</button>
+      <button class="btn bp bsm" onclick="openSendToGroupBulk()">📤 إرسال للمجموعات</button>
+      <button class="btn bp bsm" onclick="loadGroupMembersToEngine()">📲 أعضاء → محرك الإرسال</button>
+      <button class="btn bp bsm" onclick="openMembersMgrBulk('add')">➕ إضافة أعضاء</button>
+      <button class="btn bd bsm" onclick="openMembersMgrBulk('remove')">➖ حذف أعضاء</button>
+      <button class="btn bo bsm" onclick="bulkExportSelected()">📊 تصدير المحدد</button>
+      <button class="btn bo bsm" onclick="clearGroupSelection()">✕ إلغاء</button>
+    </div>
+    <table class="dt">
+      <thead>
+        <tr>
+          <th style="width:36px"><input type="checkbox" id="grp-chk-all" onchange="toggleAllGroups(this)" title="تحديد الكل"></th>
+          <th>اسم المجموعة</th>
+          <th>Group ID</th>
+          <th>الأعضاء</th>
+          <th>آخر مزامنة</th>
+          <th>رابط الدعوة</th>
+          <th>إجراءات</th>
+        </tr>
+      </thead>
+      <tbody id="groups-tbody">
+        <tr><td colspan="7" class="ta f12 ts" style="padding:32px">لا توجد مجموعات — اسحب من جلسة Web أو أضف يدوياً</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ══ CAMPAIGNS ══ -->

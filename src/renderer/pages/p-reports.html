@@ -1,0 +1,52 @@
+<div id="p-reports" class="page">
+  <div class="ph">
+    <div class="ph-l"><div class="ph-ic">📈</div><div><h1>REPORTS</h1><p>تقارير شاملة وتحليلات متقدمة</p></div></div>
+    <div class="flex gap8">
+      <select id="reports-period" class="fc bsm" style="max-width:140px" onchange="loadReports()"><option value="7">هذا الأسبوع</option><option value="30" selected>هذا الشهر</option><option value="90">آخر 3 أشهر</option></select>
+      <select id="reports-session" class="fc bsm" style="max-width:180px" onchange="loadReports()"><option value="">📲 كل الأجهزة</option></select>
+      <select id="reports-reply-filter" class="fc bsm" style="max-width:160px" onchange="loadReports()">
+        <option value="">💬 كل الردود</option>
+        <option value="unreplied">🔔 لم يُرد عليها</option>
+        <option value="replied">✅ تم الرد</option>
+      </select>
+      <button class="btn bp bsm" onclick="exportReportExcel()">📊 تصدير Excel</button>
+    </div>
+  </div>
+  <div class="sg mb18">
+    <div class="sc"><div class="si">📤</div><div class="sn" id="rep-s-sent">0</div><div class="sl">إجمالي المُرسل</div></div>
+    <div class="sc"><div class="si">✔✔</div><div class="sn" id="rep-s-read">0</div><div class="sl">إجمالي المقروء</div></div>
+    <div class="sc"><div class="si">💬</div><div class="sn" id="rep-s-replies">0</div><div class="sl">إجمالي الردود</div></div>
+    <div class="sc"><div class="si">📈</div><div class="sn" id="rep-s-rate">0%</div><div class="sl">معدل الاستجابة</div></div>
+  </div>
+  <div class="g2 mb18">
+    <div class="card">
+      <div class="ct">📊 أداء كل حساب</div>
+      <div id="rep-accounts-bars">
+        <div class="f12 ts" style="padding:18px 0">لا توجد بيانات — ابدأ بإرسال رسائل أولاً</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="ct">🎯 إحصائيات الإرسال</div>
+      <div id="rep-campaigns-bars">
+        <div class="f12 ts" style="padding:18px 0">لا توجد بيانات</div>
+      </div>
+    </div>
+  </div>
+  <!-- Reply stats summary -->
+  <div class="sg mb18" style="grid-template-columns:repeat(3,1fr)">
+    <div class="sc"><div class="si">💬</div><div class="sn" id="rep-rs-total">0</div><div class="sl">إجمالي الردود الواردة</div></div>
+    <div class="sc"><div class="si">🔔</div><div class="sn ta fm" id="rep-rs-unreplied">0</div><div class="sl">لم يُرد عليها</div></div>
+    <div class="sc"><div class="si">✅</div><div class="sn" id="rep-rs-replied">0</div><div class="sl">تم الرد عليها</div></div>
+  </div>
+  <div class="card">
+    <div class="ct flex ic jb"><span>💬 الرسائل الواردة (ردود)</span><button class="btn bo bsm" onclick="exportReportExcel()">📊 تصدير</button></div>
+    <table class="dt">
+      <thead><tr><th>من / الجروب</th><th>الجلسة</th><th>الرسالة</th><th>الوقت</th><th>الحالة</th></tr></thead>
+      <tbody id="rep-replies-tbody">
+        <tr><td colspan="5" class="ta f12 ts" style="padding:24px">لا توجد ردود حتى الآن</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ══ SETTINGS ══ -->

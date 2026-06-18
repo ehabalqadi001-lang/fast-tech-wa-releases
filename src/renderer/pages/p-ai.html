@@ -1,0 +1,49 @@
+<div id="p-ai" class="page">
+  <div class="ph">
+    <div class="ph-l"><div class="ph-ic">🤖</div><div><h1>AI ASSISTANT</h1><p>مساعد الذكاء الاصطناعي — Gemini & Claude</p></div></div>
+    <div class="flex gap8"><span class="bge f11" id="ai-gemini-status" style="padding:6px 10px">🌟 Gemini: غير مُهيأ</span><span class="bge f11" id="ai-claude-status" style="padding:6px 10px">🤖 Claude: غير مُهيأ</span></div>
+  </div>
+  <div class="g2">
+    <div class="card" style="display:flex;flex-direction:column">
+      <div class="ct">💬 المحادثة</div>
+      <div class="ai-chat" id="ai-chat">
+        <div class="ai-msg bot"><div class="ai-av bot">🤖</div><div class="ai-bub">مرحباً! أنا مساعد AI. يمكنني مساعدتك في:<br><br>• كتابة رسائل تسويقية احترافية<br>• إنشاء سكريبتات المبيعات<br>• تخصيص الرسائل حسب جمهورك<br>• ترجمة المحتوى<br><br>ماذا تريد؟</div></div>
+      </div>
+      <div class="flex gap8">
+        <input class="fc fi" id="ai-input" type="text" placeholder="اكتب طلبك هنا...">
+        <button class="btn bp" onclick="sendAI()">إرسال ➤</button>
+      </div>
+    </div>
+    <div class="flex" style="flex-direction:column;gap:16px">
+      <div class="card">
+        <div class="ct">⚡ أوامر سريعة</div>
+        <div class="flex" style="flex-direction:column;gap:8px">
+          <button class="btn bo bsm wf" onclick="aiCmd('اكتب رسالة تسويقية لعرض خصم 20% على المنتجات الجديدة')">📢 رسالة تسويقية</button>
+          <button class="btn bo bsm wf" onclick="aiCmd('اكتب رسالة ترحيب احترافية لعميل جديد باللغة العربية')">👋 رسالة ترحيب</button>
+          <button class="btn bo bsm wf" onclick="aiCmd('اكتب رسالة متابعة لعميل لم يرد منذ 3 أيام')">🔄 رسالة متابعة</button>
+          <button class="btn bo bsm wf" onclick="aiCmd('اكتب سكريبت مبيعات احترافي لمنتج برمجي')">💼 سكريبت مبيعات</button>
+          <button class="btn bo bsm wf" onclick="aiCmd('حول هذه الرسالة إلى نبرة أكثر رسمية واحترافية')">✨ تحسين النص</button>
+          <button class="btn bo bsm wf" onclick="aiCmd('اكتب رسالة بالإنجليزية والعربية معاً')">🌐 رسالة ثنائية</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="ct">⚙️ إعدادات AI</div>
+        <div class="fg"><label class="fl">المزوّد المفضل</label><select id="ai-model-pref" class="fc"><option value="gemini">Google Gemini</option><option value="claude">Anthropic Claude</option></select></div>
+        <div class="fg"><label class="fl">نموذج Gemini</label>
+          <select id="ai-gemini-model" class="fc">
+            <option value="gemini-2.0-flash">Gemini 2.0 Flash (الأحدث — موصى به)</option>
+            <option value="gemini-2.0-flash-lite">Gemini 2.0 Flash Lite (أسرع وأرخص)</option>
+            <option value="gemini-1.5-pro">Gemini 1.5 Pro (أقوى — أبطأ)</option>
+            <option value="gemini-1.5-flash-002">Gemini 1.5 Flash 002</option>
+          </select>
+        </div>
+        <div class="fg"><label class="fl">Google Gemini API Key</label><input id="ai-gemini-key" class="fc" type="password" placeholder="AIza..."></div>
+        <div class="fg"><label class="fl">Anthropic Claude API Key</label><input id="ai-claude-key" class="fc" type="password" placeholder="sk-ant-..."></div>
+        <div class="fg"><label class="fl">لغة الإخراج</label><select id="ai-lang" class="fc"><option value="ar">عربي</option><option value="en">إنجليزي</option><option value="both">ثنائي (عربي + إنجليزي)</option></select></div>
+        <button class="btn bp wf" onclick="saveAiSettings()">💾 حفظ إعدادات AI</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ CRM ══ -->

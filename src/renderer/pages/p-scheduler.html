@@ -1,0 +1,177 @@
+<div id="p-scheduler" class="page">
+  <div class="ph">
+    <div class="ph-l"><div class="ph-ic">📅</div><div><h1>SCHEDULER</h1><p id="scheduler-subtitle">جدولة الرسائل بمواعيد محددة</p></div></div>
+    <div class="flex gap8">
+      <button class="btn bo bsm" onclick="loadScheduler()">🔄 تحديث</button>
+      <button class="btn bp bsm" onclick="openSchModal()">➕ جدولة جديدة</button>
+    </div>
+  </div>
+
+  <!-- Stats row -->
+  <div class="sg" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px">
+    <div class="sc"><div class="si">✅</div><div class="sn ta fm" id="sch-stat-active">0</div><div class="sl">مهام نشطة</div></div>
+    <div class="sc"><div class="si">⏸️</div><div class="sn" id="sch-stat-paused">0</div><div class="sl">موقوفة</div></div>
+    <div class="sc"><div class="si">🔁</div><div class="sn" id="sch-stat-runs">0</div><div class="sl">تشغيلات إجمالية</div></div>
+    <div class="sc"><div class="si">⏰</div><div class="sn f11 ta fm" id="sch-stat-next" style="font-size:11px">—</div><div class="sl">أقرب تشغيل</div></div>
+  </div>
+
+  <!-- Tasks list -->
+  <div class="card">
+    <div class="ct flex ic jb">
+      <span>⏳ المهام المجدولة</span>
+      <span class="f11 ts" id="sch-count">0 مهمة</span>
+    </div>
+    <div id="tasks-list">
+      <div style="text-align:center;padding:40px;opacity:.4" class="f12 ts">لا توجد مهام مجدولة — أضف مهمة جديدة</div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: New / Edit scheduled task -->
+<div class="mo" id="m-scheduler">
+  <div class="md" style="max-width:600px;max-height:92vh;display:flex;flex-direction:column;padding:0;overflow:hidden">
+
+    <!-- ── Sticky header ── -->
+    <div style="padding:18px 22px 14px;border-bottom:1px solid rgba(var(--ar),.1);flex-shrink:0">
+      <div class="md-tt" id="sch-modal-title" style="margin:0;padding:0;border:none">📅 جدولة مهمة جديدة</div>
+    </div>
+    <input type="hidden" id="sch-edit-id">
+
+    <!-- ── Scrollable body ── -->
+    <div style="flex:1;overflow-y:auto;padding:16px 22px;display:flex;flex-direction:column;gap:0">
+
+      <!-- Name -->
+      <div class="fg">
+        <label class="fl">اسم المهمة</label>
+        <input id="sch-name" class="fc" type="text" placeholder="مثال: عروض نهاية الأسبوع">
+      </div>
+
+      <!-- Message -->
+      <div class="fg">
+        <div class="flex ic jb mb6">
+          <label class="fl" style="margin:0">📝 نص الرسالة</label>
+          <select id="sch-tmpl-sel" class="fc bsm" style="max-width:180px" onchange="applySchTemplate()">
+            <option value="">من القوالب...</option>
+          </select>
+        </div>
+        <textarea id="sch-body" class="fc" rows="3" placeholder="اكتب نص الرسالة هنا..." style="resize:vertical"></textarea>
+      </div>
+
+      <!-- Media -->
+      <div class="fg">
+        <div class="flex ic gap8">
+          <label class="fl" style="margin:0;flex:1">📎 وسائط (اختياري)</label>
+          <button class="btn bo bsm" onclick="pickSchMedia()">اختر ملف</button>
+          <button class="btn bd bsm" onclick="clearSchMedia()" id="btn-sch-clear-media" style="display:none">✕</button>
+        </div>
+        <div class="f11 ts mt4" id="sch-media-label">لا يوجد ملف مرفق</div>
+        <input type="hidden" id="sch-media-path">
+        <input type="hidden" id="sch-media-type">
+      </div>
+
+      <!-- Recipients -->
+      <div class="fg">
+        <label class="fl">👥 المستقبلون</label>
+        <select id="sch-recipients-type" class="fc" onchange="onSchRecipientsChange()">
+          <option value="all">كل جهات الاتصال المُوافِقة</option>
+          <option value="label">بالتصنيف (Label)</option>
+          <option value="manual">قائمة يدوية (أرقام)</option>
+        </select>
+      </div>
+      <div id="sch-label-row" class="fg" style="display:none">
+        <label class="fl">اسم التصنيف (Label)</label>
+        <input id="sch-label-input" class="fc" type="text" placeholder="مثال: VIP">
+      </div>
+      <div id="sch-manual-row" class="fg" style="display:none">
+        <label class="fl">أرقام الهواتف (سطر لكل رقم)</label>
+        <textarea id="sch-phones-input" class="fc" rows="3" placeholder="966500000001&#10;966500000002"></textarea>
+      </div>
+
+      <!-- Session -->
+      <div class="fg">
+        <label class="fl">📱 جهاز الإرسال</label>
+        <select id="sch-session" class="fc">
+          <option value="">توزيع تلقائي</option>
+        </select>
+      </div>
+
+      <!-- Quick presets -->
+      <div class="fg">
+        <label class="fl">⚡ اختصارات سريعة</label>
+        <div class="flex gap6" style="flex-wrap:wrap" id="sch-presets-row"></div>
+      </div>
+
+      <!-- Date/time + repeat -->
+      <div class="g2">
+        <div class="fg">
+          <label class="fl">📅 التاريخ والوقت</label>
+          <input id="sch-datetime" type="datetime-local" class="fc">
+        </div>
+        <div class="fg">
+          <label class="fl">🔁 التكرار</label>
+          <select id="sch-repeat" class="fc" onchange="onSchRepeatChange()">
+            <option value="once">مرة واحدة</option>
+            <option value="daily">يومياً</option>
+            <option value="workdays">الأيام الاعتيادية (ن–ج)</option>
+            <option value="weekly">أسبوعياً (يوم محدد)</option>
+            <option value="monthly">شهرياً</option>
+            <option value="hourly">كل ساعة</option>
+            <option value="custom">Cron مخصص</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Day-of-week -->
+      <div id="sch-dow-row" class="fg" style="display:none">
+        <label class="fl">أيام التكرار</label>
+        <div class="flex gap6" style="flex-wrap:wrap">
+          <label class="flex ic gap4 f12"><input type="checkbox" id="dow-0" value="0"> الأحد</label>
+          <label class="flex ic gap4 f12"><input type="checkbox" id="dow-1" value="1"> الإثنين</label>
+          <label class="flex ic gap4 f12"><input type="checkbox" id="dow-2" value="2"> الثلاثاء</label>
+          <label class="flex ic gap4 f12"><input type="checkbox" id="dow-3" value="3"> الأربعاء</label>
+          <label class="flex ic gap4 f12"><input type="checkbox" id="dow-4" value="4"> الخميس</label>
+          <label class="flex ic gap4 f12"><input type="checkbox" id="dow-5" value="5"> الجمعة</label>
+          <label class="flex ic gap4 f12"><input type="checkbox" id="dow-6" value="6"> السبت</label>
+        </div>
+      </div>
+
+      <!-- Custom cron -->
+      <div id="sch-cron-row" class="fg" style="display:none">
+        <label class="fl">Cron Expression</label>
+        <input id="sch-cron-custom" class="fc" type="text" placeholder="0 9 * * 1-5" style="font-family:monospace">
+        <div class="f11 ts mt4">مثال: <b>0 9 * * *</b> (يومياً 9ص) — <b>*/30 * * * *</b> (كل 30 دقيقة)</div>
+      </div>
+
+      <!-- Timezone -->
+      <div class="fg">
+        <label class="fl">🌐 المنطقة الزمنية</label>
+        <select id="sch-timezone" class="fc">
+          <option value="Asia/Riyadh">Asia/Riyadh — الرياض (UTC+3)</option>
+          <option value="Asia/Dubai">Asia/Dubai — دبي (UTC+4)</option>
+          <option value="Africa/Cairo">Africa/Cairo — القاهرة (UTC+2/3)</option>
+          <option value="Asia/Kuwait">Asia/Kuwait — الكويت (UTC+3)</option>
+          <option value="Asia/Baghdad">Asia/Baghdad — بغداد (UTC+3)</option>
+          <option value="Africa/Tunis">Africa/Tunis — تونس (UTC+1)</option>
+          <option value="Europe/London">Europe/London — لندن (UTC+0/1)</option>
+          <option value="UTC">UTC</option>
+        </select>
+      </div>
+
+      <!-- Preview -->
+      <div style="padding:10px 14px;background:rgba(var(--ar),.05);border-radius:8px;border:1px solid rgba(var(--ar),.1)">
+        <div class="f11 ts">معاينة الجدولة:</div>
+        <div class="f12 ta fm mt4" id="sch-preview">—</div>
+      </div>
+
+    </div><!-- end scrollable body -->
+
+    <!-- ── Sticky footer ── -->
+    <div style="padding:14px 22px;border-top:1px solid rgba(var(--ar),.1);flex-shrink:0;display:flex;gap:10px;justify-content:flex-end">
+      <button class="btn bo" onclick="closeM('m-scheduler')">إلغاء</button>
+      <button class="btn bp" id="btn-sch-save" onclick="saveSchedule()">📅 حفظ الجدولة</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══ TEMPLATES ══ -->

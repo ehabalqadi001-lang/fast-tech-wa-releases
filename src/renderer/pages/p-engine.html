@@ -1,0 +1,142 @@
+<div id="p-engine" class="page">
+  <div class="ph">
+    <div class="ph-l"><div class="ph-ic">⚡</div><div><h1>SEND ENGINE</h1><p>محرك الإرسال المضاد للحظر — تأخير عشوائي + تدوير الحسابات</p></div></div>
+    <div class="flex gap8">
+      <button class="btn bo bsm" id="eng-pause-btn" onclick="toggleEnginePause()">⏸️ إيقاف مؤقت</button>
+      <button class="btn bd bsm" onclick="clearEngineQueue()">🗑️ مسح المكتملة</button>
+      <button class="btn bo bsm" onclick="loadEngineStats()">🔄 تحديث</button>
+    </div>
+  </div>
+  <!-- Queue stats -->
+  <div class="sg mb18">
+    <div class="sc"><div class="si">⏳</div><div class="sn" id="eng-s-pending">0</div><div class="sl">في الانتظار</div></div>
+    <div class="sc"><div class="si">📤</div><div class="sn ta" id="eng-s-sent">0</div><div class="sl">مُرسَل</div></div>
+    <div class="sc"><div class="si">✔✔</div><div class="sn" id="eng-s-delivered" style="color:#3b82f6">0</div><div class="sl">مُستلَم</div></div>
+    <div class="sc"><div class="si">❌</div><div class="sn" id="eng-s-failed" style="color:#ef4444">0</div><div class="sl">فاشل</div></div>
+  </div>
+  <!-- Form -->
+  <div class="g2 mb18">
+    <!-- LEFT: recipients + session + media -->
+    <div class="card">
+      <div class="ct">📋 بيانات الحملة</div>
+      <div class="fg"><label class="fl">اسم الحملة</label><input id="eng-name" class="fc" type="text" placeholder="مثال: حملة رمضان 2025"></div>
+      <div class="fg">
+        <label class="fl">أرقام الهواتف / معرفات المجموعات <span class="f11 ts">(رقم أو JID في كل سطر)</span></label>
+        <textarea id="eng-recipients" class="fc" style="min-height:110px;direction:ltr" placeholder="966501234567&#10;971509876543&#10;120363XXXXXX@g.us" oninput="countEngineTargets()"></textarea>
+        <div class="f11 ts mb6 mt8">📂 استيراد من مصدر:</div>
+        <div class="src-grid">
+          <button class="src-btn" onclick="engImportContacts()">📥 جهات الاتصال المسحوبة</button>
+          <button class="src-btn" onclick="engImportScrapedGroups()">👥 الجروبات المسحوبة</button>
+          <button class="src-btn" onclick="engOpenGroupPicker()">🔍 من جروبات محددة</button>
+          <button class="src-btn" onclick="engImportAllGroupMembers()">📱 أعضاء كل الجروبات</button>
+          <button class="src-btn" onclick="engImportFromFile()">📂 Excel / CSV</button>
+          <button class="src-btn" onclick="engOpenSheetsModal()">🔗 Google Sheets</button>
+        </div>
+        <div class="flex gap8 mt8 ic">
+          <span class="f11 ts fi" id="eng-count">0 مستهدف</span>
+          <button class="btn bd bsm" onclick="document.getElementById('eng-recipients').value='';countEngineTargets()">🗑️ مسح</button>
+        </div>
+      </div>
+      <div class="fg">
+        <label class="fl">الجهاز المُرسِل</label>
+        <select id="eng-session" class="fc">
+          <option value="">🔄 توزيع تلقائي — Anti-Ban Rotation</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label class="fl">مرفق (صورة / فيديو / مستند)</label>
+        <div class="flex gap8 ic">
+          <input id="eng-media-path" class="fc fi f11" type="text" placeholder="لا يوجد مرفق" readonly style="direction:ltr">
+          <button class="btn bo bsm" onclick="pickEngineMedia()">📎</button>
+          <button class="btn bd bsm" onclick="document.getElementById('eng-media-path').value=''">✕</button>
+        </div>
+      </div>
+    </div>
+    <!-- RIGHT: A/B Script Builder + Account Selection -->
+    <div class="card">
+      <div class="ct jb">
+        <span>✍️ سكريبتات الرسائل — A/B Testing</span>
+        <button class="btn bo" style="padding:3px 10px;font-size:10px;letter-spacing:.5px;border-radius:6px" onclick="loadAbResults()">📊 نتائج A/B</button>
+      </div>
+      <div class="f11 ts mb12" style="line-height:1.7">أضف حتى 10 سكريبتات — النظام يختار عشوائياً لكل مستهدف لتجنب الحظر وقياس أفضل الرسائل. يمكن إرفاق ملف مختلف لكل سكريبت.</div>
+
+      <!-- Dynamic script slots -->
+      <div id="ab-scripts-container" style="max-height:280px;overflow-y:auto;padding-left:1px;margin-bottom:2px"></div>
+
+      <!-- Add script + AI buttons -->
+      <div class="flex gap8 mb14 mt8">
+        <button class="btn bo bsm fi" onclick="addAbScript()">➕ إضافة سكريبت</button>
+        <button class="btn bo bsm fi" onclick="generateEngineVariants()">🤖 توليد 5 نسخ AI</button>
+      </div>
+
+      <!-- Account Participation -->
+      <div class="fg">
+        <label class="fl">الأجهزة المشاركة في الحملة</label>
+        <div class="flex gap8 mb8">
+          <button id="acc-mode-auto"   class="src-btn active fi" onclick="setAccMode('auto')">🔄 توزيع تلقائي</button>
+          <button id="acc-mode-select" class="src-btn fi"        onclick="setAccMode('select')">☑️ أجهزة محددة</button>
+        </div>
+        <div id="acc-check-list" style="display:none;max-height:110px;overflow-y:auto;background:rgba(0,0,0,.25);border:1px solid rgba(var(--ar),.12);border-radius:8px;padding:6px 10px">
+          <div class="f11 ts" style="padding:10px;text-align:center;opacity:.6">لا توجد أجهزة متصلة حالياً</div>
+        </div>
+      </div>
+
+      <!-- Delay -->
+      <div class="fg">
+        <label class="fl">التأخير العشوائي بين الرسائل</label>
+        <div class="flex gap10 ic mt6">
+          <span class="f12 ts" style="white-space:nowrap">من</span>
+          <input id="eng-delay-min" class="fc" type="number" value="15" min="5" max="300" style="width:72px;text-align:center">
+          <span class="f12 ts" style="white-space:nowrap">إلى</span>
+          <input id="eng-delay-max" class="fc" type="number" value="45" min="10" max="600" style="width:72px;text-align:center">
+          <span class="f12 ts" style="white-space:nowrap">ثانية</span>
+        </div>
+      </div>
+      <button class="btn bp wf" style="margin-top:8px" onclick="startBulkSend()">🚀 بدء الإرسال المضاد للحظر</button>
+    </div>
+  </div>
+  <!-- Wake Lock status bar -->
+  <div id="eng-wakelock-bar" style="display:none;background:rgba(var(--ar),.08);border:1px solid rgba(var(--ar),.2);border-radius:10px;padding:10px 16px;margin-bottom:12px;display:none;align-items:center;gap:10px">
+    <span style="font-size:18px">☀️</span>
+    <div class="fi">
+      <div class="f12 fw7" style="color:var(--acc)">منع وضع السكون نشط</div>
+      <div class="f11 ts">الحملة قيد التشغيل — سيعود الجهاز لوضعه الطبيعي عند الانتهاء</div>
+    </div>
+    <div class="pulse-dot" style="width:8px;height:8px;border-radius:50%;background:var(--acc);animation:pulse 1.5s infinite"></div>
+  </div>
+  <!-- Progress -->
+  <div class="card" id="eng-progress-card" style="display:none">
+    <div class="ct flex ic jb">
+      <span>⚡ تقدم الإرسال</span>
+      <span class="f12 fm ta" id="eng-prog-pct">0%</span>
+    </div>
+    <div class="pb mb14"><div class="pf" id="eng-prog-bar" style="width:0%;transition:width .5s"></div></div>
+    <div class="flex gap20 f12">
+      <span>✅ مُرسَل: <b class="ta" id="eng-prog-sent">0</b></span>
+      <span>❌ فشل: <b style="color:#ef4444" id="eng-prog-fail">0</b></span>
+      <span>⏳ متبقي: <b id="eng-prog-left">0</b></span>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<!-- MODAL: A/B Testing Results                                            -->
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<div class="mo" id="m-ab-results">
+  <div class="md" style="max-width:660px;width:95%;max-height:84vh;overflow-y:auto;padding:24px">
+    <div class="md-tt">📊 نتائج A/B Testing</div>
+    <div class="md-st" style="margin-bottom:18px">أداء كل سكريبت عبر الحملات — اكتشف الرسائل الأعلى استجابة من عملائك</div>
+    <div id="ab-results-content" style="min-height:120px">
+      <div class="flex ic jb" style="padding:40px;opacity:.4;justify-content:center">
+        <span class="f12">جارٍ التحميل...</span>
+      </div>
+    </div>
+    <div class="md-cl">
+      <button class="btn bo" onclick="closeM('m-ab-results')">إغلاق</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<!-- PAGE: INBOX (incoming messages from all sessions)                     -->
+<!-- ══════════════════════════════════════════════════════════════════════ -->

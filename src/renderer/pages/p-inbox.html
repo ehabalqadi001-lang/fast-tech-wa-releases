@@ -1,0 +1,60 @@
+<div id="p-inbox" class="page">
+  <div class="ph">
+    <div class="ph-l"><div class="ph-ic">📩</div><div><h1>INBOX</h1><p>الرسائل الواردة من جميع الأجهزة</p></div></div>
+    <div class="flex gap8 ic">
+      <select id="inbox-filter" class="fc bsm" style="max-width:200px" onchange="loadInbox()">
+        <option value="">📲 كل الأجهزة</option>
+      </select>
+      <button class="btn bo bsm" onclick="loadInbox()">🔄 تحديث</button>
+      <button class="btn bo bsm" onclick="markAllRead()">✔✔ قراءة الكل</button>
+    </div>
+  </div>
+  <div class="card mb14" style="padding:14px">
+    <div class="flex ic gap20">
+      <span class="f12"><b class="ta fm" id="inbox-unread">0</b> رسالة غير مقروءة</span>
+      <span class="f12"><b style="color:#bf00ff" id="inbox-unreplied-count">0</b> تنتظر رد</span>
+      <span class="f12 ts" id="inbox-total-count">0 إجمالي</span>
+    </div>
+  </div>
+  <!-- Tabs: All / Unreplied / Replied -->
+  <div class="flex gap0 mb14" style="border-bottom:2px solid rgba(var(--ar),.1)">
+    <button id="inbox-tab-all"       class="tab-btn active" onclick="switchInboxTab('all')"       style="padding:9px 20px;background:none;border:none;border-bottom:2px solid var(--hp);color:var(--hp);cursor:pointer;font-size:13px;font-weight:600;margin-bottom:-2px">📨 الكل</button>
+    <button id="inbox-tab-unreplied" class="tab-btn"        onclick="switchInboxTab('unreplied')" style="padding:9px 20px;background:none;border:none;border-bottom:2px solid transparent;color:var(--ts);cursor:pointer;font-size:13px;font-weight:600;margin-bottom:-2px">🔔 لم يُرد عليها</button>
+    <button id="inbox-tab-replied"   class="tab-btn"        onclick="switchInboxTab('replied')"   style="padding:9px 20px;background:none;border:none;border-bottom:2px solid transparent;color:var(--ts);cursor:pointer;font-size:13px;font-weight:600;margin-bottom:-2px">✅ تم الرد</button>
+  </div>
+  <div class="card">
+    <table class="dt">
+      <thead><tr><th>الجهاز</th><th>من / الجروب</th><th>الرسالة</th><th>الوقت</th><th>الحالة</th><th>إجراءات</th></tr></thead>
+      <tbody id="inbox-tbody">
+        <tr><td colspan="6" style="text-align:center;padding:32px;opacity:.5">لا توجد رسائل — قم بتوصيل جهاز أولاً</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- MODAL: Reply to inbox message -->
+<div class="mo" id="m-inbox-reply">
+  <div class="md" style="max-width:520px">
+    <div class="md-tt">↩️ رد على رسالة</div>
+    <div class="card mb14" style="padding:12px;background:rgba(var(--ar),.05)">
+      <div class="f11 ts" id="reply-from-info">من: —</div>
+      <div class="f12 mt4" id="reply-orig-body" style="font-style:italic;color:var(--ts)">—</div>
+    </div>
+    <div class="fg">
+      <label class="fl">إرسال من (جلسة)</label>
+      <select id="reply-session-sel" class="fc"></select>
+    </div>
+    <div class="fg">
+      <label class="fl">نص الرد</label>
+      <textarea id="reply-body-input" class="fc" rows="4" placeholder="اكتب ردك هنا..." style="resize:vertical"></textarea>
+    </div>
+    <div class="md-cl">
+      <button class="btn bo" onclick="closeM('m-inbox-reply')">إلغاء</button>
+      <button class="btn bp" id="btn-send-reply" onclick="sendInboxReply()">↩️ إرسال الرد</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<!-- PAGE: ANTI-BAN                                                        -->
+<!-- ══════════════════════════════════════════════════════════════════════ -->
