@@ -205,10 +205,12 @@ class Scheduler {
         console.warn(`[Scheduler] Task ${task.name} has no message_body or campaign_id — skipping.`);
       }
 
-      this._db.taskBumpRun(task.id, this._nextRun(task.cron_expr));
       console.log(`[Scheduler] Task complete: ${task.name}`);
     } catch (err) {
       console.error(`[Scheduler] Task error (${task.name}):`, err.message);
+    } finally {
+      // Always bump run counter so the task doesn't re-fire immediately on error
+      try { this._db.taskBumpRun(task.id, this._nextRun(task.cron_expr)); } catch (_) {}
     }
   }
 

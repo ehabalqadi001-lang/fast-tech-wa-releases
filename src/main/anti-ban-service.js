@@ -195,6 +195,21 @@ class AntiBanService extends EventEmitter {
     if (newHealth !== session.health_score) {
       this._db.sessionUpdateHealthScore(sessionId, newHealth);
     }
+
+    // Emit rate-limit warning at 80% of daily or hourly limit
+    const dailyCount  = this._getTodayCount(session) + 1; // +1 = the send we just recorded
+    const hourlyCount = this._getHourCount(session)  + 1;
+    const dailyLimit  = session.warmup_mode
+      ? (session.warmup_daily_limit || this._getWarmupLimit(session.warmup_day || 1))
+      : this._settings.dailyLimit;
+    const hourlyLimit = this._settings.hourlyLimit;
+
+    if (dailyLimit > 0 && dailyCount / dailyLimit >= 0.8 && dailyCount < dailyLimit) {
+      this.emit('rate-limit', { sessionId, type: 'daily',  count: dailyCount,  limit: dailyLimit,  pct: Math.round(dailyCount / dailyLimit * 100) });
+    }
+    if (hourlyLimit > 0 && hourlyCount / hourlyLimit >= 0.8 && hourlyCount < hourlyLimit) {
+      this.emit('rate-limit', { sessionId, type: 'hourly', count: hourlyCount, limit: hourlyLimit, pct: Math.round(hourlyCount / hourlyLimit * 100) });
+    }
   }
 
   recordError(sessionId, errType = 'send_error') {

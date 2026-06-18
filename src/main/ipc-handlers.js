@@ -48,9 +48,10 @@ function register(ipcMain, { db, waApi, waSvc, engine, scraper, scheduler, aiSvc
     waSvc.on('auth_failure_internal', (sessionId) => {
       antiBanSvc.recordAuthFailure(sessionId);
     });
-    antiBanSvc.on('session:banned',    (d) => _pushAll('antiban:banned',    d));
-    antiBanSvc.on('session:suspended', (d) => _pushAll('antiban:suspended', d));
+    antiBanSvc.on('session:banned',    (d) => _pushAll('antiban:banned',      d));
+    antiBanSvc.on('session:suspended', (d) => _pushAll('antiban:suspended',   d));
     antiBanSvc.on('warmup:complete',   (d) => _pushAll('antiban:warmup:complete', d));
+    antiBanSvc.on('rate-limit',        (d) => _pushAll('antiban:rate-limit',  d));
   }
 
   function handle(channel, fn) {
@@ -240,6 +241,90 @@ function register(ipcMain, { db, waApi, waSvc, engine, scraper, scheduler, aiSvc
     if (!accountId) return [];
     return waApi.getTemplates(accountId);
   });
+  handle('templates:send', async ({ templateId, recipients, sessionId, accountId, delaySec }) => {
+    const tpl = db.templateList().find(t => t.id === templateId);
+    if (!tpl) throw new Error('القالب غير موجود');
+    if (!recipients?.length) throw new Error('لا يوجد مستقبلون');
+    return adapter.sendBulk({
+      sessionIds: sessionId ? [sessionId] : [],
+      accountIds: accountId ? [accountId] : [],
+      recipients,
+      messageBody: tpl.body,
+      delaySec: delaySec || 10,
+      campaignName: `قالب: ${tpl.name}`,
+    });
+  });
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // CONVERSATION VIEW
+  // ══════════════════════════════════════════════════════════════════════════
+  handle('conversation:get', ({ phone, limit }) => db.conversationGet(phone, limit || 100));
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // MEDIA LIBRARY
+  // ══════════════════════════════════════════════════════════════════════════
+  handle('media:list',   ()    => db.mediaList());
+  handle('media:delete', (id)  => { const m = db.mediaGet(id); if (m) { try { fs.unlinkSync(m.file_path); } catch (_) {} } return db.mediaDelete(id); });
+  handle('media:add', async ({ filePath }) => {
+    const { app } = require('electron');
+    const mediaDir = path.join(app.getPath('userData'), 'fasttech-data', 'media');
+    if (!fs.existsSync(mediaDir)) fs.mkdirSync(mediaDir, { recursive: true });
+    const ext  = path.extname(filePath);
+    const dest = path.join(mediaDir, `${uuidv4()}${ext}`);
+    fs.copyFileSync(filePath, dest);
+    const stat = fs.statSync(dest);
+    const mime = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
+                   '.mp4': 'video/mp4', '.pdf': 'application/pdf',
+                   '.gif': 'image/gif', '.webp': 'image/webp' }[ext.toLowerCase()] || 'application/octet-stream';
+    const entry = { id: uuidv4(), name: path.basename(filePath), file_path: dest, mime_type: mime, size_bytes: stat.size };
+    db.mediaAdd(entry);
+    return entry;
+  });
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // DASHBOARD STATS
+  // ══════════════════════════════════════════════════════════════════════════
+  handle('dashboard:stats', () => db.dashboardStats());
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // CONTACTS PREVIEW IMPORT (validate phones before committing)
+  // ══════════════════════════════════════════════════════════════════════════
+  handle('contacts:previewImport', async (filePath) => {
+    const result = await excel.importContacts(filePath, { preview: true });
+    return result;
+  });
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // RETRY FAILED MESSAGES
+  // ══════════════════════════════════════════════════════════════════════════
+  handle('wa:send:retryFailed', ({ campaignId }) => {
+    const n = db.queueRetryFailed(campaignId || null);
+    if (n > 0) engine.wake();
+    return { requeued: n };
+  });
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // A/B AUTO WINNER
+  // ══════════════════════════════════════════════════════════════════════════
+  handle('wa:ab:autoWinner', ({ campaignId }) => db.abGetWinner(campaignId));
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // ENCRYPTED BACKUP
+  // ══════════════════════════════════════════════════════════════════════════
+  handle('settings:backupEncrypted', async () => {
+    const { app } = require('electron');
+    const crypto = require('crypto');
+    const dataDir = path.join(app.getPath('userData'), 'fasttech-data');
+    const src  = path.join(dataDir, 'ftwa.db');
+    const dst  = path.join(app.getPath('downloads'), `ftwa-backup-enc-${Date.now()}.db.enc`);
+    const key  = crypto.scryptSync('ftwa-backup-key', 'fasttech-salt', 32);
+    const iv   = crypto.randomBytes(16);
+    const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
+    const input  = fs.readFileSync(src);
+    const enc    = Buffer.concat([iv, cipher.update(input), cipher.final()]);
+    fs.writeFileSync(dst, enc);
+    return { path: dst };
+  });
 
   // ══════════════════════════════════════════════════════════════════════════
   // AI
@@ -412,8 +497,29 @@ function register(ipcMain, { db, waApi, waSvc, engine, scraper, scheduler, aiSvc
       if (m) {
         const csvUrl = `https://docs.google.com/spreadsheets/d/${m[1]}/export?format=csv`;
         const res = await axios.get(csvUrl, { timeout: 15000 });
-        const rows = res.data.split('\n').map(r => r.split(','));
-        const hdr = rows[0]?.map(h => h.trim().toLowerCase().replace(/"/g, '')) || [];
+        // RFC-4180 compliant CSV parser — handles quoted fields with embedded commas/newlines
+        const parseCSV = (text) => {
+          const rows = []; let row = []; let field = ''; let inQ = false;
+          for (let i = 0; i < text.length; i++) {
+            const ch = text[i];
+            if (inQ) {
+              if (ch === '"' && text[i+1] === '"') { field += '"'; i++; }
+              else if (ch === '"') inQ = false;
+              else field += ch;
+            } else {
+              if (ch === '"') inQ = true;
+              else if (ch === ',') { row.push(field); field = ''; }
+              else if (ch === '\n' || (ch === '\r' && text[i+1] === '\n')) {
+                if (ch === '\r') i++;
+                row.push(field); rows.push(row); row = []; field = '';
+              } else field += ch;
+            }
+          }
+          if (field || row.length) { row.push(field); rows.push(row); }
+          return rows;
+        };
+        const rows = parseCSV(res.data);
+        const hdr = rows[0]?.map(h => h.trim().toLowerCase()) || [];
         const phoneCol = s.crm_gsheets_phone_col?.toLowerCase() || 'phone';
         const nameCol  = s.crm_gsheets_name_col?.toLowerCase()  || 'name';
         const pi = hdr.findIndex(h => h.includes(phoneCol) || h.includes('phone') || h.includes('mobile'));
@@ -421,12 +527,12 @@ function register(ipcMain, { db, waApi, waSvc, engine, scraper, scheduler, aiSvc
         const ei = hdr.findIndex(h => h.includes('email'));
         for (let i = 1; i < rows.length; i++) {
           const row = rows[i];
-          const phone = (pi >= 0 ? row[pi] : '').replace(/["\s]/g, '');
+          const phone = (pi >= 0 ? row[pi] : '').replace(/\s/g, '');
           if (phone && /\d{6,}/.test(phone)) {
             leads.push({
               id: uuidv4(), source: 'gsheets',
-              name: ni >= 0 ? row[ni]?.replace(/"/g, '').trim() : '',
-              phone, email: ei >= 0 ? row[ei]?.replace(/"/g, '').trim() : '',
+              name:  ni >= 0 ? row[ni]?.trim() : '',
+              phone, email: ei >= 0 ? row[ei]?.trim() : '',
               status: '', raw_json: JSON.stringify(row),
             });
           }
@@ -443,6 +549,18 @@ function register(ipcMain, { db, waApi, waSvc, engine, scraper, scheduler, aiSvc
   handle('crm:triggerWebhook', async (payload) => {
     const s = db.settingsGetAll();
     if (!s.crm_webhook_url) throw new Error('Webhook URL غير محدد');
+    // SSRF protection — only allow HTTPS to public hosts
+    const _validateWebhookUrl = (raw) => {
+      let u;
+      try { u = new URL(raw); } catch { throw new Error('Webhook URL غير صالح'); }
+      if (u.protocol !== 'https:') throw new Error('Webhook URL يجب أن يكون HTTPS');
+      const h = u.hostname.toLowerCase();
+      if (h === 'localhost' || h === '127.0.0.1' || h === '::1' ||
+          h.startsWith('192.168.') || h.startsWith('10.') ||
+          h.startsWith('172.16.') || h.endsWith('.local'))
+        throw new Error('Webhook URL لا يمكن أن يشير إلى شبكة داخلية');
+    };
+    _validateWebhookUrl(s.crm_webhook_url);
     const axios = require('axios');
     const headers = { 'Content-Type': 'application/json' };
     if (s.crm_webhook_secret) headers['X-Webhook-Secret'] = s.crm_webhook_secret;
@@ -551,13 +669,20 @@ function register(ipcMain, { db, waApi, waSvc, engine, scraper, scheduler, aiSvc
     const dataDir = path.join(app.getPath('userData'), 'fasttech-data');
     const dst     = path.join(dataDir, 'ftwa.db');
 
-    // Validate: must be a .db file inside an expected directory
     const resolved = path.resolve(backupPath);
     if (!resolved.endsWith('.db')) throw new Error('ملف النسخة الاحتياطية يجب أن يكون .db');
     if (!fs.existsSync(resolved)) throw new Error('ملف النسخة الاحتياطية غير موجود');
 
-    // Use SQLite's built-in backup API instead of raw file copy (safe on open DB)
-    db._db.exec(`VACUUM INTO '${resolved.replace(/'/g, "''")}'`);  // validate source is valid SQLite
+    // Validate the file is a real SQLite database using the library — no raw SQL injection risk
+    try {
+      const Database = require('better-sqlite3');
+      const testDb = new Database(resolved, { readonly: true });
+      testDb.pragma('integrity_check');
+      testDb.close();
+    } catch (e) {
+      throw new Error('الملف ليس قاعدة بيانات SQLite صالحة: ' + e.message);
+    }
+
     db.close();
     fs.copyFileSync(resolved, dst);
     return { ok: true, message: 'تم الاستعادة. يرجى إعادة تشغيل التطبيق.' };

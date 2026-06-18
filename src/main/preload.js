@@ -31,13 +31,14 @@ contextBridge.exposeInMainWorld('ftwa', {
 
   // ── Contacts ─────────────────────────────────────────────────────────────
   contacts: {
-    list:         (filter) => ipcRenderer.invoke('contacts:list',       filter),
-    save:         (data)   => ipcRenderer.invoke('contacts:save',       data),
-    remove:       (id)     => ipcRenderer.invoke('contacts:remove',     id),
-    importExcel:  (path)   => ipcRenderer.invoke('contacts:importExcel',path),
-    exportExcel:  (opts)   => ipcRenderer.invoke('contacts:exportExcel',opts),
-    fixCountry:   (data)   => ipcRenderer.invoke('contacts:fixCountry', data),
-    deduplicate:  ()       => ipcRenderer.invoke('contacts:deduplicate'),
+    list:          (filter) => ipcRenderer.invoke('contacts:list',          filter),
+    save:          (data)   => ipcRenderer.invoke('contacts:save',          data),
+    remove:        (id)     => ipcRenderer.invoke('contacts:remove',        id),
+    importExcel:   (path)   => ipcRenderer.invoke('contacts:importExcel',   path),
+    exportExcel:   (opts)   => ipcRenderer.invoke('contacts:exportExcel',   opts),
+    fixCountry:    (data)   => ipcRenderer.invoke('contacts:fixCountry',    data),
+    deduplicate:   ()       => ipcRenderer.invoke('contacts:deduplicate'),
+    previewImport: (path)   => ipcRenderer.invoke('contacts:previewImport', path),
   },
 
   // ── Groups ────────────────────────────────────────────────────────────────
@@ -77,6 +78,24 @@ contextBridge.exposeInMainWorld('ftwa', {
     save:    (data)   => ipcRenderer.invoke('templates:save',   data),
     remove:  (id)     => ipcRenderer.invoke('templates:remove', id),
     getWa:   (acctId) => ipcRenderer.invoke('templates:getWa',  acctId),
+    send:    (data)   => ipcRenderer.invoke('templates:send',   data),
+  },
+
+  // ── Conversation view ─────────────────────────────────────────────────────
+  conversation: {
+    get: (phone, limit) => ipcRenderer.invoke('conversation:get', { phone, limit }),
+  },
+
+  // ── Media library ─────────────────────────────────────────────────────────
+  media: {
+    list:   ()           => ipcRenderer.invoke('media:list'),
+    add:    (filePath)   => ipcRenderer.invoke('media:add',    { filePath }),
+    delete: (id)         => ipcRenderer.invoke('media:delete', id),
+  },
+
+  // ── Dashboard ─────────────────────────────────────────────────────────────
+  dashboard: {
+    stats: () => ipcRenderer.invoke('dashboard:stats'),
   },
 
   // ── AI ────────────────────────────────────────────────────────────────────
@@ -109,10 +128,11 @@ contextBridge.exposeInMainWorld('ftwa', {
 
   // ── Settings ──────────────────────────────────────────────────────────────
   settings: {
-    get:     ()      => ipcRenderer.invoke('settings:get'),
-    save:    (data)  => ipcRenderer.invoke('settings:save',  data),
-    backup:  ()      => ipcRenderer.invoke('settings:backup'),
-    restore: (path)  => ipcRenderer.invoke('settings:restore', path),
+    get:             ()      => ipcRenderer.invoke('settings:get'),
+    save:            (data)  => ipcRenderer.invoke('settings:save',            data),
+    backup:          ()      => ipcRenderer.invoke('settings:backup'),
+    restore:         (path)  => ipcRenderer.invoke('settings:restore',         path),
+    backupEncrypted: ()      => ipcRenderer.invoke('settings:backupEncrypted'),
   },
 
   // ── Engine mode ───────────────────────────────────────────────────────────
@@ -144,20 +164,22 @@ contextBridge.exposeInMainWorld('ftwa', {
     },
     // Direct send
     send: {
-      text:             (data)   => ipcRenderer.invoke('wa:send:text',           data),
-      media:            (data)   => ipcRenderer.invoke('wa:send:media',          data),
-      bulk:             (opts)   => ipcRenderer.invoke('wa:send:bulk',           opts),
-      queueStats:       ()       => ipcRenderer.invoke('wa:send:queueStats'),
-      pause:            ()       => ipcRenderer.invoke('wa:send:pause'),
-      resume:           ()       => ipcRenderer.invoke('wa:send:resume'),
-      clearDone:        ()       => ipcRenderer.invoke('wa:send:clearDone'),
-      importFromFile:   (path)   => ipcRenderer.invoke('send:importFromFile',    path),
-      importFromSheets: (url)    => ipcRenderer.invoke('send:importFromSheets',  url),
+      text:             (data)       => ipcRenderer.invoke('wa:send:text',           data),
+      media:            (data)       => ipcRenderer.invoke('wa:send:media',          data),
+      bulk:             (opts)       => ipcRenderer.invoke('wa:send:bulk',           opts),
+      queueStats:       ()           => ipcRenderer.invoke('wa:send:queueStats'),
+      pause:            ()           => ipcRenderer.invoke('wa:send:pause'),
+      resume:           ()           => ipcRenderer.invoke('wa:send:resume'),
+      clearDone:        ()           => ipcRenderer.invoke('wa:send:clearDone'),
+      importFromFile:   (path)       => ipcRenderer.invoke('send:importFromFile',    path),
+      importFromSheets: (url)        => ipcRenderer.invoke('send:importFromSheets',  url),
+      retryFailed:      (campaignId) => ipcRenderer.invoke('wa:send:retryFailed',    { campaignId }),
     },
     // A/B Testing results
     ab: {
-      results:        (campaignId) => ipcRenderer.invoke('wa:ab:results',        campaignId),
+      results:        (campaignId) => ipcRenderer.invoke('wa:ab:results',     campaignId),
       attributeReply: (phone)      => ipcRenderer.invoke('wa:ab:attributeReply', phone),
+      autoWinner:     (campaignId) => ipcRenderer.invoke('wa:ab:autoWinner',  { campaignId }),
     },
     // Data extraction / scraping
     scraper: {
@@ -250,6 +272,9 @@ contextBridge.exposeInMainWorld('ftwa', {
       'antiban:banned',
       'antiban:suspended',
       'antiban:warmup:complete',
+      'antiban:rate-limit',
+      // Campaign progress
+      'campaign:progress:live',
     ];
     if (allowed.includes(channel)) {
       // Wrap cb so we can remove it by reference via off()

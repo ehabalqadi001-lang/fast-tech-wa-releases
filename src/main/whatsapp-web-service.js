@@ -355,7 +355,11 @@ class WhatsAppWebService extends EventEmitter {
 
   // ─── internal: trigger WA Web UI to load all groups into memory ─────────
   async _forceLoadAllGroups(pupPage) {
-    return pupPage.evaluate(async () => {
+    // Global 25-second timeout — prevents UI freeze if WhatsApp is slow
+    const timeoutP = new Promise((_, rej) =>
+      setTimeout(() => rej(new Error('forceLoadAllGroups timeout after 25s')), 25000)
+    );
+    const workP = pupPage.evaluate(async () => {
       try {
         // 1. Click the "Groups" filter tab to make WA fetch all groups from server
         const allBtns = Array.from(document.querySelectorAll('[data-tab], [role="tab"], .zoWT4'));
@@ -365,24 +369,23 @@ class WhatsAppWebService extends EventEmitter {
         );
         if (groupsTab) {
           groupsTab.click();
-          await new Promise(r => setTimeout(r, 3000));
+          await new Promise(r => setTimeout(r, 2000));
         }
 
-        // 2. Scroll chat pane to force lazy-loading more chats
+        // 2. Scroll chat pane to force lazy-loading more chats (max 20 iterations)
         const pane = document.querySelector('#pane-side') ||
                      document.querySelector('[data-testid="chat-list"]') ||
                      document.querySelector('.chat-list');
         if (pane) {
-          for (let i = 0; i < 30; i++) {
+          for (let i = 0; i < 20; i++) {
             pane.scrollTop = pane.scrollHeight;
-            await new Promise(r => setTimeout(r, 300));
+            await new Promise(r => setTimeout(r, 250));
           }
-          // scroll back up and down once more
           pane.scrollTop = 0;
-          await new Promise(r => setTimeout(r, 500));
-          for (let i = 0; i < 30; i++) {
+          await new Promise(r => setTimeout(r, 300));
+          for (let i = 0; i < 20; i++) {
             pane.scrollTop = pane.scrollHeight;
-            await new Promise(r => setTimeout(r, 200));
+            await new Promise(r => setTimeout(r, 150));
           }
         }
 
@@ -391,13 +394,19 @@ class WhatsAppWebService extends EventEmitter {
           (b.dataset && b.dataset.tab === '1') ||
           (b.innerText && /^all$|^الكل$/i.test(b.innerText.trim()))
         );
-        if (allTab) { allTab.click(); await new Promise(r => setTimeout(r, 1000)); }
+        if (allTab) { allTab.click(); await new Promise(r => setTimeout(r, 800)); }
 
         return { done: true };
       } catch (e) {
         return { done: false, error: e.message };
       }
     });
+    try {
+      return await Promise.race([workP, timeoutP]);
+    } catch (e) {
+      console.warn('[WA-WEB] _forceLoadAllGroups:', e.message);
+      return { done: false, error: e.message };
+    }
   }
 
   async getAllChats(sessionId) {

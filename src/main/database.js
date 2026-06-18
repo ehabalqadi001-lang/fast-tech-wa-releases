@@ -394,6 +394,27 @@ class Db {
       this.settingSet('db_version', '8');
       v = 8;
     }
+
+    if (v < 9) {
+      // Media Library — centralised file store
+      this._db.exec(`
+        CREATE TABLE IF NOT EXISTS media_files (
+          id          TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(8)))),
+          name        TEXT NOT NULL,
+          file_path   TEXT NOT NULL UNIQUE,
+          mime_type   TEXT,
+          size_bytes  INTEGER DEFAULT 0,
+          created_at  TEXT DEFAULT (datetime('now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_media_created ON media_files(created_at DESC);
+      `);
+      // Per-contact scheduled_at column on send_queue (already has scheduled_at but now user-settable)
+      const sqCols9 = this._db.pragma('table_info(send_queue)').map(c => c.name);
+      if (!sqCols9.includes('contact_note'))
+        this._db.exec(`ALTER TABLE send_queue ADD COLUMN contact_note TEXT`);
+      this.settingSet('db_version', '9');
+      v = 9;
+    }
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -1189,6 +1210,118 @@ class Db {
       ORDER BY im.received_at DESC
       LIMIT 200
     `).all();
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // CONVERSATION VIEW — all in+out messages for a phone number
+  // ═══════════════════════════════════════════════════════════════════════════
+  conversationGet(phone, limit = 100) {
+    // Outbound from send_queue
+    const out = this._db.prepare(`
+      SELECT 'out' AS dir,
+             COALESCE(picked_body, body) AS body,
+             processed_at AS ts,
+             status, wa_msg_id, session_id
+      FROM send_queue
+      WHERE recipient=? AND status IN ('sent','delivered','read','failed')
+      ORDER BY processed_at DESC LIMIT ?
+    `).all(phone, limit);
+    // Inbound from incoming_messages
+    const inc = this._db.prepare(`
+      SELECT 'in' AS dir, body, received_at AS ts,
+             'received' AS status, NULL AS wa_msg_id, session_id
+      FROM incoming_messages
+      WHERE from_number=?
+      ORDER BY received_at DESC LIMIT ?
+    `).all(phone, limit);
+    return [...out, ...inc].sort((a, b) => (a.ts > b.ts ? -1 : 1)).slice(0, limit);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // MEDIA LIBRARY
+  // ═══════════════════════════════════════════════════════════════════════════
+  mediaList() {
+    return this._db.prepare('SELECT * FROM media_files ORDER BY created_at DESC').all();
+  }
+
+  mediaAdd(m) {
+    return this._db.prepare(`
+      INSERT OR IGNORE INTO media_files (id, name, file_path, mime_type, size_bytes)
+      VALUES (@id, @name, @file_path, @mime_type, @size_bytes)
+    `).run(m);
+  }
+
+  mediaDelete(id) {
+    return this._db.prepare('DELETE FROM media_files WHERE id=?').run(id);
+  }
+
+  mediaGet(id) {
+    return this._db.prepare('SELECT * FROM media_files WHERE id=?').get(id);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // LIVE DASHBOARD STATS
+  // ═══════════════════════════════════════════════════════════════════════════
+  dashboardStats() {
+    const today = new Date().toISOString().slice(0, 10);
+    const queue = this._db.prepare(`
+      SELECT
+        SUM(CASE WHEN status='pending'   THEN 1 ELSE 0 END) AS queued,
+        SUM(CASE WHEN status='sent' OR status='delivered' OR status='read' THEN 1 ELSE 0 END) AS sent_today,
+        SUM(CASE WHEN status='failed'    THEN 1 ELSE 0 END) AS failed_today
+      FROM send_queue WHERE DATE(created_at)=?
+    `).get(today);
+
+    const sessions = this._db.prepare(`
+      SELECT id, name, status, health_score, daily_count,
+             warmup_mode, ban_detected_at, hourly_count
+      FROM wa_sessions WHERE status IN ('ready','authenticated')
+    `).all();
+
+    const todayMsgs = this._db.prepare(`
+      SELECT COUNT(*) AS n FROM messages WHERE DATE(sent_at)=?
+    `).get(today);
+
+    const unread = this._db.prepare(
+      'SELECT COUNT(*) AS n FROM incoming_messages WHERE read=0'
+    ).get();
+
+    return {
+      queue:      queue   || { queued: 0, sent_today: 0, failed_today: 0 },
+      sessions,
+      todayMsgs:  todayMsgs?.n  || 0,
+      unreadInbox: unread?.n || 0,
+    };
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // RETRY FAILED MESSAGES
+  // ═══════════════════════════════════════════════════════════════════════════
+  queueRetryFailed(campaignId) {
+    const sql = campaignId
+      ? `UPDATE send_queue SET status='pending', attempts=0, error_msg=NULL,
+           scheduled_at=datetime('now') WHERE status='failed' AND campaign_id=?`
+      : `UPDATE send_queue SET status='pending', attempts=0, error_msg=NULL,
+           scheduled_at=datetime('now') WHERE status='failed'`;
+    const params = campaignId ? [campaignId] : [];
+    return this._db.prepare(sql).run(...params).changes;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // A/B AUTO WINNER
+  // ═══════════════════════════════════════════════════════════════════════════
+  abGetWinner(campaignId) {
+    return this._db.prepare(`
+      SELECT script_index, script_text, sent_count, failed_count, replied_count,
+        CASE WHEN sent_count > 0
+             THEN ROUND(replied_count * 100.0 / sent_count, 2)
+             ELSE 0
+        END AS reply_rate
+      FROM campaign_scripts
+      WHERE campaign_id=? AND sent_count > 0
+      ORDER BY reply_rate DESC, replied_count DESC
+      LIMIT 1
+    `).get(campaignId);
   }
 }
 

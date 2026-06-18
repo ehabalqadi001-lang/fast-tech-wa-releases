@@ -251,7 +251,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
 .dn-l{font-size:9px;color:var(--ts)}
 
 /* UTILS */
-.flex{display:flex}.fi{flex:1}.ic{align-items:center}.jb{justify-content:space-between}.gap6{gap:6px}.gap8{gap:8px}.gap12{gap:12px}.gap16{gap:16px}.gap20{gap:20px}.mb0{margin-bottom:0}.mb8{margin-bottom:8px}.mb14{margin-bottom:14px}.mb18{margin-bottom:18px}.mb22{margin-bottom:22px}.mt4{margin-top:4px}.mt8{margin-top:8px}.mt10{margin-top:10px}.wf{width:100%}.ta{color:var(--acc)}.ts{color:var(--ts)}.fm{font-family:'Orbitron';font-weight:700}.f10{font-size:10px}.f11{font-size:11px}.f12{font-size:12px}.f13{font-size:13px}.f16{font-size:16px}.fw6{font-weight:600}.fw7{font-weight:700}.mt14{margin-top:14px}.mt18{margin-top:18px}
+.flex{display:flex}.fi{flex:1}.ic{align-items:center}.jb{justify-content:space-between}.jc{justify-content:center}.gap6{gap:6px}.gap8{gap:8px}.gap12{gap:12px}.gap16{gap:16px}.gap20{gap:20px}.mb0{margin-bottom:0}.mb8{margin-bottom:8px}.mb14{margin-bottom:14px}.mb18{margin-bottom:18px}.mb22{margin-bottom:22px}.mt4{margin-top:4px}.mt8{margin-top:8px}.mt10{margin-top:10px}.wf{width:100%}.ta{color:var(--acc)}.ts{color:var(--ts)}.fm{font-family:'Orbitron';font-weight:700}.f10{font-size:10px}.f11{font-size:11px}.f12{font-size:12px}.f13{font-size:13px}.f16{font-size:16px}.fw6{font-weight:600}.fw7{font-weight:700}.mt14{margin-top:14px}.mt18{margin-top:18px}
 .cyline{height:1px;background:linear-gradient(90deg,transparent,var(--acc),transparent);margin:18px 0;opacity:.25}
 .spinner{width:18px;height:18px;border:2px solid rgba(var(--ar),.2);border-top-color:var(--acc);border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -324,6 +324,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
     <div class="ni" onclick="nav('campaigns')"><span class="ni-ic">📢</span><span class="ni-lb">الحملات</span></div>
     <div class="ni" onclick="nav('scheduler')"><span class="ni-ic">📅</span><span class="ni-lb">الجدولة</span><span class="nb-badge" id="nb-scheduler">0</span></div>
     <div class="ni" onclick="nav('templates')"><span class="ni-ic">📝</span><span class="ni-lb">القوالب</span></div>
+    <div class="ni" onclick="nav('media')"><span class="ni-ic">🖼️</span><span class="ni-lb">مكتبة الوسائط</span></div>
   </div>
   <div class="ndiv"></div>
   <div class="nb-sec">
@@ -661,8 +662,32 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
       </div>
     </div>
   </div>
+  <!-- Live progress bar (shown during active campaign) -->
+  <div id="campaign-progress-bar-wrap" class="card mb18" style="display:none">
+    <div class="ct flex ic jb">
+      <span>📤 إرسال جاري...</span>
+      <span class="f11 ta fm" id="camp-prog-eta">—</span>
+    </div>
+    <div style="background:rgba(var(--ar),.08);border-radius:6px;height:14px;overflow:hidden;margin-bottom:8px">
+      <div id="camp-prog-bar" style="height:100%;background:var(--acc);transition:width .4s ease;width:0%"></div>
+    </div>
+    <div class="flex ic jb f12">
+      <span class="ts" id="camp-prog-text">0 / 0</span>
+      <div class="flex gap8">
+        <button class="btn bo bsm" onclick="ftwa.wa.send.pause().then(()=>beOk('تم إيقاف الإرسال مؤقتاً'))">⏸️ إيقاف مؤقت</button>
+        <button class="btn bd bsm" onclick="ftwa.wa.send.resume().then(()=>beOk('تم استئناف الإرسال'))">▶️ استئناف</button>
+      </div>
+    </div>
+  </div>
+
   <div class="card">
-    <div class="ct flex ic jb"><span>📋 آخر الحملات المُرسَلة</span><button class="btn bo bsm" onclick="loadCampaigns()">🔄 تحديث</button></div>
+    <div class="ct flex ic jb">
+      <span>📋 آخر الحملات المُرسَلة</span>
+      <div class="flex gap8">
+        <button class="btn bo bsm" onclick="retryFailedMessages()">🔁 إعادة الفاشلة</button>
+        <button class="btn bo bsm" onclick="loadCampaigns()">🔄 تحديث</button>
+      </div>
+    </div>
     <div id="campaigns-list">
       <div style="text-align:center;padding:32px;opacity:.5" class="f12 ts">لا توجد حملات — ابدأ إرسالاً جماعياً من محرك الإرسال</div>
     </div>
@@ -1235,9 +1260,10 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
       <!-- Backup -->
       <div class="card mb18">
         <div class="ct">💾 النسخ الاحتياطي</div>
-        <div class="flex gap8">
+        <div class="flex gap8" style="flex-wrap:wrap">
           <button class="btn bp fi bsm" onclick="backupData()">💾 نسخ الآن</button>
           <button class="btn bo fi bsm" onclick="restoreData()">📂 استعادة</button>
+          <button class="btn bo fi bsm" onclick="backupEncrypted()">🔐 نسخ مشفّر (AES-256)</button>
         </div>
       </div>
 
@@ -1652,6 +1678,29 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
   </div>
 </div>
 
+<!-- ══ MEDIA LIBRARY ══ -->
+<div id="p-media" class="page">
+  <div class="ph">
+    <div class="ph-l"><div class="ph-ic">🖼️</div><div><h1>MEDIA LIBRARY</h1><p>مكتبة الوسائط — صور، فيديو، PDF</p></div></div>
+    <button class="btn bp" onclick="mediaUpload()">📤 رفع ملف</button>
+  </div>
+  <div class="sg" style="grid-template-columns:repeat(4,1fr);margin-bottom:18px">
+    <div class="sc"><div class="si">🖼️</div><div class="sn" id="media-cnt-img">0</div><div class="sl">صور</div></div>
+    <div class="sc"><div class="si">🎬</div><div class="sn" id="media-cnt-vid">0</div><div class="sl">فيديو</div></div>
+    <div class="sc"><div class="si">📄</div><div class="sn" id="media-cnt-pdf">0</div><div class="sl">مستندات</div></div>
+    <div class="sc"><div class="si">📦</div><div class="sn" id="media-cnt-total">0</div><div class="sl">إجمالي</div></div>
+  </div>
+  <div class="card">
+    <div class="ct flex ic jb">
+      <span>📁 الملفات</span>
+      <button class="btn bo bsm" onclick="loadMedia()">🔄 تحديث</button>
+    </div>
+    <div id="media-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:14px;margin-top:8px">
+      <div style="text-align:center;padding:32px;opacity:.4;grid-column:1/-1" class="f12 ts">لا توجد ملفات — ارفع ملفاً الآن</div>
+    </div>
+  </div>
+</div>
+
 </main><!-- END MAIN -->
 
 <!-- ═══════ MODALS ═══════ -->
@@ -1928,6 +1977,78 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
   </div>
 </div>
 
+<!-- ═══ MODAL: Conversation View ═══ -->
+<div class="mo" id="m-conversation" onclick="if(event.target===this)closeM('m-conversation')">
+  <div class="md" style="max-width:560px;max-height:88vh;display:flex;flex-direction:column;padding:0;overflow:hidden">
+    <div style="padding:16px 20px 12px;border-bottom:1px solid rgba(var(--ar),.1);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+      <div class="fw7 f14 ta">💬 محادثة مع: <span id="conv-phone-title" class="ta">—</span></div>
+      <button class="hbtn bsm" onclick="closeM('m-conversation')">✕</button>
+    </div>
+    <div id="conv-thread" style="flex:1;overflow-y:auto;padding:16px 18px;display:flex;flex-direction:column;gap:10px">
+      <div style="text-align:center;opacity:.4" class="f12 ts">جاري التحميل...</div>
+    </div>
+    <div style="padding:12px 16px;border-top:1px solid rgba(var(--ar),.1);flex-shrink:0;display:flex;gap:8px">
+      <input id="conv-reply-input" class="fc fi" type="text" placeholder="اكتب رداً...">
+      <select id="conv-reply-session" class="fc" style="max-width:130px"><option value="">جلسة...</option></select>
+      <button class="btn bp bsm" onclick="sendConvReply()">إرسال</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL: Phone Import Preview ═══ -->
+<div class="mo" id="m-import-preview" onclick="if(event.target===this)closeM('m-import-preview')">
+  <div class="md" style="max-width:620px;max-height:88vh;display:flex;flex-direction:column;padding:0;overflow:hidden">
+    <div style="padding:16px 20px 12px;border-bottom:1px solid rgba(var(--ar),.1);flex-shrink:0">
+      <div class="fw7 f14 ta">📥 معاينة الاستيراد</div>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:16px 18px">
+      <div class="sg" style="grid-template-columns:repeat(3,1fr);margin-bottom:14px">
+        <div class="sc"><div class="sn ta fm" id="imp-cnt-valid">0</div><div class="sl">أرقام صحيحة</div></div>
+        <div class="sc"><div class="sn" id="imp-cnt-dup" style="color:#ffcc00">0</div><div class="sl">مكررة</div></div>
+        <div class="sc"><div class="sn" id="imp-cnt-inv" style="color:#ff3344">0</div><div class="sl">غير صحيحة</div></div>
+      </div>
+      <div id="imp-preview-list" style="max-height:320px;overflow-y:auto">
+        <table class="dt">
+          <thead><tr><th>الرقم</th><th>الاسم</th><th>الحالة</th></tr></thead>
+          <tbody id="imp-preview-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div style="padding:12px 18px;border-top:1px solid rgba(var(--ar),.1);flex-shrink:0;display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn bo" onclick="closeM('m-import-preview')">إلغاء</button>
+      <button class="btn bp" id="btn-imp-confirm" onclick="confirmImport()">✅ استيراد الصحيحة (<span id="imp-confirm-cnt">0</span>)</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL: Send Template ═══ -->
+<div class="mo" id="m-send-template" onclick="if(event.target===this)closeM('m-send-template')">
+  <div class="md" style="max-width:520px">
+    <div class="md-tt">📤 إرسال القالب</div>
+    <input type="hidden" id="send-tpl-id">
+    <div class="fg">
+      <label class="fl">القالب</label>
+      <div class="fc" id="send-tpl-preview" style="min-height:60px;white-space:pre-wrap;color:var(--ts);cursor:default">—</div>
+    </div>
+    <div class="fg">
+      <label class="fl">المستقبلون (أرقام مفصولة بسطر جديد أو فاصلة)</label>
+      <textarea id="send-tpl-recipients" class="fc" rows="5" placeholder="9665xxxxxxxx&#10;9665xxxxxxxx"></textarea>
+    </div>
+    <div class="fg">
+      <label class="fl">الجلسة (اتركه فارغاً للتلقائي)</label>
+      <select id="send-tpl-session" class="fc"><option value="">— تلقائي —</option></select>
+    </div>
+    <div class="fg">
+      <label class="fl">تأخير بين الرسائل (ثانية)</label>
+      <input id="send-tpl-delay" class="fc" type="number" value="15" min="5">
+    </div>
+    <div class="flex gap8 jb mt8">
+      <button class="btn bo" onclick="closeM('m-send-template')">إلغاء</button>
+      <button class="btn bp" onclick="sendTemplateNow()">📤 إرسال الآن</button>
+    </div>
+  </div>
+</div>
+
 <!-- ═══════ JAVASCRIPT ═══════ -->
 <script>
 // ── NAVIGATION ──
@@ -1940,6 +2061,9 @@ function nav(page){
     if(n.getAttribute('onclick')&&n.getAttribute('onclick').includes("'"+page+"'"))
       n.classList.add('on');
   });
+  // Auto-refresh dashboard stats every 15s
+  if (page==='dashboard') startDashAutoRefresh();
+  else                    stopDashAutoRefresh();
 }
 
 // ── GLOBAL PROGRESS BAR ──────────────────────────────────────────────────
@@ -2517,10 +2641,7 @@ async function importContactsExcel() {
   if (!IS_ELECTRON) { beOk('استيراد (وضع العرض)'); return; }
   const fp = await BE.openFile({ filters:[{name:'Excel/CSV',extensions:['xlsx','xls','csv']}] });
   if (!fp) return;
-  showN('استيراد','جاري معالجة الملف...','📂');
-  const r = await BE.contacts.importExcel(fp);
-  if (r.ok) beOk(`تم استيراد ${r.data.imported} جهة اتصال (محذوف: ${r.data.skipped})`);
-  else beErr(r.error);
+  await openImportPreview(fp);
 }
 
 async function exportContactsExcel() {
@@ -2558,7 +2679,6 @@ let _dashRefreshTimer = null;
 async function loadDashboard() {
   await updateStats();
   if (!IS_ELECTRON) return;
-  if (_dashRefreshTimer) { clearTimeout(_dashRefreshTimer); _dashRefreshTimer = null; }
   try {
     const [statsR, inboxR, queueR, unrepliedR] = await Promise.all([
       BE.messages.getStats(),
@@ -3171,6 +3291,7 @@ async function loadTemplates() {
       <div class="f12 ts" style="line-height:1.7;white-space:pre-wrap">${esc((t.body||'').slice(0,150))}${(t.body||'').length>150?'…':''}</div>
       <div class="flex gap8 mt14">
         <button class="btn bo bsm fi" onclick="useTemplate('${esc(t.id||'')}')">🚀 استخدام</button>
+        <button class="btn bp bsm" onclick="openSendTemplate('${esc(t.id||'')}',${JSON.stringify((t.body||'').slice(0,300))})">📤 إرسال</button>
         <button class="btn bd bsm" onclick="deleteTemplate('${esc(t.id||'')}')">🗑️</button>
       </div>
     </div>`).join('');
@@ -4326,9 +4447,11 @@ async function loadInbox() {
     const statusBadge = m.replied
       ? '<span class="bge bg-g f11">تم الرد</span>'
       : (m.read ? '<span class="bge f11">مقروء</span>' : '<span class="bge bg-y f11">جديد</span>');
+    const phone = esc(m.from_number||'');
     const actions = [
       !m.read ? `<button class="btn bo bsm" onclick="markMsgRead('${m.id}',this)" title="تحديد كمقروء">✔</button>` : '',
-      `<button class="btn bp bsm" onclick="openReplyModal('${m.id}','${esc(m.from_number||'')}','${bodySnippet.replace(/'/g,'')}','${sessionLabel}')" title="رد">↩️ رد</button>`,
+      `<button class="btn bp bsm" onclick="openReplyModal('${m.id}','${phone}','${bodySnippet.replace(/'/g,'')}','${sessionLabel}')" title="رد">↩️ رد</button>`,
+      `<button class="btn bo bsm" onclick="openConversation('${phone}')" title="عرض المحادثة">💬</button>`,
     ].join(' ');
     return `<tr style="${!m.read ? 'background:rgba(var(--ar),.04)' : ''}">
       <td class="f11 ts" style="white-space:nowrap">${sessionLabel}</td>
@@ -4444,6 +4567,7 @@ window.nav = function(page) {
   else if (page==='inbox')      loadInbox();
   else if (page==='groups')     loadGroupsPage();
   else if (page==='antiban')    loadAntiBan();
+  else if (page==='media')      loadMedia();
 };
 
 // ── Boot: load engine status in header immediately ───────────────────────
@@ -5465,6 +5589,269 @@ if (IS_ELECTRON) {
     showN('إحماء مكتمل', `✅ انتهى الإحماء للجلسة ${sessionId}`, 'success');
     if (document.getElementById('p-antiban')?.classList.contains('on')) loadAntiBan();
   });
+  // Rate-limit warning at 80%
+  BE.on('antiban:rate-limit', ({ sessionId, type, count, limit, pct }) => {
+    const label = type === 'daily' ? 'اليومي' : 'الساعي';
+    showN('تحذير حد الإرسال', `⚠️ وصلت إلى ${pct}% من الحد ${label} (${count}/${limit}) — جلسة: ${sessionId}`, 'warning');
+  });
+  // Live campaign progress
+  BE.on('campaign:progress', (d) => {
+    const wrap = document.getElementById('campaign-progress-bar-wrap');
+    const bar  = document.getElementById('camp-prog-bar');
+    const txt  = document.getElementById('camp-prog-text');
+    const eta  = document.getElementById('camp-prog-eta');
+    if (!wrap) return;
+    const total = d.total || 1;
+    const done  = (d.sent || 0) + (d.failed || 0);
+    const pct   = Math.min(100, Math.round(done / total * 100));
+    wrap.style.display = 'block';
+    bar.style.width    = pct + '%';
+    txt.textContent    = `${done} / ${total}`;
+    if (d.etaSec > 0) {
+      const m = Math.floor(d.etaSec / 60), s = d.etaSec % 60;
+      eta.textContent = `ETA: ${m}:${String(s).padStart(2,'0')}`;
+    }
+    if (pct >= 100) setTimeout(() => { wrap.style.display = 'none'; }, 4000);
+  });
+}
+
+// ── IPC helper: unwrap {ok,data} and show error on failure ─────────────────
+async function safeIpc(fn) {
+  try {
+    const r = await fn();
+    if (r && r.ok === false) { beErr(r.error || 'خطأ غير معروف'); return null; }
+    return r?.data !== undefined ? r.data : r;
+  } catch(e) { beErr(String(e?.message||e)); return null; }
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// MEDIA LIBRARY
+// ══════════════════════════════════════════════════════════════════════════
+let _mediaList = [];
+
+async function loadMedia() {
+  if (!IS_ELECTRON) return;
+  const r = await safeIpc(() => BE.media.list());
+  if (!r) return;
+  _mediaList = r;
+  const grid = document.getElementById('media-grid');
+  if (!grid) return;
+
+  let img = 0, vid = 0, pdf = 0;
+  if (!r.length) {
+    grid.innerHTML = '<div style="text-align:center;padding:32px;opacity:.4;grid-column:1/-1" class="f12 ts">لا توجد ملفات — ارفع ملفاً الآن</div>';
+  } else {
+    grid.innerHTML = r.map(m => {
+      const ext   = (m.mime_type || '').split('/')[0];
+      const icon  = ext === 'image' ? '🖼️' : ext === 'video' ? '🎬' : ext === 'application' ? '📄' : '📎';
+      if (ext === 'image') img++;
+      else if (ext === 'video') vid++;
+      else pdf++;
+      const kb = m.size_bytes ? Math.round(m.size_bytes / 1024) + ' KB' : '';
+      return `<div class="card" style="padding:12px;cursor:pointer;text-align:center" title="${escH(m.name)}">
+        <div style="font-size:32px;margin-bottom:8px">${icon}</div>
+        <div class="f11 fw6" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%">${escH(m.name)}</div>
+        <div class="f10 ts mt4">${kb}</div>
+        <div class="flex gap6 mt8 ic jc" onclick="event.stopPropagation()">
+          <button class="btn bo bsm" style="padding:4px 8px;font-size:10px" onclick="mediaUseInEngine(${JSON.stringify(m.file_path)})">استخدام</button>
+          <button class="btn bd bsm" style="padding:4px 8px;font-size:10px" onclick="mediaDelete(${JSON.stringify(m.id)})">🗑️</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+  const total = r.length;
+  document.getElementById('media-cnt-img').textContent   = img;
+  document.getElementById('media-cnt-vid').textContent   = vid;
+  document.getElementById('media-cnt-pdf').textContent   = pdf;
+  document.getElementById('media-cnt-total').textContent = total;
+}
+
+async function mediaUpload() {
+  if (!IS_ELECTRON) return;
+  const fp = await BE.openFile({ filters:[{ name:'وسائط', extensions:['jpg','jpeg','png','gif','webp','mp4','pdf'] }] });
+  if (!fp) return;
+  const res = await safeIpc(() => BE.media.add(fp));
+  if (res) { beOk('✅ تم رفع الملف'); loadMedia(); }
+}
+
+async function mediaDelete(id) {
+  if (!confirm('حذف هذا الملف نهائياً؟')) return;
+  await safeIpc(() => BE.media.delete(id));
+  loadMedia();
+}
+
+function mediaUseInEngine(filePath) {
+  nav('engine');
+  setTimeout(() => {
+    const inp = document.getElementById('eng-media-path');
+    const lbl = document.getElementById('eng-media-label');
+    if (inp) inp.value = filePath;
+    if (lbl) lbl.textContent = filePath.split(/[\\/]/).pop();
+    beOk('✅ تم تحديد الملف في محرك الإرسال');
+  }, 300);
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// CONVERSATION VIEW
+// ══════════════════════════════════════════════════════════════════════════
+let _convPhone = null;
+
+async function openConversation(phone) {
+  _convPhone = phone;
+  document.getElementById('conv-phone-title').textContent = phone;
+  openM('m-conversation');
+  // Populate session dropdown
+  const sessEl = document.getElementById('conv-reply-session');
+  if (IS_ELECTRON) {
+    const sr = await safeIpc(() => BE.wa.sessions.list());
+    sessEl.innerHTML = '<option value="">— جلسة —</option>' +
+      (sr||[]).filter(s=>s.status==='ready').map(s=>`<option value="${s.id}">${escH(s.name)}</option>`).join('');
+  }
+  await reloadConversation(phone);
+}
+
+async function reloadConversation(phone) {
+  const thread = document.getElementById('conv-thread');
+  if (!IS_ELECTRON) return;
+  const r = await safeIpc(() => BE.conversation.get(phone, 100));
+  if (!r || !r.length) {
+    thread.innerHTML = '<div style="text-align:center;opacity:.4" class="f12 ts">لا توجد رسائل</div>';
+    return;
+  }
+  thread.innerHTML = r.map(m => {
+    const out  = m.direction === 'out';
+    const time = m.created_at ? new Date(m.created_at).toLocaleString('ar') : '';
+    const bg   = out ? 'rgba(0,255,136,.07)' : 'rgba(0,180,255,.07)';
+    const align= out ? 'flex-end' : 'flex-start';
+    return `<div style="display:flex;justify-content:${align}">
+      <div style="max-width:80%;background:${bg};border:1px solid rgba(var(--ar),.12);border-radius:10px;padding:10px 14px">
+        <div class="f11 ts mb4">${out ? '📤 أنت' : '📩 ' + escH(phone)} · ${time}</div>
+        <div class="f12" style="white-space:pre-wrap">${escH(m.body||'')}</div>
+      </div>
+    </div>`;
+  }).join('');
+  thread.scrollTop = thread.scrollHeight;
+}
+
+async function sendConvReply() {
+  const body    = document.getElementById('conv-reply-input').value.trim();
+  const session = document.getElementById('conv-reply-session').value;
+  if (!body) return;
+  if (!session) { beErr('اختر جلسة للرد'); return; }
+  const r = await safeIpc(() => BE.wa.send.text({ sessionId: session, to: _convPhone, body }));
+  if (r) {
+    document.getElementById('conv-reply-input').value = '';
+    await reloadConversation(_convPhone);
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// TEMPLATE SEND
+// ══════════════════════════════════════════════════════════════════════════
+async function openSendTemplate(tplId, tplBody) {
+  document.getElementById('send-tpl-id').value      = tplId;
+  document.getElementById('send-tpl-preview').textContent = tplBody || '—';
+  document.getElementById('send-tpl-recipients').value    = '';
+  // Populate session dropdown
+  const sel = document.getElementById('send-tpl-session');
+  sel.innerHTML = '<option value="">— تلقائي —</option>';
+  if (IS_ELECTRON) {
+    const sr = await safeIpc(() => BE.wa.sessions.list());
+    (sr||[]).filter(s=>s.status==='ready').forEach(s=>{
+      sel.innerHTML += `<option value="${s.id}">${escH(s.name)}</option>`;
+    });
+  }
+  openM('m-send-template');
+}
+
+async function sendTemplateNow() {
+  const templateId = document.getElementById('send-tpl-id').value;
+  const raw        = document.getElementById('send-tpl-recipients').value;
+  const sessionId  = document.getElementById('send-tpl-session').value || null;
+  const delaySec   = parseInt(document.getElementById('send-tpl-delay').value||'15',10);
+  const recipients = raw.split(/[\n,;]+/).map(x=>x.trim().replace(/\D/g,'')).filter(x=>x.length>=7);
+  if (!templateId) { beErr('لا يوجد قالب'); return; }
+  if (!recipients.length) { beErr('أضف أرقاماً'); return; }
+  const r = await safeIpc(() => BE.templates.send({ templateId, recipients, sessionId, delaySec }));
+  if (r) { beOk(`✅ تم إضافة ${recipients.length} رسالة للقائمة`); closeM('m-send-template'); }
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// ENCRYPTED BACKUP
+// ══════════════════════════════════════════════════════════════════════════
+async function backupEncrypted() {
+  const r = await safeIpc(() => BE.settings.backupEncrypted());
+  if (r?.path) beOk(`🔐 تم حفظ النسخة المشفرة:\n${r.path}`);
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// RETRY FAILED MESSAGES
+// ══════════════════════════════════════════════════════════════════════════
+async function retryFailedMessages(campaignId) {
+  const r = await safeIpc(() => BE.wa.send.retryFailed(campaignId || undefined));
+  if (r) { beOk(`🔁 تم إعادة ${r.requeued || 0} رسالة فاشلة للقائمة`); loadCampaigns(); }
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// PHONE IMPORT PREVIEW
+// ══════════════════════════════════════════════════════════════════════════
+let _importFilePath = null;
+let _importValidRows = [];
+
+async function openImportPreview(filePath) {
+  _importFilePath = filePath;
+  openM('m-import-preview');
+  const r = await safeIpc(() => BE.contacts.previewImport(filePath));
+  if (!r) return;
+  _importValidRows = (r.valid || []);
+  document.getElementById('imp-cnt-valid').textContent = r.validCount  || r.valid?.length  || 0;
+  document.getElementById('imp-cnt-dup').textContent   = r.dupCount    || r.dups?.length   || 0;
+  document.getElementById('imp-cnt-inv').textContent   = r.invalidCount|| r.invalid?.length|| 0;
+  document.getElementById('imp-confirm-cnt').textContent = _importValidRows.length;
+  const tbody = document.getElementById('imp-preview-tbody');
+  const rows  = [...(r.valid||[]).map(x=>({...x,st:'صحيح',c:'bg-g'})),
+                 ...(r.dups||[]).map(x=>({...x,st:'مكرر',c:'bg-y'})),
+                 ...(r.invalid||[]).map(x=>({...x,st:'خطأ',c:'bg-r'}))].slice(0,200);
+  tbody.innerHTML = rows.map(x=>`<tr><td>${escH(x.phone||x.raw||'')}</td><td>${escH(x.name||'')}</td><td><span class="bge ${x.c}">${x.st}</span></td></tr>`).join('');
+}
+
+async function confirmImport() {
+  if (!_importFilePath) return;
+  const r = await safeIpc(() => BE.contacts.importExcel(_importFilePath));
+  if (r) { beOk(`✅ تم استيراد ${r.imported||_importValidRows.length} جهة اتصال`); closeM('m-import-preview'); }
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// DASHBOARD AUTO-REFRESH with live stats
+// ══════════════════════════════════════════════════════════════════════════
+async function loadDashboardStats() {
+  if (!IS_ELECTRON) return;
+  const r = await safeIpc(() => BE.dashboard.stats());
+  if (!r) return;
+  // Update header stat counters
+  if (r.sessionsReady  !== undefined) _el('dash-s-accounts',  r.sessionsReady);
+  if (r.sentToday      !== undefined) _el('dash-s-sent',      r.sentToday);
+  if (r.repliesTotal   !== undefined) _el('dash-s-replies',   r.repliesTotal);
+  if (r.unrepliedCount !== undefined) _el('dash-s-unreplied', r.unrepliedCount);
+  if (r.scheduledActive!== undefined) _el('dash-s-scheduled', r.scheduledActive);
+  if (r.queuePending   !== undefined) _el('dash-q-pending',   r.queuePending);
+  if (r.queueSent      !== undefined) _el('dash-q-sent',      r.queueSent);
+  if (r.queueFailed    !== undefined) _el('dash-q-failed',    r.queueFailed);
+  if (r.sessionsReady  !== undefined) _el('dash-q-devices',   r.sessionsReady);
+}
+
+function _el(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = val ?? '—';
+}
+
+function startDashAutoRefresh() {
+  if (_dashRefreshTimer) return;
+  _dashRefreshTimer = setInterval(() => { loadDashboardStats(); }, 15000);
+}
+
+function stopDashAutoRefresh() {
+  if (_dashRefreshTimer) { clearInterval(_dashRefreshTimer); _dashRefreshTimer = null; }
 }
 
 // ── Boot ──────────────────────────────────────────────────────────────────
