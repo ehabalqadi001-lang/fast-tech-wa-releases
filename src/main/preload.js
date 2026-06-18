@@ -54,10 +54,11 @@ contextBridge.exposeInMainWorld('ftwa', {
 
   // ── Messages / Campaigns ─────────────────────────────────────────────────
   messages: {
-    sendSingle:  (data)  => ipcRenderer.invoke('messages:sendSingle',  data),
-    sendBulk:    (data)  => ipcRenderer.invoke('messages:sendBulk',    data),
-    getHistory:  (phone) => ipcRenderer.invoke('messages:getHistory',  phone),
-    getStats:    ()      => ipcRenderer.invoke('messages:getStats'),
+    sendSingle:  (data)         => ipcRenderer.invoke('messages:sendSingle',  data),
+    sendBulk:    (data)         => ipcRenderer.invoke('messages:sendBulk',    data),
+    getHistory:  (phone)        => ipcRenderer.invoke('messages:getHistory',  phone),
+    getStats:    ()             => ipcRenderer.invoke('messages:getStats'),
+    search:      (query, limit) => ipcRenderer.invoke('messages:search',      { query, limit }),
   },
 
   // ── Scheduler ─────────────────────────────────────────────────────────────

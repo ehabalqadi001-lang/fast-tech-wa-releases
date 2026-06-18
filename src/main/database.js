@@ -18,12 +18,31 @@ class Db {
     this._db = new Database(this._path);
     this._db.pragma('journal_mode = WAL');
     this._db.pragma('foreign_keys = ON');
+    this._db.pragma('cache_size = -65536');     // 64 MB page cache
+    this._db.pragma('temp_store = memory');      // temp tables in RAM
+    this._db.pragma('mmap_size = 268435456');    // 256 MB memory-mapped I/O
+    this._db.pragma('synchronous = NORMAL');     // safe with WAL, faster than FULL
+    this._db.pragma('busy_timeout = 5000');      // 5s retry on locked db
     this._createTables();
     this._runMigrations();
+    this._schedulePragmaOptimize();
     return this;
   }
 
-  close() { this._db?.close(); }
+  _schedulePragmaOptimize() {
+    // PRAGMA optimize analyzes query patterns and updates statistics
+    const SIX_HOURS = 6 * 60 * 60 * 1000;
+    this._optimizeTimer = setInterval(() => {
+      try { this._db.pragma('optimize'); } catch (_) {}
+    }, SIX_HOURS);
+    if (this._optimizeTimer.unref) this._optimizeTimer.unref();
+  }
+
+  close() {
+    if (this._optimizeTimer) clearInterval(this._optimizeTimer);
+    try { this._db?.pragma('optimize'); } catch (_) {}
+    this._db?.close();
+  }
 
   // ─── Schema ──────────────────────────────────────────────────────────────
   _createTables() {
@@ -415,6 +434,53 @@ class Db {
       this.settingSet('db_version', '9');
       v = 9;
     }
+
+    if (v < 10) {
+      // FTS5 virtual table for full-text conversation search (Phase 3 prep)
+      this._db.exec(`
+        CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(
+          body,
+          recipient UNINDEXED,
+          direction UNINDEXED,
+          sent_at UNINDEXED,
+          content='messages',
+          content_rowid='rowid',
+          tokenize='unicode61 remove_diacritics 2'
+        );
+
+        -- Triggers to keep FTS in sync with messages table
+        CREATE TRIGGER IF NOT EXISTS messages_ai AFTER INSERT ON messages BEGIN
+          INSERT INTO messages_fts(rowid, body, recipient, direction, sent_at)
+          VALUES (new.rowid, new.body, new.recipient, new.direction, new.sent_at);
+        END;
+
+        CREATE TRIGGER IF NOT EXISTS messages_ad AFTER DELETE ON messages BEGIN
+          INSERT INTO messages_fts(messages_fts, rowid, body, recipient, direction, sent_at)
+          VALUES ('delete', old.rowid, old.body, old.recipient, old.direction, old.sent_at);
+        END;
+
+        CREATE TRIGGER IF NOT EXISTS messages_au AFTER UPDATE ON messages BEGIN
+          INSERT INTO messages_fts(messages_fts, rowid, body, recipient, direction, sent_at)
+          VALUES ('delete', old.rowid, old.body, old.recipient, old.direction, old.sent_at);
+          INSERT INTO messages_fts(rowid, body, recipient, direction, sent_at)
+          VALUES (new.rowid, new.body, new.recipient, new.direction, new.sent_at);
+        END;
+      `);
+      this.settingSet('db_version', '10');
+      v = 10;
+    }
+  }
+
+  // ─── FTS Search ───────────────────────────────────────────────────────────
+  messagesFtsSearch(query, limit = 50) {
+    return this._db.prepare(`
+      SELECT m.*, snippet(messages_fts, 0, '<mark>', '</mark>', '…', 20) AS highlight
+      FROM messages_fts
+      JOIN messages m ON m.rowid = messages_fts.rowid
+      WHERE messages_fts MATCH ?
+      ORDER BY rank
+      LIMIT ?
+    `).all(query, limit);
   }
 
   // ═══════════════════════════════════════════════════════════════════════════

@@ -1,6 +1,6 @@
 {
   "name": "fast-tech-whatsapp-manager",
-  "version": "1.0.7",
+  "version": "2.0.0",
   "description": "Fast Tech WhatsApp Business Manager - Professional WhatsApp Business Management System",
   "main": "src/main/index.js",
   "author": "Fast Tech",
@@ -18,13 +18,13 @@
     "obfuscate": "javascript-obfuscator src/main --output src/main-obfuscated --compact true --self-defending true --identifier-names-generator mangled --string-array true --string-array-encoding rc4 --string-array-threshold 0.75 --dead-code-injection false"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.20.9",
-    "@google/generative-ai": "^0.3.1",
-    "axios": "^1.6.5",
+    "@anthropic-ai/sdk": "^0.105.0",
+    "@google/generative-ai": "^0.24.1",
+    "axios": "^1.18.0",
     "better-sqlite3": "^9.4.3",
-    "electron-updater": "^6.8.3",
-    "form-data": "^4.0.0",
-    "libphonenumber-js": "^1.10.58",
+    "electron-updater": "^6.8.9",
+    "form-data": "^4.0.6",
+    "libphonenumber-js": "^1.13.7",
     "multer": "^1.4.5-lts.1",
     "node-cron": "^3.0.3",
     "puppeteer": "^21.11.0",
@@ -36,8 +36,8 @@
   "devDependencies": {
     "@electron/asar": "^3.4.1",
     "electron": "^29.4.6",
-    "electron-builder": "^24.13.3",
-    "javascript-obfuscator": "^4.2.2",
+    "electron-builder": "^26.15.3",
+    "javascript-obfuscator": "^5.4.3",
     "jimp": "^1.6.1",
     "to-ico": "^1.1.5"
   },
@@ -62,10 +62,7 @@
         }
       ],
       "icon": "assets/icon.ico",
-      "requestedExecutionLevel": "requireAdministrator",
-      "sign": null,
-      "certificateSubjectName": null,
-      "signingHashAlgorithms": null
+      "requestedExecutionLevel": "requireAdministrator"
     },
     "nsis": {
       "oneClick": false,
