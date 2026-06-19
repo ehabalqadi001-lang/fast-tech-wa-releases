@@ -1821,9 +1821,51 @@ if (IS_ELECTRON) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 function countEngineTargets() {
-  const raw = document.getElementById('eng-recipients').value;
+  const raw  = document.getElementById('eng-recipients')?.value || '';
   const nums = raw.split(/[\n,]+/).map(s=>s.trim()).filter(s=> s.includes('@') || /\d{6,}/.test(s));
-  document.getElementById('eng-count').textContent = nums.length + ' مستهدف';
+  const n = nums.length;
+  const el = document.getElementById('eng-count');
+  if (el) el.textContent = n + ' مستهدف';
+  const badge = document.getElementById('eng-count-badge');
+  if (badge) badge.textContent = n.toLocaleString() + ' مستهدف';
+  // Estimated time
+  const minDelay = parseInt(document.getElementById('eng-delay-min')?.value || 15, 10);
+  const maxDelay = parseInt(document.getElementById('eng-delay-max')?.value || 45, 10);
+  const avgDelay = (minDelay + maxDelay) / 2;
+  const estSec   = Math.round(n * avgDelay);
+  const etaEl    = document.getElementById('eng-est-time');
+  if (etaEl && n > 0) {
+    const mins = Math.floor(estSec / 60), secs = estSec % 60;
+    etaEl.textContent = `⏱ ~${mins ? mins + 'د ' : ''}${secs}ث`;
+  } else if (etaEl) { etaEl.textContent = ''; }
+}
+
+function setDelayPreset(min, max) {
+  if (min === 0 && max === 0) { countEngineTargets(); return; }
+  const minEl = document.getElementById('eng-delay-min');
+  const maxEl = document.getElementById('eng-delay-max');
+  if (minEl) minEl.value = min;
+  if (maxEl) maxEl.value = max;
+  _updateRiskBadge(min, max);
+  countEngineTargets();
+  // Highlight active preset
+  document.querySelectorAll('#delay-presets .src-btn').forEach(b => b.classList.remove('active'));
+  event?.target?.closest('.src-btn')?.classList.add('active');
+}
+
+function _updateRiskBadge(min, max) {
+  const badge = document.getElementById('eng-risk-badge');
+  if (!badge) return;
+  const avg = (min + max) / 2;
+  if (avg >= 25)      { badge.textContent = '🛡️ آمن جداً'; badge.className = 'bge bg-g f11'; }
+  else if (avg >= 12) { badge.textContent = '✅ آمن';      badge.className = 'bge bg-g f11'; }
+  else if (avg >= 6)  { badge.textContent = '⚠️ متوسط';   badge.className = 'bge bg-y f11'; }
+  else                { badge.textContent = '🔴 خطر';      badge.className = 'bge f11'; badge.style.background='rgba(239,68,68,.15)'; badge.style.color='#ef4444'; }
+}
+
+function _engUpdateLiveBadge(pending) {
+  const badge = document.getElementById('eng-live-badge');
+  if (badge) badge.style.display = pending > 0 ? 'flex' : 'none';
 }
 
 async function loadEngineStats() {
@@ -1831,22 +1873,47 @@ async function loadEngineStats() {
   const r = await BE.wa.send.queueStats();
   if (!r || !r.ok) return;
   const s = r.data;
-  document.getElementById('eng-s-pending').textContent   = (s.pending||0).toLocaleString();
-  document.getElementById('eng-s-sent').textContent      = (s.sent||0).toLocaleString();
-  document.getElementById('eng-s-delivered').textContent = (s.delivered||0).toLocaleString();
-  document.getElementById('eng-s-failed').textContent    = (s.failed||0).toLocaleString();
 
-  const total = s.total || 1;
-  const done  = (s.sent||0) + (s.delivered||0) + (s.read_count||0) + (s.failed||0);
-  const pct   = Math.round(done / total * 100);
-  if ((s.pending||0) > 0 || done > 0) {
-    document.getElementById('eng-progress-card').style.display = 'block';
-    document.getElementById('eng-prog-bar').style.width  = pct + '%';
-    document.getElementById('eng-prog-pct').textContent  = pct + '%';
-    document.getElementById('eng-prog-sent').textContent = (s.sent||0);
-    document.getElementById('eng-prog-fail').textContent = (s.failed||0);
-    document.getElementById('eng-prog-left').textContent = (s.pending||0);
+  // Update stat cards
+  const _set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+  _set('eng-s-pending',   (s.pending||0).toLocaleString());
+  _set('eng-s-sent',      (s.sent||0).toLocaleString());
+  _set('eng-s-delivered', (s.delivered||0).toLocaleString());
+  _set('eng-s-failed',    (s.failed||0).toLocaleString());
+
+  // Live badge
+  _engUpdateLiveBadge(s.pending||0);
+
+  // Progress card — show when there's an active campaign
+  const total   = s.total || 1;
+  const done    = (s.sent||0) + (s.delivered||0) + (s.read_count||0) + (s.failed||0);
+  const pct     = Math.min(100, Math.round(done / total * 100));
+  const pending = s.pending || 0;
+
+  const card = document.getElementById('eng-progress-card');
+  if (card) {
+    card.style.display = (pending > 0 || done > 0) ? 'block' : 'none';
+    const barEl  = document.getElementById('eng-prog-bar');  if (barEl)  barEl.style.width      = pct + '%';
+    const pctEl  = document.getElementById('eng-prog-pct');  if (pctEl)  pctEl.textContent      = pct + '%';
+    const sentEl = document.getElementById('eng-prog-sent'); if (sentEl) sentEl.textContent     = (s.sent||0).toLocaleString();
+    const failE2 = document.getElementById('eng-prog-fail'); if (failE2) failE2.textContent     = (s.failed||0).toLocaleString();
+    const leftEl = document.getElementById('eng-prog-left'); if (leftEl) leftEl.textContent     = pending.toLocaleString();
+    // ETA estimate
+    const minD = parseInt(document.getElementById('eng-delay-min')?.value || 15, 10);
+    const maxD = parseInt(document.getElementById('eng-delay-max')?.value || 45, 10);
+    const avgD = (minD + maxD) / 2;
+    const etaSec = Math.round(pending * avgD);
+    const etaEl  = document.getElementById('eng-prog-eta');
+    if (etaEl && pending > 0) {
+      const m = Math.floor(etaSec / 60), sec = etaSec % 60;
+      etaEl.textContent = `⏱ متبقي ~${m ? m + ' د ' : ''}${sec} ث`;
+    } else if (etaEl) { etaEl.textContent = ''; }
   }
+
+  // Update risk badge based on current delay values
+  const minD = parseInt(document.getElementById('eng-delay-min')?.value || 15, 10);
+  const maxD = parseInt(document.getElementById('eng-delay-max')?.value || 45, 10);
+  _updateRiskBadge(minD, maxD);
 }
 
 async function toggleEnginePause() {
@@ -2529,7 +2596,14 @@ window._pg_reports   = () => { loadReportStats(); loadReports(); loadAuditLog();
 window._pg_settings  = () => { loadSettings(); loadDevApiSettings(); };
 window._pg_chatbot   = () => { loadChatbotFlows(); };
 window._pg_devices   = () => { loadDevices(); };
-window._pg_engine    = () => { loadDevices(); loadEngineStats(); _ensureAbInit(); loadCampaigns(); };
+window._pg_engine    = () => {
+  loadDevices();
+  loadEngineStats();
+  _ensureAbInit();
+  loadCampaigns();
+  _updateRiskBadge(15, 45);
+  countEngineTargets();
+};
 window._pg_inbox     = () => { loadInbox(); };
 window._pg_antiban   = () => { loadAntiBan(); };
 window._pg_media     = () => { loadMedia(); };
@@ -3008,9 +3082,16 @@ async function sendToGroupConfirm() {
   try {
     const r = await BE.wa.send.bulk(payload);
     const mediaNote = mediaPath ? ' مع مرفق' : '';
-    beOk(`✅ تم إضافة ${_sendToGroupTargets.length} مجموعة للقائمة${mediaNote} — الإرسال جارٍ`);
-    nav('engine');
-    setTimeout(loadEngineStats, 2000);
+    beOk(`✅ تم إضافة ${_sendToGroupTargets.length} مجموعة للقائمة${mediaNote} — الإرسال يعمل في الخلفية`);
+    // Clear group selection if still on groups page
+    _groupsSelected.clear();
+    document.querySelectorAll('.grp-chk').forEach(cb => cb.checked = false);
+    const chkAll = document.getElementById('grp-chk-all');
+    if (chkAll) chkAll.checked = false;
+    const bulkBar = document.getElementById('grp-bulk-bar');
+    if (bulkBar) bulkBar.style.display = 'none';
+    const selCount = document.getElementById('grp-sel-count');
+    if (selCount) selCount.textContent = '0';
   } catch (e) {
     beErr('فشل الإرسال: ' + (e.message || 'خطأ غير معروف'));
   }

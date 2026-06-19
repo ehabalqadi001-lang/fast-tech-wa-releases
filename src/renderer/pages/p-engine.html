@@ -1,132 +1,65 @@
 <div id="p-engine" class="page">
+
+  <!-- ═══ PAGE HEADER ═══ -->
   <div class="ph">
-    <div class="ph-l"><div class="ph-ic">⚡</div><div><h1>SEND ENGINE</h1><p>محرك الإرسال المضاد للحظر — تأخير عشوائي + تدوير الحسابات</p></div></div>
-    <div class="flex gap8">
+    <div class="ph-l">
+      <div class="ph-ic">⚡</div>
+      <div>
+        <h1>SEND ENGINE</h1>
+        <p>محرك الإرسال المضاد للحظر — Anti-Ban AI · A/B Testing · Smart Rotation</p>
+      </div>
+    </div>
+    <div class="flex gap8 ic">
+      <div id="eng-live-badge" style="display:none;align-items:center;gap:6px;background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.3);border-radius:20px;padding:5px 12px">
+        <span style="width:7px;height:7px;border-radius:50%;background:#22c55e;animation:pulse 1.5s infinite;flex-shrink:0"></span>
+        <span class="f11 fw7" style="color:#22c55e">إرسال نشط</span>
+      </div>
       <button class="btn bo bsm" id="eng-pause-btn" onclick="toggleEnginePause()">⏸️ إيقاف مؤقت</button>
       <button class="btn bd bsm" onclick="clearEngineQueue()">🗑️ مسح المكتملة</button>
-      <button class="btn bo bsm" onclick="loadEngineStats()">🔄 تحديث</button>
+      <button class="btn bo bsm" onclick="loadEngineStats();loadCampaigns()">🔄 تحديث</button>
     </div>
   </div>
-  <!-- Queue stats -->
-  <div class="sg mb18">
-    <div class="sc"><div class="si">⏳</div><div class="sn" id="eng-s-pending">0</div><div class="sl">في الانتظار</div></div>
-    <div class="sc"><div class="si">📤</div><div class="sn ta" id="eng-s-sent">0</div><div class="sl">مُرسَل</div></div>
-    <div class="sc"><div class="si">✔✔</div><div class="sn" id="eng-s-delivered" style="color:#3b82f6">0</div><div class="sl">مُستلَم</div></div>
-    <div class="sc"><div class="si">❌</div><div class="sn" id="eng-s-failed" style="color:#ef4444">0</div><div class="sl">فاشل</div></div>
-  </div>
-  <!-- Form -->
-  <div class="g2 mb18">
-    <!-- LEFT: recipients + session + media -->
-    <div class="card">
-      <div class="ct">📋 بيانات الحملة</div>
-      <div class="fg"><label class="fl">اسم الحملة</label><input id="eng-name" class="fc" type="text" placeholder="مثال: حملة رمضان 2025"></div>
-      <div class="fg">
-        <label class="fl">أرقام الهواتف / معرفات المجموعات <span class="f11 ts">(رقم أو JID في كل سطر)</span></label>
-        <textarea id="eng-recipients" class="fc" style="min-height:110px;direction:ltr" placeholder="966501234567&#10;971509876543&#10;120363XXXXXX@g.us" oninput="countEngineTargets()"></textarea>
-        <div class="f11 ts mb6 mt8">📂 استيراد من مصدر:</div>
-        <div class="src-grid">
-          <button class="src-btn" onclick="engImportContacts()">📥 جهات الاتصال المسحوبة</button>
-          <button class="src-btn" onclick="engImportScrapedGroups()">👥 الجروبات المسحوبة</button>
-          <button class="src-btn" onclick="engOpenGroupPicker()">🔍 من جروبات محددة</button>
-          <button class="src-btn" onclick="engImportAllGroupMembers()">📱 أعضاء كل الجروبات</button>
-          <button class="src-btn" onclick="engImportFromFile()">📂 Excel / CSV</button>
-          <button class="src-btn" onclick="engOpenSheetsModal()">🔗 Google Sheets</button>
-        </div>
-        <div class="flex gap8 mt8 ic">
-          <span class="f11 ts fi" id="eng-count">0 مستهدف</span>
-          <button class="btn bd bsm" onclick="document.getElementById('eng-recipients').value='';countEngineTargets()">🗑️ مسح</button>
-        </div>
-      </div>
-      <div class="fg">
-        <label class="fl">الجهاز المُرسِل</label>
-        <select id="eng-session" class="fc">
-          <option value="">🔄 توزيع تلقائي — Anti-Ban Rotation</option>
-        </select>
-      </div>
-      <div class="fg">
-        <label class="fl">مرفق (صورة / فيديو / مستند)</label>
-        <div class="flex gap8 ic">
-          <input id="eng-media-path" class="fc fi f11" type="text" placeholder="لا يوجد مرفق" readonly style="direction:ltr">
-          <button class="btn bo bsm" onclick="pickEngineMedia()">📎</button>
-          <button class="btn bd bsm" onclick="document.getElementById('eng-media-path').value=''">✕</button>
-        </div>
-      </div>
+
+  <!-- ═══ LIVE STATS ═══ -->
+  <div class="sg mb14">
+    <div class="sc">
+      <div class="si">⏳</div>
+      <div class="sn" id="eng-s-pending">0</div>
+      <div class="sl">في الانتظار</div>
     </div>
-    <!-- RIGHT: A/B Script Builder + Account Selection -->
-    <div class="card">
-      <div class="ct jb">
-        <span>✍️ سكريبتات الرسائل — A/B Testing</span>
-        <button class="btn bo" style="padding:3px 10px;font-size:10px;letter-spacing:.5px;border-radius:6px" onclick="loadAbResults()">📊 نتائج A/B</button>
-      </div>
-      <div class="f11 ts mb12" style="line-height:1.7">أضف حتى 10 سكريبتات — النظام يختار عشوائياً لكل مستهدف لتجنب الحظر وقياس أفضل الرسائل. يمكن إرفاق ملف مختلف لكل سكريبت.</div>
-
-      <!-- Dynamic script slots -->
-      <div id="ab-scripts-container" style="max-height:280px;overflow-y:auto;padding-left:1px;margin-bottom:2px"></div>
-
-      <!-- Add script + AI buttons -->
-      <div class="flex gap8 mb14 mt8">
-        <button class="btn bo bsm fi" onclick="addAbScript()">➕ إضافة سكريبت</button>
-        <button class="btn bo bsm fi" onclick="generateEngineVariants()">🤖 توليد 5 نسخ AI</button>
-      </div>
-
-      <!-- Account Participation -->
-      <div class="fg">
-        <label class="fl">الأجهزة المشاركة في الحملة</label>
-        <div class="flex gap8 mb8">
-          <button id="acc-mode-auto"   class="src-btn active fi" onclick="setAccMode('auto')">🔄 توزيع تلقائي</button>
-          <button id="acc-mode-select" class="src-btn fi"        onclick="setAccMode('select')">☑️ أجهزة محددة</button>
-        </div>
-        <div id="acc-check-list" style="display:none;max-height:110px;overflow-y:auto;background:rgba(0,0,0,.25);border:1px solid rgba(var(--ar),.12);border-radius:8px;padding:6px 10px">
-          <div class="f11 ts" style="padding:10px;text-align:center;opacity:.6">لا توجد أجهزة متصلة حالياً</div>
-        </div>
-      </div>
-
-      <!-- Delay -->
-      <div class="fg">
-        <label class="fl">التأخير العشوائي بين الرسائل</label>
-        <div class="flex gap10 ic mt6">
-          <span class="f12 ts" style="white-space:nowrap">من</span>
-          <input id="eng-delay-min" class="fc" type="number" value="15" min="5" max="300" style="width:72px;text-align:center">
-          <span class="f12 ts" style="white-space:nowrap">إلى</span>
-          <input id="eng-delay-max" class="fc" type="number" value="45" min="10" max="600" style="width:72px;text-align:center">
-          <span class="f12 ts" style="white-space:nowrap">ثانية</span>
-        </div>
-      </div>
-      <!-- Enhanced Cloud API: Interactive Messages (Phase 5) -->
-      <div style="border-top:1px solid rgba(var(--ar),.1);padding-top:12px;margin-top:4px">
-        <div class="flex ic gap8 mb8">
-          <div class="tg" id="eng-interactive-toggle" onclick="toggleInteractiveMode()"></div>
-          <span class="f12 ts">رسالة تفاعلية (Cloud API) — أزرار سريعة</span>
-        </div>
-        <div id="eng-interactive-panel" style="display:none">
-          <div class="f11 ts mb8">أضف حتى 3 أزرار رد سريع (Cloud API فقط)</div>
-          <div class="flex gap8" style="flex-direction:column">
-            <input class="fc bsm" id="eng-btn-1" placeholder="زر 1: مثال — نعم، أنا مهتم">
-            <input class="fc bsm" id="eng-btn-2" placeholder="زر 2: مثال — أرسل لي المزيد">
-            <input class="fc bsm" id="eng-btn-3" placeholder="زر 3: مثال — شكراً، لا أريد">
-          </div>
-        </div>
-      </div>
-
-      <button class="btn bp wf" style="margin-top:8px" onclick="startBulkSend()">🚀 بدء الإرسال المضاد للحظر</button>
+    <div class="sc">
+      <div class="si">📤</div>
+      <div class="sn ta" id="eng-s-sent">0</div>
+      <div class="sl">مُرسَل</div>
+    </div>
+    <div class="sc">
+      <div class="si">✔✔</div>
+      <div class="sn" id="eng-s-delivered" style="color:#3b82f6">0</div>
+      <div class="sl">مُستلَم</div>
+    </div>
+    <div class="sc">
+      <div class="si">❌</div>
+      <div class="sn" id="eng-s-failed" style="color:#ef4444">0</div>
+      <div class="sl">فاشل</div>
     </div>
   </div>
-  <!-- Wake Lock status bar -->
-  <div id="eng-wakelock-bar" style="display:none;background:rgba(var(--ar),.08);border:1px solid rgba(var(--ar),.2);border-radius:10px;padding:10px 16px;margin-bottom:12px;display:none;align-items:center;gap:10px">
-    <span style="font-size:18px">☀️</span>
-    <div class="fi">
-      <div class="f12 fw7" style="color:var(--acc)">منع وضع السكون نشط</div>
-      <div class="f11 ts">الحملة قيد التشغيل — سيعود الجهاز لوضعه الطبيعي عند الانتهاء</div>
+
+  <!-- ═══ ACTIVE PROGRESS BAR (shown while sending) ═══ -->
+  <div id="eng-progress-card" class="card mb14" style="display:none">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div class="flex ic gap10">
+        <span style="width:9px;height:9px;border-radius:50%;background:var(--acc);animation:pulse 1.2s infinite;flex-shrink:0"></span>
+        <span class="f13 fw7">⚡ إرسال جارٍ...</span>
+        <span class="f11 ts" id="eng-prog-campaign-name"></span>
+      </div>
+      <div class="flex ic gap8">
+        <span class="f13 fw7 ta" id="eng-prog-pct">0%</span>
+        <span class="f11 ts" id="eng-prog-eta"></span>
+      </div>
     </div>
-    <div class="pulse-dot" style="width:8px;height:8px;border-radius:50%;background:var(--acc);animation:pulse 1.5s infinite"></div>
-  </div>
-  <!-- Progress -->
-  <div class="card" id="eng-progress-card" style="display:none">
-    <div class="ct flex ic jb">
-      <span>⚡ تقدم الإرسال</span>
-      <span class="f12 fm ta" id="eng-prog-pct">0%</span>
+    <div style="background:rgba(var(--ar),.08);border-radius:6px;height:10px;overflow:hidden;margin-bottom:10px">
+      <div id="eng-prog-bar" style="height:100%;background:linear-gradient(90deg,var(--acc),#8b5cf6);width:0%;transition:width .6s ease;border-radius:6px"></div>
     </div>
-    <div class="pb mb14"><div class="pf" id="eng-prog-bar" style="width:0%;transition:width .5s"></div></div>
     <div class="flex gap20 f12">
       <span>✅ مُرسَل: <b class="ta" id="eng-prog-sent">0</b></span>
       <span>❌ فشل: <b style="color:#ef4444" id="eng-prog-fail">0</b></span>
@@ -134,8 +67,164 @@
     </div>
   </div>
 
-  <!-- Campaign History (inline so user doesn't need to navigate) -->
-  <div class="card" style="margin-top:8px">
+  <!-- ═══ WAKE LOCK BAR ═══ -->
+  <div id="eng-wakelock-bar" style="display:none;background:rgba(var(--ar),.06);border:1px solid rgba(var(--ar),.15);border-radius:10px;padding:10px 16px;margin-bottom:12px;align-items:center;gap:10px">
+    <span style="font-size:18px">☀️</span>
+    <div class="fi">
+      <div class="f12 fw7" style="color:var(--acc)">منع وضع السكون نشط</div>
+      <div class="f11 ts">الحملة قيد التشغيل — سيعود الجهاز لوضعه الطبيعي عند الانتهاء</div>
+    </div>
+    <div style="width:8px;height:8px;border-radius:50%;background:var(--acc);animation:pulse 1.5s infinite;flex-shrink:0"></div>
+  </div>
+
+  <!-- ═══ CAMPAIGN SETUP — 2-COLUMN ═══ -->
+  <div class="g2 mb14">
+
+    <!-- ─── LEFT: Targets + Device ─── -->
+    <div class="card">
+      <div class="ct jb">
+        <span>🎯 المستهدفون</span>
+        <span class="bge bg-b f11" id="eng-count-badge">0 مستهدف</span>
+      </div>
+
+      <!-- Campaign name -->
+      <div class="fg">
+        <label class="fl">اسم الحملة</label>
+        <input id="eng-name" class="fc" type="text" placeholder="مثال: حملة عروض يونيو 2026">
+      </div>
+
+      <!-- Recipients -->
+      <div class="fg">
+        <div class="flex ic jb mb6">
+          <label class="fl" style="margin:0">قائمة الأرقام / المجموعات</label>
+          <span class="f10 ts">رقم أو JID — كل سطر</span>
+        </div>
+        <textarea id="eng-recipients" class="fc" style="min-height:120px;direction:ltr;font-family:monospace;font-size:12px;line-height:1.6"
+          placeholder="966501234567&#10;971509876543&#10;120363XXXXXX@g.us"
+          oninput="countEngineTargets()"></textarea>
+        <div class="flex ic jb mt8">
+          <span class="f11 ts fi" id="eng-count">0 مستهدف</span>
+          <div class="flex gap6">
+            <span class="f11 ts" id="eng-est-time"></span>
+            <button class="btn bd bsm" onclick="document.getElementById('eng-recipients').value='';countEngineTargets()">🗑️ مسح</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Import sources -->
+      <div style="background:rgba(var(--ar),.03);border:1px solid rgba(var(--ar),.08);border-radius:8px;padding:10px;margin-bottom:12px">
+        <div class="f11 ts fw7 mb8">📂 استيراد سريع من:</div>
+        <div class="src-grid">
+          <button class="src-btn" onclick="engImportContacts()">📥 جهات الاتصال</button>
+          <button class="src-btn" onclick="engImportScrapedGroups()">👥 الجروبات</button>
+          <button class="src-btn" onclick="engOpenGroupPicker()">🔍 جروبات محددة</button>
+          <button class="src-btn" onclick="engImportAllGroupMembers()">📱 أعضاء الجروبات</button>
+          <button class="src-btn" onclick="engImportFromFile()">📂 Excel / CSV</button>
+          <button class="src-btn" onclick="engOpenSheetsModal()">🔗 Google Sheets</button>
+        </div>
+      </div>
+
+      <!-- Device selector -->
+      <div class="fg">
+        <label class="fl">الجهاز المُرسِل</label>
+        <select id="eng-session" class="fc">
+          <option value="">🔄 توزيع تلقائي — Anti-Ban Rotation</option>
+        </select>
+      </div>
+
+      <!-- Device participation mode -->
+      <div class="fg">
+        <label class="fl">الأجهزة المشاركة</label>
+        <div class="flex gap8 mb8">
+          <button id="acc-mode-auto"   class="src-btn active fi" onclick="setAccMode('auto')">🔄 توزيع تلقائي</button>
+          <button id="acc-mode-select" class="src-btn fi"        onclick="setAccMode('select')">☑️ أجهزة محددة</button>
+        </div>
+        <div id="acc-check-list" style="display:none;max-height:100px;overflow-y:auto;background:rgba(0,0,0,.2);border:1px solid rgba(var(--ar),.1);border-radius:8px;padding:6px 10px">
+          <div class="f11 ts" style="padding:8px;text-align:center;opacity:.6">لا توجد أجهزة متصلة</div>
+        </div>
+      </div>
+
+      <!-- Global media attachment -->
+      <div class="fg">
+        <label class="fl">مرفق عام (يُضاف لكل الرسائل)</label>
+        <div style="display:grid;grid-template-columns:1fr auto auto;gap:6px;align-items:center">
+          <input id="eng-media-path" class="fc f11" type="text" placeholder="لا يوجد مرفق" readonly style="direction:ltr;font-family:monospace">
+          <button class="btn bo bsm" onclick="pickEngineMedia()" title="اختر ملف">📎 إرفاق</button>
+          <button class="btn bd bsm" onclick="document.getElementById('eng-media-path').value=''" title="حذف المرفق">✕</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── RIGHT: Message Builder + Settings ─── -->
+    <div class="card" style="display:flex;flex-direction:column">
+
+      <!-- A/B Scripts -->
+      <div class="ct jb mb4">
+        <span>✍️ بناء الرسائل — A/B Testing</span>
+        <button class="btn bo" style="padding:3px 10px;font-size:10px;border-radius:6px" onclick="loadAbResults()">📊 نتائج A/B</button>
+      </div>
+      <div class="f11 ts mb10" style="line-height:1.7;padding:8px;background:rgba(var(--ar),.03);border-radius:6px;border:1px solid rgba(var(--ar),.07)">
+        💡 أضف حتى <b>10 سكريبتات</b> — النظام يختار عشوائياً لكل مستهدف. يمكن إرفاق ملف مختلف لكل سكريبت لاختبار A/B للوسائط.
+      </div>
+
+      <!-- Dynamic script slots -->
+      <div id="ab-scripts-container" style="flex:1;max-height:260px;overflow-y:auto;padding-right:2px;margin-bottom:8px"></div>
+
+      <!-- Script actions -->
+      <div class="flex gap8 mb14">
+        <button class="btn bo bsm fi" onclick="addAbScript()">➕ إضافة سكريبت</button>
+        <button class="btn bo bsm fi" onclick="generateEngineVariants()">🤖 توليد 5 نسخ AI</button>
+      </div>
+
+      <div style="border-top:1px solid rgba(var(--ar),.1);padding-top:12px">
+
+        <!-- Delay presets -->
+        <div class="fg">
+          <label class="fl">التأخير بين الرسائل (ثانية)</label>
+          <div class="flex gap6 mb8 flex-wrap" id="delay-presets">
+            <button class="src-btn" onclick="setDelayPreset(30,60)">🛡️ آمن جداً<div class="f10 ts">30–60 ث</div></button>
+            <button class="src-btn active" onclick="setDelayPreset(15,45)">✅ موصى به<div class="f10 ts">15–45 ث</div></button>
+            <button class="src-btn" onclick="setDelayPreset(8,20)">⚡ سريع<div class="f10 ts">8–20 ث</div></button>
+            <button class="src-btn" onclick="setDelayPreset(0,0)">⚙️ مخصص<div class="f10 ts">يدوي</div></button>
+          </div>
+          <div class="flex gap8 ic" id="delay-custom-row">
+            <span class="f12 ts">من</span>
+            <input id="eng-delay-min" class="fc" type="number" value="15" min="3" max="600" style="width:68px;text-align:center">
+            <span class="f12 ts">إلى</span>
+            <input id="eng-delay-max" class="fc" type="number" value="45" min="5" max="600" style="width:68px;text-align:center">
+            <span class="f12 ts">ثانية</span>
+            <span id="eng-risk-badge" class="bge bg-g f11">🛡️ آمن</span>
+          </div>
+        </div>
+
+        <!-- Interactive messages -->
+        <div style="background:rgba(var(--ar),.03);border:1px solid rgba(var(--ar),.08);border-radius:8px;padding:10px;margin-bottom:12px">
+          <div class="flex ic gap8 mb6">
+            <div class="tg" id="eng-interactive-toggle" onclick="toggleInteractiveMode()"></div>
+            <span class="f12">رسالة تفاعلية (Cloud API) — أزرار رد سريع</span>
+          </div>
+          <div id="eng-interactive-panel" style="display:none">
+            <div class="f11 ts mb8">أضف حتى 3 أزرار (Cloud API فقط)</div>
+            <div class="flex gap6" style="flex-direction:column">
+              <input class="fc bsm" id="eng-btn-1" placeholder="زر 1: مثال — نعم، أنا مهتم">
+              <input class="fc bsm" id="eng-btn-2" placeholder="زر 2: مثال — أرسل لي المزيد">
+              <input class="fc bsm" id="eng-btn-3" placeholder="زر 3: مثال — شكراً، لا أريد">
+            </div>
+          </div>
+        </div>
+
+        <!-- LAUNCH BUTTON -->
+        <button class="btn bp wf" id="btn-start-bulk" onclick="startBulkSend()"
+          style="height:50px;font-size:15px;font-weight:700;letter-spacing:.5px;border-radius:12px;background:linear-gradient(135deg,var(--hp),#8b5cf6)">
+          🚀 بدء الإرسال المضاد للحظر
+        </button>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ CAMPAIGN HISTORY ═══ -->
+  <div class="card">
     <div class="ct jb">
       <span>📋 سجل الحملات</span>
       <div class="flex gap8">
@@ -147,6 +236,7 @@
       <div style="text-align:center;padding:28px;opacity:.5" class="f12 ts">جاري تحميل الحملات...</div>
     </div>
   </div>
+
 </div>
 
 <!-- ══════════════════════════════════════════════════════════════════════ -->
@@ -155,7 +245,7 @@
 <div class="mo" id="m-ab-results">
   <div class="md" style="max-width:660px;width:95%;max-height:84vh;overflow-y:auto;padding:24px">
     <div class="md-tt">📊 نتائج A/B Testing</div>
-    <div class="md-st" style="margin-bottom:18px">أداء كل سكريبت عبر الحملات — اكتشف الرسائل الأعلى استجابة من عملائك</div>
+    <div class="md-st" style="margin-bottom:18px">أداء كل سكريبت عبر الحملات — اكتشف الرسائل الأعلى استجابة</div>
     <div id="ab-results-content" style="min-height:120px">
       <div class="flex ic jb" style="padding:40px;opacity:.4;justify-content:center">
         <span class="f12">جارٍ التحميل...</span>
@@ -169,4 +259,3 @@
 
 <!-- ══════════════════════════════════════════════════════════════════════ -->
 <!-- PAGE: INBOX (incoming messages from all sessions)                     -->
-<!-- ══════════════════════════════════════════════════════════════════════ -->
