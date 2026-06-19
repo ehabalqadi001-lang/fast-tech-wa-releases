@@ -1,21 +1,60 @@
 <div id="p-media" class="page">
   <div class="ph">
-    <div class="ph-l"><div class="ph-ic">🖼️</div><div><h1>MEDIA LIBRARY</h1><p>مكتبة الوسائط — صور، فيديو، PDF</p></div></div>
-    <button class="btn bp" onclick="mediaUpload()">📤 رفع ملف</button>
-  </div>
-  <div class="sg" style="grid-template-columns:repeat(4,1fr);margin-bottom:18px">
-    <div class="sc"><div class="si">🖼️</div><div class="sn" id="media-cnt-img">0</div><div class="sl">صور</div></div>
-    <div class="sc"><div class="si">🎬</div><div class="sn" id="media-cnt-vid">0</div><div class="sl">فيديو</div></div>
-    <div class="sc"><div class="si">📄</div><div class="sn" id="media-cnt-pdf">0</div><div class="sl">مستندات</div></div>
-    <div class="sc"><div class="si">📦</div><div class="sn" id="media-cnt-total">0</div><div class="sl">إجمالي</div></div>
-  </div>
-  <div class="card">
-    <div class="ct flex ic jb">
-      <span>📁 الملفات</span>
+    <div class="ph-l"><div class="ph-ic">🖼️</div><div><h1>MEDIA LIBRARY</h1><p>مكتبة الوسائط — صور · فيديو · مستندات</p></div></div>
+    <div class="flex gap8 ic">
       <button class="btn bo bsm" onclick="loadMedia()">🔄 تحديث</button>
+      <button class="btn bp" onclick="mediaUpload()">📤 رفع ملف</button>
     </div>
-    <div id="media-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:14px;margin-top:8px">
-      <div style="text-align:center;padding:32px;opacity:.4;grid-column:1/-1" class="f12 ts">لا توجد ملفات — ارفع ملفاً الآن</div>
+  </div>
+
+  <!-- Stats -->
+  <div class="sg" style="grid-template-columns:repeat(4,1fr);margin-bottom:14px">
+    <div class="sc" style="cursor:pointer" onclick="filterMedia('all')">
+      <div class="si">📦</div><div class="sn" id="media-cnt-total">0</div><div class="sl">إجمالي</div>
+    </div>
+    <div class="sc" style="cursor:pointer" onclick="filterMedia('image')">
+      <div class="si">🖼️</div><div class="sn" id="media-cnt-img">0</div><div class="sl">صور</div>
+    </div>
+    <div class="sc" style="cursor:pointer" onclick="filterMedia('video')">
+      <div class="si">🎬</div><div class="sn" id="media-cnt-vid">0</div><div class="sl">فيديو</div>
+    </div>
+    <div class="sc" style="cursor:pointer" onclick="filterMedia('doc')">
+      <div class="si">📄</div><div class="sn" id="media-cnt-pdf">0</div><div class="sl">مستندات</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <!-- Toolbar -->
+    <div class="flex ic jb mb12" style="gap:10px;flex-wrap:wrap">
+      <div class="flex gap6 ic">
+        <button id="mf-all"   class="btn bp bsm"  onclick="filterMedia('all')">كل الملفات</button>
+        <button id="mf-image" class="btn bo bsm"  onclick="filterMedia('image')">🖼️ صور</button>
+        <button id="mf-video" class="btn bo bsm"  onclick="filterMedia('video')">🎬 فيديو</button>
+        <button id="mf-doc"   class="btn bo bsm"  onclick="filterMedia('doc')">📄 مستندات</button>
+      </div>
+      <input id="media-search" class="fc" style="max-width:200px;padding:6px 10px"
+             placeholder="🔍 بحث باسم الملف..." oninput="filterMediaSearch(this.value)">
+    </div>
+
+    <!-- Grid -->
+    <div id="media-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px">
+      <div style="text-align:center;padding:32px;opacity:.4;grid-column:1/-1" class="f12 ts">لا توجد ملفات — اضغط رفع ملف</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MEDIA PREVIEW MODAL ═══ -->
+<div id="m-media-preview" class="mo" onclick="if(event.target===this)closeM('m-media-preview')">
+  <div style="max-width:700px;width:94%;background:var(--bg2);border-radius:12px;padding:20px">
+    <div class="flex ic jb mb14">
+      <div class="fw7 f14" id="mp-title">معاينة الملف</div>
+      <button class="btn bd bsm" onclick="closeM('m-media-preview')">✕</button>
+    </div>
+    <div id="mp-content" style="text-align:center;min-height:200px;display:flex;align-items:center;justify-content:center"></div>
+    <div class="flex gap8 mt14 jc">
+      <button class="btn bp bsm" id="mp-use-btn">📤 استخدام في محرك الإرسال</button>
+      <button class="btn bd bsm" id="mp-del-btn">🗑️ حذف</button>
+      <button class="btn bo bsm" onclick="closeM('m-media-preview')">إغلاق</button>
     </div>
   </div>
 </div>

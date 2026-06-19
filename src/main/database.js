@@ -650,6 +650,38 @@ class Db {
       this.settingSet('db_version', '16');
       v = 16;
     }
+
+    if (v < 17) {
+      // FTS on incoming_messages (inbox search) + missing performance indexes
+      this._db.exec(`
+        CREATE VIRTUAL TABLE IF NOT EXISTS incoming_messages_fts USING fts5(
+          body,
+          from_number UNINDEXED,
+          session_id  UNINDEXED,
+          timestamp   UNINDEXED,
+          content='incoming_messages',
+          content_rowid='rowid',
+          tokenize='unicode61 remove_diacritics 2'
+        );
+
+        CREATE TRIGGER IF NOT EXISTS im_ai AFTER INSERT ON incoming_messages BEGIN
+          INSERT INTO incoming_messages_fts(rowid, body, from_number, session_id, timestamp)
+          VALUES (new.rowid, new.body, new.from_number, new.session_id, new.timestamp);
+        END;
+
+        CREATE TRIGGER IF NOT EXISTS im_ad AFTER DELETE ON incoming_messages BEGIN
+          INSERT INTO incoming_messages_fts(incoming_messages_fts, rowid, body, from_number, session_id, timestamp)
+          VALUES ('delete', old.rowid, old.body, old.from_number, old.session_id, old.timestamp);
+        END;
+
+        CREATE INDEX IF NOT EXISTS idx_wa_sessions_status  ON wa_sessions(status);
+        CREATE INDEX IF NOT EXISTS idx_queue_session_status ON send_queue(session_id, status);
+        CREATE INDEX IF NOT EXISTS idx_campaigns_status    ON campaigns(status);
+        CREATE INDEX IF NOT EXISTS idx_messages_acct_sent  ON messages(account_id, sent_at DESC);
+      `);
+      this.settingSet('db_version', '17');
+      v = 17;
+    }
   }
 
   // ─── FTS Search ───────────────────────────────────────────────────────────
@@ -662,6 +694,26 @@ class Db {
       ORDER BY rank
       LIMIT ?
     `).all(query, limit);
+  }
+
+  incomingMessagesFtsSearch(query, limit = 50) {
+    try {
+      return this._db.prepare(`
+        SELECT im.*, snippet(incoming_messages_fts, 0, '<mark>', '</mark>', '…', 20) AS highlight
+        FROM incoming_messages_fts
+        JOIN incoming_messages im ON im.rowid = incoming_messages_fts.rowid
+        WHERE incoming_messages_fts MATCH ?
+        ORDER BY rank
+        LIMIT ?
+      `).all(query, limit);
+    } catch (_) {
+      // FTS table not yet populated — fall back to LIKE search
+      return this._db.prepare(`
+        SELECT * FROM incoming_messages
+        WHERE body LIKE ?
+        ORDER BY received_at DESC LIMIT ?
+      `).all(`%${query}%`, limit);
+    }
   }
 
   // ═══════════════════════════════════════════════════════════════════════════

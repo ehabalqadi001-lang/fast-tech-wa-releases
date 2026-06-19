@@ -59,6 +59,7 @@ contextBridge.exposeInMainWorld('ftwa', {
     getHistory:  (phone)        => ipcRenderer.invoke('messages:getHistory',  phone),
     getStats:    ()             => ipcRenderer.invoke('messages:getStats'),
     search:      (query, limit) => ipcRenderer.invoke('messages:search',      { query, limit }),
+    inboxSearch: (query, limit) => ipcRenderer.invoke('messages:inboxSearch', { query, limit }),
   },
 
   campaigns: {

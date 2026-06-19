@@ -218,7 +218,8 @@ function register(ipcMain, { db, waApi, waSvc, engine, scraper, scheduler, aiSvc
 
   handle('messages:getHistory', (phone) => db.messageHistory(phone));
   handle('messages:getStats',   ()      => db.messageStats());
-  handle('messages:search',     ({ query, limit }) => db.messagesFtsSearch(query, limit || 50));
+  handle('messages:search',       ({ query, limit }) => db.messagesFtsSearch(query, limit || 50));
+  handle('messages:inboxSearch',  ({ query, limit }) => db.incomingMessagesFtsSearch(query, limit || 50));
   handle('campaigns:list',      ()      => db.campaignList());
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -236,9 +237,9 @@ function register(ipcMain, { db, waApi, waSvc, engine, scraper, scheduler, aiSvc
   // ══════════════════════════════════════════════════════════════════════════
   // TEMPLATES
   // ══════════════════════════════════════════════════════════════════════════
-  handle('templates:list',   ()     => db.templateList());
-  handle('templates:save',   (t)    => { if (!t.id) t.id = uuidv4(); db.templateUpsert(t); return t; });
-  handle('templates:remove', (id)   => db.templateDelete(id));
+  handle('templates:list',   ()     => ({ ok: true, data: db.templateList() }));
+  handle('templates:save',   (t)    => { if (!t.id) t.id = uuidv4(); db.templateUpsert(t); return { ok: true, data: t }; });
+  handle('templates:remove', (id)   => { db.templateDelete(id); return { ok: true }; });
   handle('templates:getWa',  async (accountId) => {
     if (!accountId) return [];
     return waApi.getTemplates(accountId);

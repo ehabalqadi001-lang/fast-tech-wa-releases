@@ -3881,42 +3881,139 @@ async function safeIpc(fn) {
 // MEDIA LIBRARY
 // ══════════════════════════════════════════════════════════════════════════
 let _mediaList = [];
+let _mediaFilter = 'all';
+let _mediaSearch = '';
+
+function _toFileUrl(p) {
+  if (!p) return '';
+  return 'file:///' + p.replace(/\\/g, '/');
+}
+
+function _mediaCategory(mimeType) {
+  const t = (mimeType || '').split('/')[0];
+  if (t === 'image') return 'image';
+  if (t === 'video') return 'video';
+  return 'doc';
+}
 
 async function loadMedia() {
   if (!IS_ELECTRON) return;
   const r = await safeIpc(() => BE.media.list());
   if (!r) return;
   _mediaList = r;
+  _renderMediaGrid();
+}
+
+function _renderMediaGrid() {
   const grid = document.getElementById('media-grid');
   if (!grid) return;
 
-  let img = 0, vid = 0, pdf = 0;
-  if (!r.length) {
-    grid.innerHTML = '<div style="text-align:center;padding:32px;opacity:.4;grid-column:1/-1" class="f12 ts">لا توجد ملفات — ارفع ملفاً الآن</div>';
-  } else {
-    grid.innerHTML = r.map(m => {
-      const ext   = (m.mime_type || '').split('/')[0];
-      const icon  = ext === 'image' ? '🖼️' : ext === 'video' ? '🎬' : ext === 'application' ? '📄' : '📎';
-      if (ext === 'image') img++;
-      else if (ext === 'video') vid++;
-      else pdf++;
-      const kb = m.size_bytes ? Math.round(m.size_bytes / 1024) + ' KB' : '';
-      return `<div class="card" style="padding:12px;cursor:pointer;text-align:center" title="${escH(m.name)}">
-        <div style="font-size:32px;margin-bottom:8px">${icon}</div>
-        <div class="f11 fw6" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%">${escH(m.name)}</div>
-        <div class="f10 ts mt4">${kb}</div>
-        <div class="flex gap6 mt8 ic jc" onclick="event.stopPropagation()">
-          <button class="btn bo bsm" style="padding:4px 8px;font-size:10px" onclick="mediaUseInEngine(${JSON.stringify(m.file_path)})">استخدام</button>
-          <button class="btn bd bsm" style="padding:4px 8px;font-size:10px" onclick="mediaDelete(${JSON.stringify(m.id)})">🗑️</button>
-        </div>
-      </div>`;
-    }).join('');
+  let img = 0, vid = 0, doc = 0;
+  const query = _mediaSearch.toLowerCase();
+
+  const filtered = _mediaList.filter(m => {
+    const cat = _mediaCategory(m.mime_type);
+    if (_mediaFilter !== 'all' && cat !== _mediaFilter) return false;
+    if (query && !m.name.toLowerCase().includes(query)) return false;
+    if (cat === 'image') img++;
+    else if (cat === 'video') vid++;
+    else doc++;
+    return true;
+  });
+
+  // Recount totals from full list
+  let ti = 0, tv = 0, td = 0;
+  _mediaList.forEach(m => {
+    const c = _mediaCategory(m.mime_type);
+    if (c === 'image') ti++; else if (c === 'video') tv++; else td++;
+  });
+  const el = id => document.getElementById(id);
+  if (el('media-cnt-img'))   el('media-cnt-img').textContent   = ti;
+  if (el('media-cnt-vid'))   el('media-cnt-vid').textContent   = tv;
+  if (el('media-cnt-pdf'))   el('media-cnt-pdf').textContent   = td;
+  if (el('media-cnt-total')) el('media-cnt-total').textContent = _mediaList.length;
+
+  // Update active filter button
+  ['all','image','video','doc'].forEach(f => {
+    const btn = document.getElementById('mf-' + f);
+    if (btn) btn.className = 'btn bsm ' + (_mediaFilter === f ? 'bp' : 'bo');
+  });
+
+  if (!filtered.length) {
+    grid.innerHTML = '<div style="text-align:center;padding:32px;opacity:.4;grid-column:1/-1" class="f12 ts">لا توجد ملفات</div>';
+    return;
   }
-  const total = r.length;
-  document.getElementById('media-cnt-img').textContent   = img;
-  document.getElementById('media-cnt-vid').textContent   = vid;
-  document.getElementById('media-cnt-pdf').textContent   = pdf;
-  document.getElementById('media-cnt-total').textContent = total;
+
+  grid.innerHTML = filtered.map(m => {
+    const cat  = _mediaCategory(m.mime_type);
+    const kb   = m.size_bytes ? (m.size_bytes < 1048576
+      ? Math.round(m.size_bytes / 1024) + ' KB'
+      : (m.size_bytes / 1048576).toFixed(1) + ' MB') : '';
+    const furl = _toFileUrl(m.file_path);
+    let thumb;
+    if (cat === 'image') {
+      thumb = `<img src="${escH(furl)}" alt="" style="width:100%;height:110px;object-fit:cover;border-radius:6px;display:block"
+                    onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
+               <div style="display:none;font-size:36px;padding:20px 0">🖼️</div>`;
+    } else if (cat === 'video') {
+      thumb = `<div style="font-size:36px;padding:20px 0;background:#111;border-radius:6px">🎬</div>`;
+    } else {
+      thumb = `<div style="font-size:36px;padding:20px 0;background:#1a1a2e;border-radius:6px">📄</div>`;
+    }
+    return `<div class="card" style="padding:10px;cursor:pointer;text-align:center;transition:transform .15s"
+                 onmouseover="this.style.transform='scale(1.03)'" onmouseout="this.style.transform=''"
+                 onclick="mediaPreview(${m.id})" title="${escH(m.name)}">
+      ${thumb}
+      <div class="f11 fw6 mt6" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escH(m.name)}</div>
+      <div class="f10 ts">${kb}</div>
+      <div class="flex gap6 mt6 ic jc" onclick="event.stopPropagation()">
+        <button class="btn bo bsm" style="padding:3px 7px;font-size:10px" onclick="mediaUseInEngine(${JSON.stringify(m.file_path)})">📤</button>
+        <button class="btn bd bsm" style="padding:3px 7px;font-size:10px" onclick="mediaDelete(${JSON.stringify(m.id)})">🗑️</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function filterMedia(type) {
+  _mediaFilter = type;
+  _renderMediaGrid();
+}
+
+function filterMediaSearch(q) {
+  _mediaSearch = q;
+  _renderMediaGrid();
+}
+
+function mediaPreview(id) {
+  const m = _mediaList.find(x => x.id === id);
+  if (!m) return;
+  const cat  = _mediaCategory(m.mime_type);
+  const furl = _toFileUrl(m.file_path);
+
+  const title   = document.getElementById('mp-title');
+  const content = document.getElementById('mp-content');
+  const useBtn  = document.getElementById('mp-use-btn');
+  const delBtn  = document.getElementById('mp-del-btn');
+  if (!content) return;
+
+  if (title) title.textContent = m.name;
+
+  if (cat === 'image') {
+    content.innerHTML = `<img src="${escH(furl)}" alt="" style="max-width:100%;max-height:420px;border-radius:8px;box-shadow:0 4px 20px #0006">`;
+  } else if (cat === 'video') {
+    content.innerHTML = `<video src="${escH(furl)}" controls style="max-width:100%;max-height:420px;border-radius:8px"></video>`;
+  } else {
+    content.innerHTML = `<div style="padding:40px">
+      <div style="font-size:64px">📄</div>
+      <div class="fw6 mt12">${escH(m.name)}</div>
+      <div class="ts mt4 f12">${m.size_bytes ? Math.round(m.size_bytes/1024) + ' KB' : ''}</div>
+    </div>`;
+  }
+
+  if (useBtn) useBtn.onclick = () => { closeM('m-media-preview'); mediaUseInEngine(m.file_path); };
+  if (delBtn) delBtn.onclick = () => { closeM('m-media-preview'); mediaDelete(m.id); };
+
+  openM('m-media-preview');
 }
 
 async function mediaUpload() {
@@ -4280,9 +4377,8 @@ async function loadSavedAudiences() {
 let _searchDebounce = null;
 async function searchConversations(query) {
   clearTimeout(_searchDebounce);
-  const resEl   = document.getElementById('inbox-search-results');
-  const cntEl   = document.getElementById('inbox-search-count');
-  const tableEl = document.querySelector('#p-inbox .card:last-of-type');
+  const resEl = document.getElementById('inbox-search-results');
+  const cntEl = document.getElementById('inbox-search-count');
   if (!query || query.length < 2) {
     if (resEl) resEl.style.display = 'none';
     if (cntEl) cntEl.textContent = '';
@@ -4290,19 +4386,23 @@ async function searchConversations(query) {
   }
   _searchDebounce = setTimeout(async () => {
     if (!IS_ELECTRON) return;
-    const r = await BE.messages.search(query, 30);
-    if (!r.ok || !resEl) return;
-    const hits = r.data || [];
-    if (cntEl) cntEl.textContent = `${hits.length} نتيجة`;
+    // Search inbox (incoming_messages FTS) — much more relevant than outgoing messages
+    const r = await BE.messages.inboxSearch(query, 50);
+    if (!resEl) return;
+    const hits = Array.isArray(r) ? r : (r?.data || []);
+    if (cntEl) cntEl.textContent = hits.length ? `${hits.length} نتيجة` : '';
     resEl.style.display = hits.length ? '' : 'none';
     resEl.innerHTML = hits.length
-      ? `<table class="dt"><thead><tr><th>المستلم</th><th>النص</th><th>الاتجاه</th><th>التاريخ</th></tr></thead><tbody>${
-          hits.map(h=>`<tr>
-            <td class="f11 fm">${esc(h.recipient||'')}</td>
-            <td class="f12" style="max-width:300px">${(h.highlight||esc(h.body||'')).replace(/<mark>/g,'<mark style="background:rgba(var(--ar),.25);border-radius:2px">') }</td>
-            <td>${h.direction==='out'?'📤 صادر':'📥 وارد'}</td>
-            <td class="f11 ts">${(h.sent_at||'').slice(0,16)}</td>
-          </tr>`).join('')
+      ? `<table class="dt"><thead><tr><th>المُرسِل</th><th>النص</th><th>الجلسة</th><th>التاريخ</th></tr></thead><tbody>${
+          hits.map(h => {
+            const bodyHtml = (h.highlight || esc(h.body || '')).replace(/<mark>/g, '<mark style="background:rgba(var(--ar),.25);border-radius:2px">');
+            return `<tr>
+              <td class="f11 fm">${esc(h.from_number || h.recipient || '')}</td>
+              <td class="f12" style="max-width:300px">${bodyHtml}</td>
+              <td class="f11 ts">${esc(h.session_id || '')}</td>
+              <td class="f11 ts">${(h.timestamp || h.received_at || h.sent_at || '').slice(0, 16)}</td>
+            </tr>`;
+          }).join('')
         }</tbody></table>`
       : '<div class="f12 ts" style="padding:10px">لا توجد نتائج</div>';
   }, 350);
