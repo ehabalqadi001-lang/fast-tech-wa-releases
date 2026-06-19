@@ -1,0 +1,100 @@
+<div id="p-whitelabel" class="page">
+  <div class="ph">
+    <div class="ph-l">
+      <div class="ph-ic">🎨</div>
+      <div><h1>White-Label</h1><p>تخصيص مظهر التطبيق — الاسم، الشعار، والألوان</p></div>
+    </div>
+    <div class="flex gap8 ic">
+      <button class="btn bp" onclick="saveBranding()">💾 حفظ الإعدادات</button>
+    </div>
+  </div>
+
+  <div class="g2" style="gap:18px">
+    <!-- Branding Settings -->
+    <div class="card">
+      <div class="ct">🏷️ إعدادات البراندينج</div>
+
+      <div class="fg mt14">
+        <label class="fl">اسم التطبيق</label>
+        <input id="wl-app-name" class="fc" placeholder="اسم الشركة" oninput="updateBrandingPreview()">
+      </div>
+
+      <div class="fg">
+        <label class="fl">نص التذييل</label>
+        <input id="wl-footer" class="fc" placeholder="Powered by ..." oninput="updateBrandingPreview()">
+      </div>
+
+      <div class="fg">
+        <label class="fl">اللون الأساسي</label>
+        <div class="flex gap10 ic">
+          <input id="wl-color" type="color" value="#6366f1"
+            style="width:50px;height:36px;padding:2px;cursor:pointer;border:1px solid rgba(var(--ar),.2);border-radius:6px"
+            oninput="document.getElementById('wl-color-hex').value=this.value;updateBrandingPreview()">
+          <input id="wl-color-hex" class="fc" value="#6366f1" maxlength="7" placeholder="#6366f1" style="width:100px;font-family:monospace"
+            oninput="document.getElementById('wl-color').value=this.value;updateBrandingPreview()">
+        </div>
+      </div>
+
+      <div class="fg">
+        <label class="fl">شعار مخصص (مسار ملف .png / .svg)</label>
+        <div class="flex gap8 ic">
+          <input id="wl-logo" class="fc fi" placeholder="C:\logos\mylogo.png" style="direction:ltr">
+          <button class="btn bo bsm" onclick="pickWlLogo()">📂</button>
+        </div>
+        <div class="f11 ts mt4">يُعرض بدلاً من الشعار الافتراضي في الشريط العلوي</div>
+      </div>
+
+      <div class="fg">
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+          <input id="wl-show-powered" type="checkbox" checked>
+          <span class="fl" style="margin:0">إظهار "Powered by Fast Tech" في التذييل</span>
+        </label>
+      </div>
+
+      <div style="margin-top:16px">
+        <button class="btn bp fi" onclick="saveBranding()">💾 حفظ الإعدادات</button>
+      </div>
+    </div>
+
+    <!-- Preview + Instructions -->
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <!-- Live Preview -->
+      <div class="card">
+        <div class="ct">👁️ معاينة مباشرة</div>
+        <div style="margin-top:14px;background:rgba(var(--ar),.04);border-radius:12px;padding:16px;border:1px solid rgba(var(--ar),.1)">
+          <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;background:rgba(0,0,0,.35);border-radius:10px;margin-bottom:12px">
+            <div id="wl-prev-color" style="width:36px;height:36px;border-radius:10px;background:#6366f1;flex-shrink:0"></div>
+            <div>
+              <div class="fw7 f15" id="wl-prev-name">Fast Tech</div>
+              <div class="f11 ts">WhatsApp Manager</div>
+            </div>
+          </div>
+          <div id="wl-prev-footer" class="f11 ts ct" style="padding:6px 0">Powered by Fast Tech</div>
+        </div>
+      </div>
+
+      <!-- Deployment Guide -->
+      <div class="card">
+        <div class="ct">📋 دليل التوزيع</div>
+        <div style="margin-top:12px;font-size:12px;line-height:2;color:var(--ts)">
+          <div style="display:flex;gap:10px;margin-bottom:8px">
+            <span style="font-size:16px;flex-shrink:0">1️⃣</span>
+            <span>احفظ إعدادات البراندينج أعلاه</span>
+          </div>
+          <div style="display:flex;gap:10px;margin-bottom:8px">
+            <span style="font-size:16px;flex-shrink:0">2️⃣</span>
+            <span>أضف عميلاً في <strong>لوحة الريسيلر</strong> وشارك معه مفتاح الترخيص</span>
+          </div>
+          <div style="display:flex;gap:10px;margin-bottom:8px">
+            <span style="font-size:16px;flex-shrink:0">3️⃣</span>
+            <span>يُدخل العميل مفتاحه عند أول تشغيل للتفعيل</span>
+          </div>
+          <div style="display:flex;gap:10px">
+            <span style="font-size:16px;flex-shrink:0">4️⃣</span>
+            <span>يمكن بناء نسخة مخصصة (.exe) عبر <code>npm run build</code> مع تعديل package.json</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

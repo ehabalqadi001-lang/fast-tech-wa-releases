@@ -84,6 +84,18 @@
   </div>
   <div class="ndiv"></div>
   <div class="nb-sec">
+    <div class="nb-hd">الفريق والأتمتة</div>
+    <div class="ni" onclick="nav('team')"><span class="ni-ic">👨‍💼</span><span class="ni-lb">إدارة الفريق</span><span class="nb-badge" id="nb-team" style="display:none">0</span></div>
+    <div class="ni" onclick="nav('sequences')"><span class="ni-ic">🔄</span><span class="ni-lb">تسلسلات الأتمتة</span><span class="nb-badge" id="nb-sequences" style="display:none">0</span></div>
+  </div>
+  <div class="ndiv"></div>
+  <div class="nb-sec">
+    <div class="nb-hd">الريسيلر</div>
+    <div class="ni" onclick="nav('reseller')"><span class="ni-ic">🏪</span><span class="ni-lb">لوحة الريسيلر</span><span class="nb-badge" id="nb-reseller" style="display:none">0</span></div>
+    <div class="ni" onclick="nav('whitelabel')"><span class="ni-ic">🎨</span><span class="ni-lb">White-Label</span></div>
+  </div>
+  <div class="ndiv"></div>
+  <div class="nb-sec">
     <div class="ni" onclick="nav('settings')"><span class="ni-ic">⚙️</span><span class="ni-lb">الإعدادات</span></div>
   </div>
 </aside>
@@ -437,6 +449,171 @@
     <div class="flex gap8 jb mt8">
       <button class="btn bo" onclick="closeM('m-send-template')">إلغاء</button>
       <button class="btn bp" onclick="sendTemplateNow()">📤 إرسال الآن</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL: Add/Edit Team Member (Phase 6) ═══ -->
+<div class="mo" id="m-team-member" onclick="if(event.target===this)closeM('m-team-member')">
+  <div class="md" style="max-width:440px">
+    <div class="md-tt">👤 عضو الفريق</div>
+    <input type="hidden" id="tm-id">
+    <div class="g2">
+      <div class="fg"><label class="fl">الاسم</label><input id="tm-name" class="fc" placeholder="الاسم الكامل"></div>
+      <div class="fg"><label class="fl">الدور</label>
+        <select id="tm-role" class="fc">
+          <option value="admin">🔑 Admin</option>
+          <option value="agent" selected>🎧 Agent</option>
+          <option value="viewer">👁️ Viewer</option>
+        </select>
+      </div>
+    </div>
+    <div class="g2">
+      <div class="fg"><label class="fl">البريد الإلكتروني</label><input id="tm-email" class="fc" type="email" placeholder="email@example.com"></div>
+      <div class="fg"><label class="fl">PIN (اختياري)</label><input id="tm-pin" class="fc" type="password" placeholder="4 أرقام" maxlength="4"></div>
+    </div>
+    <div class="fg">
+      <label class="fl">اللون</label>
+      <div class="flex gap8 ic">
+        <input id="tm-color" class="fc" type="color" value="#6366f1" style="width:50px;height:36px;padding:2px;cursor:pointer">
+        <span class="f11 ts">لون بطاقة العضو</span>
+      </div>
+    </div>
+    <div class="md-cl">
+      <button class="btn bo" onclick="closeM('m-team-member')">إلغاء</button>
+      <button class="btn bp" onclick="saveTeamMember()">✅ حفظ</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL: Assign Conversation (Phase 6) ═══ -->
+<div class="mo" id="m-assign-conv" onclick="if(event.target===this)closeM('m-assign-conv')">
+  <div class="md" style="max-width:440px">
+    <div class="md-tt">📋 تعيين المحادثة</div>
+    <input type="hidden" id="ac-phone">
+    <div class="fg"><label class="fl">الرقم</label><div class="fc ts fm" id="ac-phone-display" style="cursor:default">—</div></div>
+    <div class="fg"><label class="fl">المسؤول</label>
+      <select id="ac-agent" class="fc"><option value="">— بدون تعيين —</option></select>
+    </div>
+    <div class="fg"><label class="fl">الحالة</label>
+      <select id="ac-status" class="fc">
+        <option value="open">🔵 مفتوح</option>
+        <option value="in_progress">🟡 جارٍ المعالجة</option>
+        <option value="resolved">🟢 محلول</option>
+        <option value="closed">⚫ مغلق</option>
+      </select>
+    </div>
+    <div class="fg"><label class="fl">الأولوية</label>
+      <select id="ac-priority" class="fc">
+        <option value="low">🔽 منخفضة</option>
+        <option value="normal" selected>▶️ عادية</option>
+        <option value="high">🔼 عالية</option>
+        <option value="urgent">🚨 عاجل</option>
+      </select>
+    </div>
+    <div class="fg"><label class="fl">الوسوم</label><input id="ac-tags" class="fc" placeholder="vip, support, sales"></div>
+    <div class="fg"><label class="fl">ملاحظات</label><textarea id="ac-notes" class="fc" rows="2" placeholder="ملاحظات داخلية..."></textarea></div>
+    <div class="md-cl">
+      <button class="btn bo" onclick="closeM('m-assign-conv')">إلغاء</button>
+      <button class="btn bp" onclick="saveAssignment()">✅ حفظ التعيين</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL: Sequence Builder (Phase 7) ═══ -->
+<div class="mo" id="m-seq-builder" onclick="if(event.target===this)closeM('m-seq-builder')">
+  <div class="md" style="max-width:620px;max-height:90vh;display:flex;flex-direction:column;padding:0;overflow:hidden">
+    <div style="padding:16px 20px 12px;border-bottom:1px solid rgba(var(--ar),.1);flex-shrink:0">
+      <div class="fw7 f15 ta">🔄 بناء التسلسل</div>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:16px 20px">
+      <input type="hidden" id="seq-edit-id">
+      <div class="g2 mb10">
+        <div class="fg"><label class="fl">اسم التسلسل</label><input id="seq-name" class="fc" placeholder="مثال: حملة ترحيب الأعضاء الجدد"></div>
+        <div class="fg"><label class="fl">نوع التفعيل</label>
+          <select id="seq-trigger" class="fc" onchange="toggleSeqTrigger()">
+            <option value="manual">🤚 يدوي</option>
+            <option value="keyword">🔑 كلمة مفتاحية</option>
+            <option value="opt_in">✅ انضمام جديد</option>
+          </select>
+        </div>
+      </div>
+      <div class="fg" id="seq-trigger-val-wrap" style="display:none">
+        <label class="fl">قيمة التفعيل (كلمات مفصولة بفاصلة)</label>
+        <input id="seq-trigger-val" class="fc" placeholder="مثال: مرحبا, هلا, join">
+      </div>
+      <div class="fg">
+        <label class="fl">الجلسة الافتراضية</label>
+        <select id="seq-session" class="fc"><option value="">— تلقائي —</option></select>
+      </div>
+      <div class="fw7 f12 mb8 mt10" style="color:var(--acc)">📋 خطوات التسلسل</div>
+      <div id="seq-steps-list" style="display:flex;flex-direction:column;gap:10px"></div>
+      <button class="btn bo bsm mt10" onclick="addSeqStep()">➕ إضافة خطوة</button>
+    </div>
+    <div class="md-cl" style="border-top:1px solid rgba(var(--ar),.1);margin:0;padding:14px 20px">
+      <button class="btn bo" onclick="closeM('m-seq-builder')">إلغاء</button>
+      <button class="btn bp fi" onclick="saveSequence()">💾 حفظ التسلسل</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL: Sequence Enrollments (Phase 7) ═══ -->
+<div class="mo" id="m-seq-enrollments" onclick="if(event.target===this)closeM('m-seq-enrollments')">
+  <div class="md" style="max-width:580px;max-height:85vh;display:flex;flex-direction:column;padding:0;overflow:hidden">
+    <div style="padding:14px 20px;border-bottom:1px solid rgba(var(--ar),.1);flex-shrink:0;display:flex;align-items:center;justify-content:space-between">
+      <div class="fw7 f14 ta">👥 المشتركون في التسلسل: <span id="enr-seq-name" style="color:var(--acc)"></span></div>
+      <button class="hbtn bsm" onclick="closeM('m-seq-enrollments')">✕</button>
+    </div>
+    <div style="padding:12px 20px;flex-shrink:0;border-bottom:1px solid rgba(var(--ar),.1)">
+      <div class="flex gap8">
+        <input id="enr-phone-input" class="fc fi" placeholder="966501234567 — أضف رقماً">
+        <button class="btn bp bsm" onclick="addEnrollment()">➕ إضافة</button>
+      </div>
+    </div>
+    <div id="enr-list" style="flex:1;overflow-y:auto;padding:12px 20px"></div>
+  </div>
+</div>
+
+<!-- ═══ MODAL: Add/Edit Reseller Client (Phase 8) ═══ -->
+<div class="mo" id="m-reseller-client" onclick="if(event.target===this)closeM('m-reseller-client')">
+  <div class="md" style="max-width:540px">
+    <div class="md-tt">🏪 عميل الريسيلر</div>
+    <input type="hidden" id="rc-id">
+    <div class="g2">
+      <div class="fg"><label class="fl">اسم العميل</label><input id="rc-name" class="fc" placeholder="اسم الشركة أو الشخص"></div>
+      <div class="fg"><label class="fl">البريد الإلكتروني</label><input id="rc-email" class="fc" type="email" placeholder="client@example.com"></div>
+    </div>
+    <div class="g2">
+      <div class="fg"><label class="fl">الخطة</label>
+        <select id="rc-plan" class="fc">
+          <option value="basic">🥉 Basic (2 جلسات)</option>
+          <option value="pro">🥈 Pro (10 جلسات)</option>
+          <option value="enterprise">🥇 Enterprise (25 جلسة)</option>
+        </select>
+      </div>
+      <div class="fg"><label class="fl">الحد اليومي (رسالة)</label>
+        <input id="rc-msg-limit" class="fc" type="number" value="500" min="50">
+      </div>
+    </div>
+    <div class="g2">
+      <div class="fg"><label class="fl">الحد الأقصى للجلسات</label>
+        <input id="rc-max-sess" class="fc" type="number" value="2" min="1">
+      </div>
+      <div class="fg"><label class="fl">تاريخ الانتهاء</label>
+        <input id="rc-expires" class="fc" type="date">
+      </div>
+    </div>
+    <div class="fg">
+      <label class="fl">مفتاح الترخيص</label>
+      <div class="flex gap8 ic">
+        <input id="rc-license-key" class="fc fi fm" readonly placeholder="سيتم توليده تلقائياً">
+        <button class="btn bo bsm" onclick="genResellerKey()">🔑 توليد</button>
+      </div>
+    </div>
+    <div class="fg"><label class="fl">ملاحظات</label><textarea id="rc-notes" class="fc" rows="2" placeholder="ملاحظات..."></textarea></div>
+    <div class="md-cl">
+      <button class="btn bo" onclick="closeM('m-reseller-client')">إلغاء</button>
+      <button class="btn bp" onclick="saveResellerClient()">✅ حفظ العميل</button>
     </div>
   </div>
 </div>

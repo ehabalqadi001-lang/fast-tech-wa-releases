@@ -1,0 +1,24 @@
+<div id="p-sequences" class="page">
+  <div class="ph">
+    <div class="ph-l">
+      <div class="ph-ic">🔄</div>
+      <div><h1>تسلسلات الأتمتة</h1><p>حملات Drip وردود تلقائية متعددة الخطوات بتأخيرات مخصصة</p></div>
+    </div>
+    <div class="flex gap8 ic">
+      <button class="btn bo bsm" onclick="loadSequencesPage()">🔄 تحديث</button>
+      <button class="btn bp" onclick="openSeqBuilder()">➕ تسلسل جديد</button>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="sg" style="grid-template-columns:repeat(3,1fr);margin-bottom:20px">
+    <div class="sc"><div class="sn ta fm" id="seq-stat-total">0</div><div class="sl">إجمالي التسلسلات</div><div class="si">🔄</div></div>
+    <div class="sc"><div class="sn ta" id="seq-stat-active">0</div><div class="sl">نشطة</div><div class="si">✅</div></div>
+    <div class="sc"><div class="sn ta" id="seq-stat-enrolled">0</div><div class="sl">مشترك نشط</div><div class="si">👥</div></div>
+  </div>
+
+  <!-- Sequences List -->
+  <div id="seq-list" style="display:flex;flex-direction:column;gap:16px">
+    <div class="ts f12 ct" style="padding:40px">جارٍ التحميل...</div>
+  </div>
+</div>

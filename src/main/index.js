@@ -19,6 +19,7 @@ const IpcHandlers    = require('./ipc-handlers');
 const LicenseService = require('./license-service');
 const Updater        = require('./updater');
 const { AntiBanService } = require('./anti-ban-service');
+const SequenceService = require('./sequence-service');
 const EventEmitter   = require('events');
 
 // Internal bus — used to signal from IPC handlers to window lifecycle code
@@ -272,10 +273,21 @@ app.whenReady().then(async () => {
       );
     }
 
-    // 7. IPC handlers (all services registered)
+    // 7. Sequence engine (Phase 7)
+    const seqSvc = new SequenceService(db, engine, waSvc);
+    seqSvc.start();
+
+    // Wire keyword trigger: check incoming messages for sequence triggers
+    if (waSvc) {
+      waSvc.on('message', ({ sessionId, from, body }) => {
+        seqSvc.checkKeywordTrigger(body, from?.replace('@c.us',''), sessionId).catch(() => {});
+      });
+    }
+
+    // 8. IPC handlers (all services registered)
     IpcHandlers.register(ipcMain, {
       db, waApi, waSvc, engine, scraper, scheduler,
-      aiSvc, excel, adapter, webhookSrv, antiBanSvc,
+      aiSvc, excel, adapter, webhookSrv, antiBanSvc, seqSvc,
     });
 
     // 6. Window + tray
@@ -342,7 +354,6 @@ app.on('before-quit', async () => {
   engine?.stop();
   webhookSrv?.stop();
   await waSvc?.destroyAll().catch(() => {});
-  // antiBanSvc is local to bootstrap scope — cron jobs stop via node-cron's destroy
   db?.close();
 });
 

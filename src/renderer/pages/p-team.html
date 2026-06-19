@@ -1,0 +1,71 @@
+<div id="p-team" class="page">
+  <div class="ph">
+    <div class="ph-l">
+      <div class="ph-ic">👨‍💼</div>
+      <div><h1>إدارة الفريق</h1><p>أدوار المستخدمين وتعيين المحادثات وأداء الوكلاء</p></div>
+    </div>
+    <div class="flex gap8 ic">
+      <button class="btn bo bsm" onclick="loadTeamPage()">🔄 تحديث</button>
+      <button class="btn bp" onclick="openAddTeamMember()">➕ عضو جديد</button>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="sg" style="grid-template-columns:repeat(3,1fr);margin-bottom:20px">
+    <div class="sc"><div class="sn ta fm" id="tm-stat-total">0</div><div class="sl">إجمالي الأعضاء</div><div class="si">👥</div></div>
+    <div class="sc"><div class="sn ta" id="tm-stat-agents">0</div><div class="sl">وكلاء نشطون</div><div class="si">🎧</div></div>
+    <div class="sc"><div class="sn ta" id="tm-stat-open">0</div><div class="sl">محادثات مفتوحة</div><div class="si">💬</div></div>
+  </div>
+
+  <div class="g2" style="gap:18px;margin-bottom:18px">
+    <!-- Team Members -->
+    <div class="card">
+      <div class="ct">👥 أعضاء الفريق</div>
+      <div id="team-members-list" style="display:flex;flex-direction:column;gap:10px;margin-top:14px">
+        <div class="ts f12">جارٍ التحميل...</div>
+      </div>
+    </div>
+
+    <!-- Performance -->
+    <div class="card">
+      <div class="ct">📊 أداء الفريق</div>
+      <div id="team-perf-list" style="margin-top:14px;display:flex;flex-direction:column;gap:10px">
+        <div class="ts f12">جارٍ التحميل...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Conversation Assignments -->
+  <div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div class="ct">💬 تعيين المحادثات</div>
+      <div class="flex gap8">
+        <select id="assign-filter-status" class="fc bsm" style="width:auto" onchange="loadAssignments()">
+          <option value="">جميع الحالات</option>
+          <option value="open">🔵 مفتوح</option>
+          <option value="in_progress">🟡 جارٍ</option>
+          <option value="resolved">🟢 محلول</option>
+          <option value="closed">⚫ مغلق</option>
+        </select>
+        <button class="btn bo bsm" onclick="loadAssignments()">🔄 تحديث</button>
+      </div>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="dt">
+        <thead>
+          <tr>
+            <th>الرقم</th>
+            <th>المسؤول</th>
+            <th>الحالة</th>
+            <th>الأولوية</th>
+            <th>آخر رسالة</th>
+            <th>إجراء</th>
+          </tr>
+        </thead>
+        <tbody id="assign-tbody">
+          <tr><td colspan="6" style="text-align:center;padding:24px;opacity:.5">جارٍ التحميل...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

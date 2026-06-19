@@ -1,0 +1,42 @@
+<div id="p-reseller" class="page">
+  <div class="ph">
+    <div class="ph-l">
+      <div class="ph-ic">🏪</div>
+      <div><h1>لوحة الريسيلر</h1><p>إدارة عملاء الترخيص، الخطط، والحدود</p></div>
+    </div>
+    <div class="flex gap8 ic">
+      <button class="btn bo bsm" onclick="loadResellerPage()">🔄 تحديث</button>
+      <button class="btn bp" onclick="openAddResellerClient()">➕ عميل جديد</button>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="sg" style="grid-template-columns:repeat(3,1fr);margin-bottom:20px">
+    <div class="sc"><div class="sn ta fm" id="rs-stat-total">0</div><div class="sl">إجمالي العملاء</div><div class="si">🏪</div></div>
+    <div class="sc"><div class="sn ta" id="rs-stat-active">0</div><div class="sl">عملاء نشطون</div><div class="si">✅</div></div>
+    <div class="sc"><div class="sn ta" id="rs-stat-msgs">0</div><div class="sl">رسائل اليوم</div><div class="si">📤</div></div>
+  </div>
+
+  <!-- Clients Table -->
+  <div class="card">
+    <div style="overflow-x:auto">
+      <table class="dt">
+        <thead>
+          <tr>
+            <th>العميل</th>
+            <th>الخطة</th>
+            <th>مفتاح الترخيص</th>
+            <th>الحد اليومي / الاستخدام</th>
+            <th>الجلسات</th>
+            <th>الانتهاء</th>
+            <th>الحالة</th>
+            <th>إجراء</th>
+          </tr>
+        </thead>
+        <tbody id="reseller-tbody">
+          <tr><td colspan="8" style="text-align:center;padding:30px;opacity:.5">جارٍ التحميل...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

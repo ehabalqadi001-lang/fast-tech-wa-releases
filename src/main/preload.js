@@ -291,6 +291,49 @@ contextBridge.exposeInMainWorld('ftwa', {
     install:  () => ipcRenderer.invoke('update:install'),
   },
 
+  // ── Phase 6: Team Management ─────────────────────────────────────────────
+  team: {
+    list:   ()      => ipcRenderer.invoke('team:list'),
+    save:   (u)     => ipcRenderer.invoke('team:save',   u),
+    delete: (id)    => ipcRenderer.invoke('team:delete', { id }),
+  },
+
+  // ── Phase 6: Conversation Assignments ────────────────────────────────────
+  assign: {
+    list:    (opts)    => ipcRenderer.invoke('assign:list',    opts),
+    upsert:  (a)       => ipcRenderer.invoke('assign:upsert',  a),
+    resolve: (phone)   => ipcRenderer.invoke('assign:resolve', { phone }),
+    stats:   ()        => ipcRenderer.invoke('assign:stats'),
+  },
+
+  // ── Phase 7: Automation Sequences ────────────────────────────────────────
+  sequences: {
+    list:        ()       => ipcRenderer.invoke('seq:list'),
+    get:         (id)     => ipcRenderer.invoke('seq:get',         { id }),
+    save:        (seq)    => ipcRenderer.invoke('seq:save',        seq),
+    delete:      (id)     => ipcRenderer.invoke('seq:delete',      { id }),
+    toggle:      (id)     => ipcRenderer.invoke('seq:toggle',      { id }),
+    enroll:      (opts)   => ipcRenderer.invoke('seq:enroll',      opts),
+    unenroll:    (opts)   => ipcRenderer.invoke('seq:unenroll',    opts),
+    enrollments: (id)     => ipcRenderer.invoke('seq:enrollments', { id }),
+  },
+
+  // ── Phase 8: Reseller Management ─────────────────────────────────────────
+  reseller: {
+    list:    ()           => ipcRenderer.invoke('reseller:list'),
+    save:    (c)          => ipcRenderer.invoke('reseller:save',   c),
+    delete:  (id)         => ipcRenderer.invoke('reseller:delete', { id }),
+    usage:   (id, days)   => ipcRenderer.invoke('reseller:usage',  { id, days }),
+    stats:   ()           => ipcRenderer.invoke('reseller:stats'),
+    genKey:  ()           => ipcRenderer.invoke('reseller:genKey'),
+  },
+
+  // ── Phase 8: Branding ────────────────────────────────────────────────────
+  branding: {
+    get:  ()     => ipcRenderer.invoke('branding:get'),
+    save: (data) => ipcRenderer.invoke('branding:save', data),
+  },
+
   // ── Push notifications from main ──────────────────────────────────────────
   on: (channel, cb) => {
     const allowed = [

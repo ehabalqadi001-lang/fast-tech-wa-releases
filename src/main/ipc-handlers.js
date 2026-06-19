@@ -13,7 +13,7 @@ const fs   = require('fs');
 function ok(data)  { return { ok: true,  data }; }
 function err(e)    { return { ok: false, error: String(e?.message || e) }; }
 
-function register(ipcMain, { db, waApi, waSvc, engine, scraper, scheduler, aiSvc, excel, adapter, webhookSrv, antiBanSvc }) {
+function register(ipcMain, { db, waApi, waSvc, engine, scraper, scheduler, aiSvc, excel, adapter, webhookSrv, antiBanSvc, seqSvc }) {
 
   // ── Wake lock (prevent sleep during active campaigns) ─────────────────────
   const { powerSaveBlocker, BrowserWindow } = require('electron');
@@ -1251,6 +1251,60 @@ function register(ipcMain, { db, waApi, waSvc, engine, scraper, scheduler, aiSvc
 
   // ── Usage Stats ────────────────────────────────────────────────────────────
   handle('stats:dailySent', ({ days } = {}) => ({ ok: true, data: db.dailySentCount(days || 7) }));
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // PHASE 6 — TEAM MANAGEMENT
+  // ══════════════════════════════════════════════════════════════════════════
+  handle('team:list',   ()       => ({ ok: true, data: db.teamUserList() }));
+  handle('team:save',   (u)      => {
+    const saved = db.teamUserSave(u);
+    return { ok: true, data: saved };
+  });
+  handle('team:delete', ({ id }) => { db.teamUserDelete(id); return { ok: true }; });
+
+  // ── Conversation Assignments ───────────────────────────────────────────────
+  handle('assign:list',    (opts)    => ({ ok: true, data: db.assignmentList(opts || {}) }));
+  handle('assign:upsert',  (a)       => { db.assignmentUpsert(a); return { ok: true }; });
+  handle('assign:resolve', ({ phone })=> { db.assignmentResolve(phone); return { ok: true }; });
+  handle('assign:stats',   ()        => ({ ok: true, data: db.assignmentStats() }));
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // PHASE 7 — AUTOMATION SEQUENCES
+  // ══════════════════════════════════════════════════════════════════════════
+  handle('seq:list',   ()        => ({ ok: true, data: db.sequenceList() }));
+  handle('seq:get',    ({ id })  => ({ ok: true, data: db.sequenceGet(id) }));
+  handle('seq:save',   (seq)     => {
+    const saved = db.sequenceSave(seq);
+    return { ok: true, data: saved };
+  });
+  handle('seq:delete', ({ id })  => { db.sequenceDelete(id); return { ok: true }; });
+  handle('seq:toggle', ({ id })  => ({ ok: true, data: { active: db.sequenceToggle(id) } }));
+
+  handle('seq:enroll',      (opts) => {
+    if (!seqSvc) { db.sequenceEnroll(opts); return { ok: true }; }
+    const r = seqSvc.enroll(opts);
+    return { ok: true, data: r };
+  });
+  handle('seq:unenroll',    (opts) => {
+    if (seqSvc) seqSvc.unenroll(opts);
+    else db.sequenceUnenroll(opts);
+    return { ok: true };
+  });
+  handle('seq:enrollments', ({ id }) => ({ ok: true, data: db.sequenceEnrollmentList(id) }));
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // PHASE 8 — RESELLER CLIENTS
+  // ══════════════════════════════════════════════════════════════════════════
+  handle('reseller:list',       ()        => ({ ok: true, data: db.resellerClientList() }));
+  handle('reseller:save',       (c)       => ({ ok: true, data: db.resellerClientSave(c) }));
+  handle('reseller:delete',     ({ id })  => { db.resellerClientDelete(id); return { ok: true }; });
+  handle('reseller:usage',      ({ id, days }) => ({ ok: true, data: db.resellerClientUsage(id, days || 30) }));
+  handle('reseller:stats',      ()        => ({ ok: true, data: db.resellerStats() }));
+  handle('reseller:genKey',     ()        => ({ ok: true, data: { key: db._genLicenseKey() } }));
+
+  // ── Branding ──────────────────────────────────────────────────────────────
+  handle('branding:get',  ()      => ({ ok: true, data: db.brandingGet() }));
+  handle('branding:save', (data)  => ({ ok: true, data: db.brandingSave(data) }));
 
 }
 

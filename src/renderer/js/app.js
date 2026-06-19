@@ -4304,6 +4304,552 @@ function toggleInteractiveMode() {
   panel.style.display = tg.classList.contains('on') ? '' : 'none';
 }
 
+// ══════════════════════════════════════════════════════════════════════════
+// PHASE 6 — TEAM MANAGEMENT PAGE
+// ══════════════════════════════════════════════════════════════════════════
+let _teamList = [];
+
+window._pg_team = () => { loadTeamPage(); };
+
+async function loadTeamPage() {
+  if (!IS_ELECTRON) return;
+  const [teamR, statsR, assignR] = await Promise.all([
+    BE.team.list(), BE.assign.stats(), BE.assign.list({})
+  ]);
+
+  if (teamR.ok) {
+    _teamList = teamR.data || [];
+    const badge = document.getElementById('nb-team');
+    if (badge) { badge.textContent = _teamList.length; badge.style.display = _teamList.length ? '' : 'none'; }
+
+    const total  = _teamList.length;
+    const agents = _teamList.filter(t => t.role === 'agent').length;
+    document.getElementById('tm-stat-total').textContent = total;
+    document.getElementById('tm-stat-agents').textContent = agents;
+
+    const list = document.getElementById('team-members-list');
+    if (list) list.innerHTML = _teamList.length ? _teamList.map(m => `
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:rgba(var(--ar),.05);border-radius:10px;border:1px solid rgba(var(--ar),.1)">
+        <div style="width:40px;height:40px;border-radius:50%;background:${m.color||'#6366f1'};display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">
+          ${m.role==='admin'?'🔑':m.role==='agent'?'🎧':'👁️'}
+        </div>
+        <div style="flex:1">
+          <div class="fw7 f13">${m.name}</div>
+          <div class="f11 ts">${m.email||'—'} · ${m.role==='admin'?'Admin':m.role==='agent'?'Agent':'Viewer'}</div>
+        </div>
+        <div class="flex gap8">
+          <span class="bge ${m.active?'bg-g':'bg-r'} f10">${m.active?'نشط':'موقوف'}</span>
+          <button class="btn bo bsm" onclick="editTeamMember(${JSON.stringify(m).replace(/"/g,'&quot;')})">✏️</button>
+          <button class="btn bd bsm" onclick="delTeamMember('${m.id}','${m.name}')">🗑️</button>
+        </div>
+      </div>`).join('') : '<div class="ts f12 ct">لا يوجد أعضاء — أضف عضواً جديداً</div>';
+  }
+
+  if (statsR.ok) {
+    const stats = statsR.data || [];
+    const openCount = stats.reduce((s,r) => s + (r.open_count||0), 0);
+    document.getElementById('tm-stat-open').textContent = openCount;
+
+    const perf = document.getElementById('team-perf-list');
+    if (perf) perf.innerHTML = stats.length ? stats.map(s => `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:rgba(var(--ar),.04);border-radius:8px">
+        <div class="fw7 f12">${s.agent_name||'غير معين'}</div>
+        <div class="flex gap10">
+          <span class="f11 ts">${s.open_count||0} مفتوح</span>
+          <span class="f11" style="color:#22c55e">${s.resolved||0} محلول</span>
+          <span class="f11 ts">${s.total||0} إجمالي</span>
+        </div>
+      </div>`).join('') : '<div class="ts f12 ct">لا توجد بيانات</div>';
+  }
+
+  if (assignR.ok) renderAssignTable(assignR.data || []);
+}
+
+function renderAssignTable(rows) {
+  const tbody = document.getElementById('assign-tbody');
+  if (!tbody) return;
+  const priorityLabel = { low:'🔽 منخفض', normal:'▶️ عادي', high:'🔼 عالي', urgent:'🚨 عاجل' };
+  const statusLabel   = { open:'🔵 مفتوح', in_progress:'🟡 جارٍ', resolved:'🟢 محلول', closed:'⚫ مغلق' };
+  tbody.innerHTML = rows.length ? rows.map(a => `
+    <tr>
+      <td class="fm f11">${a.phone}</td>
+      <td>${a.agent_name ? `<span style="color:${a.agent_color||'#6366f1'}">${a.agent_name}</span>` : '<span class="ts">—</span>'}</td>
+      <td><span class="bge f10">${statusLabel[a.status]||a.status}</span></td>
+      <td><span class="f11">${priorityLabel[a.priority]||a.priority}</span></td>
+      <td class="f11 ts">${a.last_message ? a.last_message.slice(0,40)+'…' : '—'}</td>
+      <td>
+        <button class="btn bo bsm" onclick="openAssignModal('${a.phone}')">تعيين</button>
+        <button class="btn bsm" style="background:#22c55e;color:#fff" onclick="resolveAssignment('${a.phone}')">✓ حل</button>
+      </td>
+    </tr>`).join('') : '<tr><td colspan="6" style="text-align:center;padding:20px;opacity:.5">لا توجد محادثات معينة</td></tr>';
+}
+
+async function loadAssignments() {
+  if (!IS_ELECTRON) return;
+  const status = document.getElementById('assign-filter-status')?.value || '';
+  const r = await BE.assign.list(status ? { status } : {});
+  if (r.ok) renderAssignTable(r.data || []);
+}
+
+function openAddTeamMember() {
+  document.getElementById('tm-id').value = '';
+  document.getElementById('tm-name').value = '';
+  document.getElementById('tm-role').value = 'agent';
+  document.getElementById('tm-email').value = '';
+  document.getElementById('tm-pin').value = '';
+  document.getElementById('tm-color').value = '#6366f1';
+  openM('m-team-member');
+}
+
+function editTeamMember(m) {
+  document.getElementById('tm-id').value    = m.id;
+  document.getElementById('tm-name').value  = m.name;
+  document.getElementById('tm-role').value  = m.role;
+  document.getElementById('tm-email').value = m.email || '';
+  document.getElementById('tm-pin').value   = '';
+  document.getElementById('tm-color').value = m.color || '#6366f1';
+  openM('m-team-member');
+}
+
+async function saveTeamMember() {
+  const id    = document.getElementById('tm-id').value;
+  const name  = document.getElementById('tm-name').value.trim();
+  const role  = document.getElementById('tm-role').value;
+  const email = document.getElementById('tm-email').value.trim();
+  const pin   = document.getElementById('tm-pin').value.trim();
+  const color = document.getElementById('tm-color').value;
+  if (!name) { beErr('أدخل اسم العضو'); return; }
+  if (!IS_ELECTRON) { beOk('تم الحفظ (وضع العرض)'); closeM('m-team-member'); return; }
+  const r = await BE.team.save({ id: id||undefined, name, role, email, pin: pin||undefined, color, active: 1 });
+  if (r.ok) { beOk('تم حفظ العضو'); closeM('m-team-member'); loadTeamPage(); }
+  else beErr(r.error);
+}
+
+async function delTeamMember(id, name) {
+  if (!confirm(`حذف "${name}"؟`)) return;
+  if (!IS_ELECTRON) { beOk('تم الحذف (وضع العرض)'); return; }
+  const r = await BE.team.delete(id);
+  if (r.ok) { beOk('تم الحذف'); loadTeamPage(); }
+  else beErr(r.error);
+}
+
+async function openAssignModal(phone) {
+  document.getElementById('ac-phone').value = phone;
+  document.getElementById('ac-phone-display').textContent = phone;
+  const agentSel = document.getElementById('ac-agent');
+  agentSel.innerHTML = '<option value="">— بدون تعيين —</option>' +
+    _teamList.filter(m => m.active && (m.role==='admin'||m.role==='agent')).map(m =>
+      `<option value="${m.id}">${m.name} (${m.role})</option>`
+    ).join('');
+  openM('m-assign-conv');
+}
+
+async function saveAssignment() {
+  const phone    = document.getElementById('ac-phone').value;
+  const agentId  = document.getElementById('ac-agent').value;
+  const status   = document.getElementById('ac-status').value;
+  const priority = document.getElementById('ac-priority').value;
+  const tags     = document.getElementById('ac-tags').value.trim();
+  const notes    = document.getElementById('ac-notes').value.trim();
+  if (!IS_ELECTRON) { beOk('تم الحفظ (وضع العرض)'); closeM('m-assign-conv'); return; }
+  const r = await BE.assign.upsert({ phone, agent_id:agentId||null, status, priority, tags, notes });
+  if (r.ok) { beOk('تم تعيين المحادثة'); closeM('m-assign-conv'); loadAssignments(); }
+  else beErr(r.error);
+}
+
+async function resolveAssignment(phone) {
+  if (!IS_ELECTRON) { beOk('تم الحل (وضع العرض)'); return; }
+  const r = await BE.assign.resolve(phone);
+  if (r.ok) { beOk('تم تمييز المحادثة كمحلولة'); loadAssignments(); }
+  else beErr(r.error);
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// PHASE 7 — AUTOMATION SEQUENCES PAGE
+// ══════════════════════════════════════════════════════════════════════════
+let _seqEditSteps = [];
+
+window._pg_sequences = () => { loadSequencesPage(); };
+
+async function loadSequencesPage() {
+  if (!IS_ELECTRON) return;
+  const r = await BE.sequences.list();
+  if (!r.ok) return;
+  const seqs = r.data || [];
+
+  const badge = document.getElementById('nb-sequences');
+  if (badge) { badge.textContent = seqs.filter(s=>s.active).length; badge.style.display = seqs.length?'':'none'; }
+
+  document.getElementById('seq-stat-total').textContent  = seqs.length;
+  document.getElementById('seq-stat-active').textContent  = seqs.filter(s=>s.active).length;
+  document.getElementById('seq-stat-enrolled').textContent = seqs.reduce((s,q)=>s+(q.enrolled||0),0);
+
+  const container = document.getElementById('seq-list');
+  if (!container) return;
+
+  const triggerLabel = { keyword:'🔑 كلمة مفتاحية', opt_in:'✅ انضمام جديد', campaign_complete:'📢 انتهاء حملة', manual:'🤚 يدوي' };
+
+  container.innerHTML = seqs.length ? seqs.map(s => `
+    <div class="cd" style="border-left:3px solid ${s.active?'var(--acc)':'#64748b'}">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:14px">
+        <div style="flex:1">
+          <div class="flex ic gap10 mb4">
+            <div class="fw7 f14">${s.name}</div>
+            <span class="bge f10 ${s.active?'bg-g':'bg-r'}">${s.active?'نشط':'موقوف'}</span>
+          </div>
+          <div class="flex gap10 f11 ts">
+            <span>${triggerLabel[s.trigger_type]||s.trigger_type}</span>
+            ${s.trigger_value ? `<span>· ${s.trigger_value}</span>` : ''}
+            <span>· ${s.steps?.length||0} خطوة</span>
+            <span>· ${s.enrolled||0} مشترك نشط</span>
+          </div>
+        </div>
+        <div class="flex gap8">
+          <button class="btn bo bsm" onclick="viewSeqEnrollments('${s.id}','${s.name.replace(/'/g,"\\'")}')">👥 المشتركون</button>
+          <button class="btn bo bsm" onclick="editSequence('${s.id}')">✏️ تعديل</button>
+          <button class="btn bsm ${s.active?'bo':'bp'}" onclick="toggleSeq('${s.id}',this)">
+            ${s.active?'⏸️ إيقاف':'▶️ تفعيل'}
+          </button>
+          <button class="btn bd bsm" onclick="deleteSeq('${s.id}','${s.name.replace(/'/g,"\\'")}')">🗑️</button>
+        </div>
+      </div>
+
+      ${s.steps && s.steps.length ? `
+      <div style="margin-top:14px;display:flex;gap:8px;overflow-x:auto;padding-bottom:6px">
+        ${s.steps.map((st,i) => `
+          <div style="flex-shrink:0;background:rgba(var(--ar),.06);border:1px solid rgba(var(--ar),.12);border-radius:8px;padding:8px 12px;min-width:160px">
+            <div class="fw7 f11 mb2">الخطوة ${i+1}</div>
+            <div class="f11 ts">⏱️ بعد ${st.delay_hours<24?st.delay_hours+'س':(st.delay_hours/24).toFixed(0)+' يوم'}</div>
+            <div class="f11 mt4" style="max-width:150px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${st.message_body||'—'}</div>
+          </div>
+        `).join('<div style="display:flex;align-items:center;font-size:18px;opacity:.4">→</div>')}
+      </div>` : ''}
+    </div>`).join('') : '<div class="cd ts f12 ct">لا توجد تسلسلات — أنشئ تسلسلاً جديداً</div>';
+}
+
+function openSeqBuilder() {
+  _seqEditSteps = [];
+  document.getElementById('seq-edit-id').value = '';
+  document.getElementById('seq-name').value = '';
+  document.getElementById('seq-trigger').value = 'manual';
+  document.getElementById('seq-trigger-val').value = '';
+  toggleSeqTrigger();
+  renderSeqSteps();
+  // Load sessions
+  if (IS_ELECTRON) {
+    BE.wa.sessions.list().then(r => {
+      const sel = document.getElementById('seq-session');
+      if (!sel) return;
+      sel.innerHTML = '<option value="">— تلقائي —</option>' +
+        (r.data||[]).filter(s=>s.status==='ready').map(s =>
+          `<option value="${s.id}">${s.name}</option>`
+        ).join('');
+    }).catch(()=>{});
+  }
+  openM('m-seq-builder');
+}
+
+async function editSequence(id) {
+  if (!IS_ELECTRON) return;
+  const r = await BE.sequences.get(id);
+  if (!r.ok) { beErr('تعذر تحميل التسلسل'); return; }
+  const s = r.data;
+  _seqEditSteps = (s.steps||[]).map(st => ({ ...st }));
+  document.getElementById('seq-edit-id').value = s.id;
+  document.getElementById('seq-name').value = s.name;
+  document.getElementById('seq-trigger').value = s.trigger_type;
+  document.getElementById('seq-trigger-val').value = s.trigger_value || '';
+  toggleSeqTrigger();
+  // Load sessions
+  BE.wa.sessions.list().then(r2 => {
+    const sel = document.getElementById('seq-session');
+    if (!sel) return;
+    sel.innerHTML = '<option value="">— تلقائي —</option>' +
+      (r2.data||[]).filter(ss=>ss.status==='ready').map(ss =>
+        `<option value="${ss.id}" ${ss.id===s.session_id?'selected':''}>${ss.name}</option>`
+      ).join('');
+  }).catch(()=>{});
+  renderSeqSteps();
+  openM('m-seq-builder');
+}
+
+function toggleSeqTrigger() {
+  const val = document.getElementById('seq-trigger')?.value;
+  const wrap = document.getElementById('seq-trigger-val-wrap');
+  if (wrap) wrap.style.display = (val === 'keyword') ? '' : 'none';
+}
+
+function addSeqStep() {
+  _seqEditSteps.push({ delay_hours: 24, message_body: '', media_path: '' });
+  renderSeqSteps();
+}
+
+function removeSeqStep(i) {
+  _seqEditSteps.splice(i, 1);
+  renderSeqSteps();
+}
+
+function renderSeqSteps() {
+  const container = document.getElementById('seq-steps-list');
+  if (!container) return;
+  container.innerHTML = _seqEditSteps.length ? _seqEditSteps.map((st, i) => `
+    <div style="background:rgba(var(--ar),.06);border:1px solid rgba(var(--ar),.12);border-radius:10px;padding:12px 14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div class="fw7 f12">الخطوة ${i+1}</div>
+        <button class="btn bd bsm" onclick="removeSeqStep(${i})">🗑️</button>
+      </div>
+      <div class="g2 mb8">
+        <div class="fg">
+          <label class="fl">التأخير قبل الإرسال</label>
+          <div class="flex gap8 ic">
+            <input class="fc" type="number" min="1" value="${st.delay_hours}" style="width:70px;text-align:center"
+              oninput="_seqEditSteps[${i}].delay_hours=+this.value">
+            <span class="f11 ts">ساعة</span>
+          </div>
+        </div>
+        <div class="fg">
+          <label class="fl">ملف الوسائط (اختياري)</label>
+          <input class="fc" value="${st.media_path||''}" placeholder="مسار الملف..." style="direction:ltr"
+            oninput="_seqEditSteps[${i}].media_path=this.value">
+        </div>
+      </div>
+      <div class="fg">
+        <label class="fl">نص الرسالة</label>
+        <textarea class="fc" rows="3" placeholder="اكتب الرسالة... يمكن استخدام {الاسم}"
+          oninput="_seqEditSteps[${i}].message_body=this.value">${st.message_body||''}</textarea>
+      </div>
+    </div>`).join('') : '<div class="ts f12 ct" style="padding:20px">لم تُضف أي خطوات بعد — اضغط ➕ لإضافة خطوة</div>';
+}
+
+async function saveSequence() {
+  const id           = document.getElementById('seq-edit-id').value;
+  const name         = document.getElementById('seq-name').value.trim();
+  const trigger_type = document.getElementById('seq-trigger').value;
+  const trigger_value= document.getElementById('seq-trigger-val').value.trim();
+  const session_id   = document.getElementById('seq-session')?.value || '';
+  if (!name) { beErr('أدخل اسم التسلسل'); return; }
+  if (!_seqEditSteps.length) { beErr('أضف خطوة واحدة على الأقل'); return; }
+  if (!IS_ELECTRON) { beOk('تم الحفظ (وضع العرض)'); closeM('m-seq-builder'); return; }
+  const r = await BE.sequences.save({
+    id: id||undefined, name, trigger_type, trigger_value, session_id, active: 1,
+    steps: _seqEditSteps,
+  });
+  if (r.ok) { beOk('تم حفظ التسلسل'); closeM('m-seq-builder'); loadSequencesPage(); }
+  else beErr(r.error);
+}
+
+async function toggleSeq(id, btn) {
+  if (!IS_ELECTRON) return;
+  const r = await BE.sequences.toggle(id);
+  if (r.ok) { beOk(r.data?.active ? 'تم تفعيل التسلسل' : 'تم إيقاف التسلسل'); loadSequencesPage(); }
+  else beErr(r.error);
+}
+
+async function deleteSeq(id, name) {
+  if (!confirm(`حذف التسلسل "${name}"؟`)) return;
+  if (!IS_ELECTRON) { beOk('تم الحذف (وضع العرض)'); return; }
+  const r = await BE.sequences.delete(id);
+  if (r.ok) { beOk('تم الحذف'); loadSequencesPage(); }
+  else beErr(r.error);
+}
+
+let _currentSeqId = '';
+
+async function viewSeqEnrollments(id, name) {
+  _currentSeqId = id;
+  document.getElementById('enr-seq-name').textContent = name;
+  document.getElementById('enr-phone-input').value = '';
+  if (IS_ELECTRON) await loadEnrollments();
+  openM('m-seq-enrollments');
+}
+
+async function loadEnrollments() {
+  const r = await BE.sequences.enrollments(_currentSeqId);
+  const list = document.getElementById('enr-list');
+  if (!list || !r.ok) return;
+  const rows = r.data || [];
+  list.innerHTML = rows.length ? rows.map(e => `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-radius:8px;background:rgba(var(--ar),.04);margin-bottom:6px">
+      <div>
+        <div class="fw7 f12 fm">${e.phone}</div>
+        <div class="f11 ts">خطوة ${e.current_step+1} · ${e.completed?'مكتمل ✅':'⏳ '+new Date(e.next_send_at).toLocaleString('ar')}</div>
+      </div>
+      <button class="btn bd bsm" onclick="unenrollPhone('${e.phone}')">إلغاء</button>
+    </div>`).join('') : '<div class="ts f12 ct" style="padding:24px">لا يوجد مشتركون</div>';
+}
+
+async function addEnrollment() {
+  const phone = document.getElementById('enr-phone-input').value.trim().replace(/\D/g,'');
+  if (!phone) { beErr('أدخل رقم الهاتف'); return; }
+  if (!IS_ELECTRON) { beOk('تم الاشتراك (وضع العرض)'); return; }
+  const r = await BE.sequences.enroll({ sequenceId: _currentSeqId, phone, sessionId: '' });
+  if (r.ok) { beOk('تم تسجيل الرقم في التسلسل'); document.getElementById('enr-phone-input').value=''; loadEnrollments(); }
+  else beErr(r.error);
+}
+
+async function unenrollPhone(phone) {
+  if (!IS_ELECTRON) return;
+  const r = await BE.sequences.unenroll({ sequenceId: _currentSeqId, phone });
+  if (r.ok) { beOk('تم إلغاء الاشتراك'); loadEnrollments(); }
+  else beErr(r.error);
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// PHASE 8 — RESELLER PANEL PAGE
+// ══════════════════════════════════════════════════════════════════════════
+window._pg_reseller = () => { loadResellerPage(); };
+
+async function loadResellerPage() {
+  if (!IS_ELECTRON) return;
+  const [listR, statsR] = await Promise.all([BE.reseller.list(), BE.reseller.stats()]);
+
+  if (statsR.ok) {
+    const s = statsR.data;
+    document.getElementById('rs-stat-total').textContent  = s.total || 0;
+    document.getElementById('rs-stat-active').textContent = s.active || 0;
+    document.getElementById('rs-stat-msgs').textContent   = (s.messages_today||0).toLocaleString();
+    const badge = document.getElementById('nb-reseller');
+    if (badge) { badge.textContent = s.total; badge.style.display = s.total?'':'none'; }
+  }
+
+  if (listR.ok) {
+    const clients = listR.data || [];
+    const planLabel = { basic:'🥉 Basic', pro:'🥈 Pro', enterprise:'🥇 Enterprise' };
+    const tbody = document.getElementById('reseller-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = clients.length ? clients.map(c => `
+      <tr>
+        <td>
+          <div class="fw7 f12">${c.name}</div>
+          <div class="f11 ts">${c.email||'—'}</div>
+        </td>
+        <td><span class="bge f10">${planLabel[c.plan]||c.plan}</span></td>
+        <td class="fm f10" style="letter-spacing:.5px">${c.license_key||'—'}</td>
+        <td class="f11">${c.max_msg_per_day?.toLocaleString()||'—'} / ${c.today_messages?.toLocaleString()||0} اليوم</td>
+        <td class="f11">${c.max_sessions||'—'}</td>
+        <td class="f11">${c.expires_at ? c.expires_at.slice(0,10) : '—'}</td>
+        <td><span class="bge f10 ${c.active?'bg-g':'bg-r'}">${c.active?'نشط':'موقوف'}</span></td>
+        <td>
+          <button class="btn bo bsm" onclick="editResellerClient(${JSON.stringify(c).replace(/"/g,'&quot;')})">✏️</button>
+          <button class="btn bd bsm" onclick="deleteResellerClient('${c.id}','${c.name.replace(/'/g,"\\'")}')">🗑️</button>
+        </td>
+      </tr>`).join('') : '<tr><td colspan="8" style="text-align:center;padding:24px;opacity:.5">لا يوجد عملاء — أضف عميلاً جديداً</td></tr>';
+  }
+}
+
+function openAddResellerClient() {
+  document.getElementById('rc-id').value = '';
+  document.getElementById('rc-name').value = '';
+  document.getElementById('rc-email').value = '';
+  document.getElementById('rc-plan').value = 'basic';
+  document.getElementById('rc-msg-limit').value = '500';
+  document.getElementById('rc-max-sess').value = '2';
+  document.getElementById('rc-license-key').value = '';
+  document.getElementById('rc-expires').value = '';
+  document.getElementById('rc-notes').value = '';
+  openM('m-reseller-client');
+}
+
+function editResellerClient(c) {
+  document.getElementById('rc-id').value          = c.id;
+  document.getElementById('rc-name').value        = c.name;
+  document.getElementById('rc-email').value       = c.email||'';
+  document.getElementById('rc-plan').value        = c.plan||'basic';
+  document.getElementById('rc-msg-limit').value   = c.max_msg_per_day||500;
+  document.getElementById('rc-max-sess').value    = c.max_sessions||2;
+  document.getElementById('rc-license-key').value = c.license_key||'';
+  document.getElementById('rc-expires').value     = c.expires_at ? c.expires_at.slice(0,10) : '';
+  document.getElementById('rc-notes').value       = c.notes||'';
+  openM('m-reseller-client');
+}
+
+async function genResellerKey() {
+  if (!IS_ELECTRON) { document.getElementById('rc-license-key').value='FT-XXXX-XXXX-XXXX-XXXX'; return; }
+  const r = await BE.reseller.genKey();
+  if (r.ok) document.getElementById('rc-license-key').value = r.data.key;
+}
+
+async function saveResellerClient() {
+  const id          = document.getElementById('rc-id').value;
+  const name        = document.getElementById('rc-name').value.trim();
+  const email       = document.getElementById('rc-email').value.trim();
+  const plan        = document.getElementById('rc-plan').value;
+  const msg_limit   = +document.getElementById('rc-msg-limit').value || 500;
+  const max_sess    = +document.getElementById('rc-max-sess').value  || 2;
+  const license_key = document.getElementById('rc-license-key').value.trim();
+  const expires_at  = document.getElementById('rc-expires').value || null;
+  const notes       = document.getElementById('rc-notes').value.trim();
+  if (!name) { beErr('أدخل اسم العميل'); return; }
+  if (!IS_ELECTRON) { beOk('تم الحفظ (وضع العرض)'); closeM('m-reseller-client'); return; }
+  const r = await BE.reseller.save({
+    id: id||undefined, name, email, plan, license_key: license_key||undefined,
+    max_msg_per_day: msg_limit, max_sessions: max_sess,
+    expires_at, notes, active: 1,
+  });
+  if (r.ok) { beOk('تم حفظ العميل'); closeM('m-reseller-client'); loadResellerPage(); }
+  else beErr(r.error);
+}
+
+async function deleteResellerClient(id, name) {
+  if (!confirm(`حذف عميل "${name}"؟`)) return;
+  if (!IS_ELECTRON) { beOk('تم الحذف (وضع العرض)'); return; }
+  const r = await BE.reseller.delete(id);
+  if (r.ok) { beOk('تم الحذف'); loadResellerPage(); }
+  else beErr(r.error);
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// PHASE 8 — WHITE-LABEL SETTINGS PAGE
+// ══════════════════════════════════════════════════════════════════════════
+window._pg_whitelabel = () => { loadWhitelabelPage(); };
+
+
+async function loadWhitelabelPage() {
+  if (!IS_ELECTRON) return;
+  const r = await BE.branding.get();
+  if (!r.ok) return;
+  const b = r.data;
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
+  set('wl-app-name', b.app_name || 'Fast Tech');
+  set('wl-footer',   b.footer_text || 'Powered by Fast Tech');
+  set('wl-color',    b.primary_color || '#6366f1');
+  set('wl-color-hex',b.primary_color || '#6366f1');
+  set('wl-logo',     b.logo_path || '');
+  const chk = document.getElementById('wl-show-powered');
+  if (chk) chk.checked = b.show_powered !== false;
+  updateBrandingPreview(b);
+}
+
+function updateBrandingPreview(b) {
+  const name  = document.getElementById('wl-app-name')?.value || b?.app_name || 'Fast Tech';
+  const color = document.getElementById('wl-color')?.value    || b?.primary_color || '#6366f1';
+  const footer= document.getElementById('wl-footer')?.value   || b?.footer_text || '';
+  const pName  = document.getElementById('wl-prev-name');
+  const pColor = document.getElementById('wl-prev-color');
+  const pFoot  = document.getElementById('wl-prev-footer');
+  if (pName)  pName.textContent  = name;
+  if (pColor) pColor.style.background = color;
+  if (pFoot)  pFoot.textContent  = footer;
+}
+
+async function pickWlLogo() {
+  if (!IS_ELECTRON) return;
+  const path = await BE.openFile({ filters: [{ name: 'Images', extensions: ['png','svg','jpg','ico'] }] });
+  if (path) document.getElementById('wl-logo').value = path;
+}
+
+async function saveBranding() {
+  const app_name     = document.getElementById('wl-app-name').value.trim();
+  const footer_text  = document.getElementById('wl-footer').value.trim();
+  const primary_color= document.getElementById('wl-color').value;
+  const logo_path    = document.getElementById('wl-logo').value.trim();
+  const show_powered = document.getElementById('wl-show-powered').checked;
+  if (!IS_ELECTRON) { beOk('تم الحفظ (وضع العرض)'); return; }
+  const r = await BE.branding.save({ app_name, footer_text, primary_color, logo_path, show_powered });
+  if (r.ok) { beOk('تم حفظ إعدادات البراندينج'); updateBrandingPreview(r.data); }
+  else beErr(r.error);
+}
+
 // ── Boot ─────────────────────────────────────────────────────────────────
 // ── SPARKLINES ───────────────────────────────────────────────────────────
 function drawSparkline(svgId, data, color) {

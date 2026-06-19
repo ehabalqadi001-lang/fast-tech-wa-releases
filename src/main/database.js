@@ -514,6 +514,123 @@ class Db {
       this.settingSet('db_version', '12');
       v = 12;
     }
+
+    if (v < 13) {
+      // Phase 6: Multi-User Team System
+      this._db.exec(`
+        CREATE TABLE IF NOT EXISTS team_users (
+          id          TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(8)))),
+          name        TEXT NOT NULL,
+          role        TEXT NOT NULL DEFAULT 'agent' CHECK(role IN ('admin','agent','viewer')),
+          email       TEXT,
+          pin         TEXT,
+          active      INTEGER DEFAULT 1,
+          color       TEXT DEFAULT '#6366f1',
+          created_at  TEXT DEFAULT (datetime('now')),
+          last_active TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS conversation_assignments (
+          id           TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(8)))),
+          phone        TEXT NOT NULL,
+          session_id   TEXT,
+          agent_id     TEXT,
+          status       TEXT DEFAULT 'open' CHECK(status IN ('open','in_progress','resolved','closed')),
+          priority     TEXT DEFAULT 'normal' CHECK(priority IN ('low','normal','high','urgent')),
+          tags         TEXT,
+          notes        TEXT,
+          assigned_at  TEXT DEFAULT (datetime('now')),
+          resolved_at  TEXT,
+          UNIQUE(phone)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_ca_agent  ON conversation_assignments(agent_id);
+        CREATE INDEX IF NOT EXISTS idx_ca_status ON conversation_assignments(status);
+        CREATE INDEX IF NOT EXISTS idx_tu_role   ON team_users(role, active);
+      `);
+      this.settingSet('db_version', '13');
+      v = 13;
+    }
+
+    if (v < 14) {
+      // Phase 7: Automation Sequences (drip campaigns)
+      this._db.exec(`
+        CREATE TABLE IF NOT EXISTS sequences (
+          id             TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(8)))),
+          name           TEXT NOT NULL,
+          trigger_type   TEXT NOT NULL DEFAULT 'manual'
+                           CHECK(trigger_type IN ('keyword','opt_in','campaign_complete','manual')),
+          trigger_value  TEXT DEFAULT '',
+          session_id     TEXT DEFAULT '',
+          active         INTEGER DEFAULT 1,
+          created_at     TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS sequence_steps (
+          id           TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(8)))),
+          sequence_id  TEXT NOT NULL,
+          step_order   INTEGER NOT NULL DEFAULT 0,
+          delay_hours  INTEGER NOT NULL DEFAULT 24,
+          message_body TEXT NOT NULL DEFAULT '',
+          media_path   TEXT,
+          FOREIGN KEY (sequence_id) REFERENCES sequences(id) ON DELETE CASCADE
+        );
+
+        CREATE TABLE IF NOT EXISTS sequence_enrollments (
+          id            TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(8)))),
+          sequence_id   TEXT NOT NULL,
+          phone         TEXT NOT NULL,
+          session_id    TEXT,
+          current_step  INTEGER DEFAULT 0,
+          next_send_at  TEXT,
+          completed     INTEGER DEFAULT 0,
+          enrolled_at   TEXT DEFAULT (datetime('now')),
+          completed_at  TEXT,
+          UNIQUE(sequence_id, phone)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_seq_active      ON sequences(active);
+        CREATE INDEX IF NOT EXISTS idx_seqstep_seq     ON sequence_steps(sequence_id, step_order);
+        CREATE INDEX IF NOT EXISTS idx_seqenr_due      ON sequence_enrollments(completed, next_send_at)
+          WHERE completed=0;
+        CREATE INDEX IF NOT EXISTS idx_seqenr_phone    ON sequence_enrollments(phone);
+      `);
+      this.settingSet('db_version', '14');
+      v = 14;
+    }
+
+    if (v < 15) {
+      // Phase 8: Reseller clients + branding
+      this._db.exec(`
+        CREATE TABLE IF NOT EXISTS reseller_clients (
+          id              TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(8)))),
+          name            TEXT NOT NULL,
+          email           TEXT,
+          license_key     TEXT UNIQUE,
+          plan            TEXT DEFAULT 'basic' CHECK(plan IN ('basic','pro','enterprise')),
+          max_sessions    INTEGER DEFAULT 2,
+          max_msg_per_day INTEGER DEFAULT 500,
+          active          INTEGER DEFAULT 1,
+          expires_at      TEXT,
+          notes           TEXT,
+          created_at      TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS client_usage (
+          id            TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(8)))),
+          client_id     TEXT NOT NULL,
+          date          TEXT NOT NULL,
+          messages_sent INTEGER DEFAULT 0,
+          sessions_used INTEGER DEFAULT 0,
+          UNIQUE(client_id, date)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_rc_active   ON reseller_clients(active);
+        CREATE INDEX IF NOT EXISTS idx_cu_client   ON client_usage(client_id, date DESC);
+      `);
+      this.settingSet('db_version', '15');
+      v = 15;
+    }
   }
 
   // ─── FTS Search ───────────────────────────────────────────────────────────
@@ -1566,6 +1683,336 @@ class Db {
       ORDER BY reply_rate DESC, replied_count DESC
       LIMIT 1
     `).get(campaignId);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PHASE 6 — TEAM USERS
+  // ═══════════════════════════════════════════════════════════════════════════
+  teamUserList() {
+    return this._db.prepare('SELECT * FROM team_users ORDER BY role ASC, name ASC').all();
+  }
+
+  teamUserGet(id) {
+    return this._db.prepare('SELECT * FROM team_users WHERE id=?').get(id);
+  }
+
+  teamUserSave(u) {
+    const existing = u.id ? this.teamUserGet(u.id) : null;
+    if (existing) {
+      this._db.prepare(`
+        UPDATE team_users SET name=?, role=?, email=?, color=?, active=?
+        ${u.pin ? ', pin=?' : ''}
+        WHERE id=?
+      `).run(...(u.pin
+        ? [u.name, u.role, u.email||'', u.color||'#6366f1', u.active??1, u.pin, u.id]
+        : [u.name, u.role, u.email||'', u.color||'#6366f1', u.active??1, u.id]
+      ));
+    } else {
+      if (!u.id) u.id = require('crypto').randomUUID?.() || require('uuid').v4();
+      this._db.prepare(`
+        INSERT INTO team_users (id,name,role,email,pin,color,active)
+        VALUES (?,?,?,?,?,?,?)
+      `).run(u.id, u.name, u.role||'agent', u.email||'', u.pin||'', u.color||'#6366f1', u.active??1);
+    }
+    return this.teamUserGet(u.id);
+  }
+
+  teamUserDelete(id) {
+    this._db.prepare('DELETE FROM team_users WHERE id=?').run(id);
+  }
+
+  teamUserTouch(id) {
+    this._db.prepare(`UPDATE team_users SET last_active=datetime('now') WHERE id=?`).run(id);
+  }
+
+  // ─── Conversation Assignments ─────────────────────────────────────────────
+  assignmentList({ status, agentId } = {}) {
+    let sql = `
+      SELECT ca.*, tu.name AS agent_name, tu.color AS agent_color,
+             im.body AS last_message, im.received_at AS last_msg_at
+      FROM conversation_assignments ca
+      LEFT JOIN team_users tu ON tu.id = ca.agent_id
+      LEFT JOIN (
+        SELECT from_number, body, received_at,
+               ROW_NUMBER() OVER (PARTITION BY from_number ORDER BY received_at DESC) rn
+        FROM incoming_messages
+      ) im ON im.from_number = ca.phone AND im.rn = 1
+      WHERE 1=1
+    `;
+    const params = [];
+    if (status)  { sql += ' AND ca.status=?';   params.push(status); }
+    if (agentId) { sql += ' AND ca.agent_id=?'; params.push(agentId); }
+    sql += ' ORDER BY ca.assigned_at DESC';
+    return this._db.prepare(sql).all(...params);
+  }
+
+  assignmentUpsert(a) {
+    return this._db.prepare(`
+      INSERT INTO conversation_assignments (phone, session_id, agent_id, status, priority, tags, notes)
+      VALUES (@phone, @session_id, @agent_id, @status, @priority, @tags, @notes)
+      ON CONFLICT(phone) DO UPDATE SET
+        agent_id=excluded.agent_id, status=excluded.status,
+        priority=excluded.priority, tags=excluded.tags,
+        notes=excluded.notes, session_id=excluded.session_id,
+        assigned_at=CASE WHEN excluded.agent_id != conversation_assignments.agent_id
+                         THEN datetime('now') ELSE conversation_assignments.assigned_at END
+    `).run({
+      phone:      a.phone,
+      session_id: a.session_id || '',
+      agent_id:   a.agent_id   || null,
+      status:     a.status     || 'open',
+      priority:   a.priority   || 'normal',
+      tags:       a.tags       || '',
+      notes:      a.notes      || '',
+    });
+  }
+
+  assignmentResolve(phone) {
+    this._db.prepare(`
+      UPDATE conversation_assignments SET status='resolved', resolved_at=datetime('now')
+      WHERE phone=?
+    `).run(phone);
+  }
+
+  assignmentStats() {
+    const rows = this._db.prepare(`
+      SELECT ca.agent_id, tu.name AS agent_name, tu.color,
+             COUNT(*) AS total,
+             SUM(CASE WHEN ca.status='resolved' THEN 1 ELSE 0 END) AS resolved,
+             SUM(CASE WHEN ca.status='open' OR ca.status='in_progress' THEN 1 ELSE 0 END) AS open_count
+      FROM conversation_assignments ca
+      LEFT JOIN team_users tu ON tu.id = ca.agent_id
+      GROUP BY ca.agent_id
+    `).all();
+    return rows;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PHASE 7 — AUTOMATION SEQUENCES
+  // ═══════════════════════════════════════════════════════════════════════════
+  sequenceList() {
+    const seqs = this._db.prepare('SELECT * FROM sequences ORDER BY created_at DESC').all();
+    for (const s of seqs) {
+      s.steps = this._db.prepare(
+        'SELECT * FROM sequence_steps WHERE sequence_id=? ORDER BY step_order ASC'
+      ).all(s.id);
+      s.enrolled = this._db.prepare(
+        'SELECT COUNT(*) AS n FROM sequence_enrollments WHERE sequence_id=? AND completed=0'
+      ).get(s.id)?.n || 0;
+    }
+    return seqs;
+  }
+
+  sequenceGet(id) {
+    const s = this._db.prepare('SELECT * FROM sequences WHERE id=?').get(id);
+    if (!s) return null;
+    s.steps = this._db.prepare(
+      'SELECT * FROM sequence_steps WHERE sequence_id=? ORDER BY step_order ASC'
+    ).all(id);
+    return s;
+  }
+
+  sequenceSave(seq) {
+    const steps = seq.steps || [];
+    const tx = this._db.transaction(() => {
+      if (seq.id) {
+        this._db.prepare(`
+          UPDATE sequences SET name=?, trigger_type=?, trigger_value=?, session_id=?, active=?
+          WHERE id=?
+        `).run(seq.name, seq.trigger_type||'manual', seq.trigger_value||'',
+               seq.session_id||'', seq.active??1, seq.id);
+        this._db.prepare('DELETE FROM sequence_steps WHERE sequence_id=?').run(seq.id);
+      } else {
+        seq.id = require('crypto').randomUUID?.() || require('uuid').v4();
+        this._db.prepare(`
+          INSERT INTO sequences (id, name, trigger_type, trigger_value, session_id, active)
+          VALUES (?,?,?,?,?,?)
+        `).run(seq.id, seq.name, seq.trigger_type||'manual',
+               seq.trigger_value||'', seq.session_id||'', seq.active??1);
+      }
+      const stmt = this._db.prepare(`
+        INSERT INTO sequence_steps (sequence_id, step_order, delay_hours, message_body, media_path)
+        VALUES (?,?,?,?,?)
+      `);
+      steps.forEach((st, i) => stmt.run(seq.id, i, st.delay_hours||24, st.message_body||'', st.media_path||null));
+    });
+    tx();
+    return this.sequenceGet(seq.id);
+  }
+
+  sequenceDelete(id) {
+    this._db.prepare('DELETE FROM sequences WHERE id=?').run(id);
+  }
+
+  sequenceToggle(id) {
+    this._db.prepare(`
+      UPDATE sequences SET active = CASE WHEN active=1 THEN 0 ELSE 1 END WHERE id=?
+    `).run(id);
+    return this._db.prepare('SELECT active FROM sequences WHERE id=?').get(id)?.active;
+  }
+
+  // ─── Enrollments ──────────────────────────────────────────────────────────
+  sequenceEnroll({ sequenceId, phone, sessionId }) {
+    const seq = this.sequenceGet(sequenceId);
+    if (!seq || !seq.steps.length) return null;
+    const firstStep = seq.steps[0];
+    const nextSend = new Date(Date.now() + firstStep.delay_hours * 3600000).toISOString();
+    try {
+      this._db.prepare(`
+        INSERT OR IGNORE INTO sequence_enrollments
+          (sequence_id, phone, session_id, current_step, next_send_at, completed)
+        VALUES (?,?,?,0,?,0)
+      `).run(sequenceId, phone, sessionId||'', nextSend);
+    } catch (_) {}
+    return this._db.prepare(
+      'SELECT * FROM sequence_enrollments WHERE sequence_id=? AND phone=?'
+    ).get(sequenceId, phone);
+  }
+
+  sequenceUnenroll({ sequenceId, phone }) {
+    this._db.prepare(
+      'DELETE FROM sequence_enrollments WHERE sequence_id=? AND phone=?'
+    ).run(sequenceId, phone);
+  }
+
+  sequenceEnrollmentList(sequenceId) {
+    return this._db.prepare(
+      'SELECT * FROM sequence_enrollments WHERE sequence_id=? ORDER BY enrolled_at DESC'
+    ).all(sequenceId);
+  }
+
+  sequenceDueEnrollments() {
+    return this._db.prepare(`
+      SELECT se.*, s.name AS seq_name, s.session_id AS default_session,
+             ss.message_body, ss.media_path, ss.step_order, ss.delay_hours,
+             (SELECT COUNT(*) FROM sequence_steps WHERE sequence_id=se.sequence_id) AS total_steps
+      FROM sequence_enrollments se
+      JOIN sequences s ON s.id = se.sequence_id AND s.active=1
+      JOIN sequence_steps ss ON ss.sequence_id=se.sequence_id AND ss.step_order=se.current_step
+      WHERE se.completed=0 AND se.next_send_at <= datetime('now')
+      ORDER BY se.next_send_at ASC
+      LIMIT 50
+    `).all();
+  }
+
+  sequenceAdvanceEnrollment({ id, nextStep, totalSteps, delayHours }) {
+    if (nextStep >= totalSteps) {
+      this._db.prepare(`
+        UPDATE sequence_enrollments SET completed=1, completed_at=datetime('now') WHERE id=?
+      `).run(id);
+    } else {
+      const nextSend = new Date(Date.now() + delayHours * 3600000).toISOString();
+      this._db.prepare(`
+        UPDATE sequence_enrollments SET current_step=?, next_send_at=? WHERE id=?
+      `).run(nextStep, nextSend, id);
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PHASE 8 — RESELLER CLIENTS
+  // ═══════════════════════════════════════════════════════════════════════════
+  resellerClientList() {
+    const clients = this._db.prepare(
+      'SELECT * FROM reseller_clients ORDER BY created_at DESC'
+    ).all();
+    for (const c of clients) {
+      const today = new Date().toISOString().slice(0, 10);
+      const usage = this._db.prepare(
+        'SELECT * FROM client_usage WHERE client_id=? AND date=?'
+      ).get(c.id, today);
+      c.today_messages = usage?.messages_sent || 0;
+      c.today_sessions = usage?.sessions_used || 0;
+    }
+    return clients;
+  }
+
+  resellerClientGet(id) {
+    return this._db.prepare('SELECT * FROM reseller_clients WHERE id=?').get(id);
+  }
+
+  resellerClientSave(c) {
+    if (!c.id) {
+      c.id = require('crypto').randomUUID?.() || require('uuid').v4();
+      if (!c.license_key) c.license_key = this._genLicenseKey();
+      this._db.prepare(`
+        INSERT INTO reseller_clients (id,name,email,license_key,plan,max_sessions,max_msg_per_day,active,expires_at,notes)
+        VALUES (@id,@name,@email,@license_key,@plan,@max_sessions,@max_msg_per_day,@active,@expires_at,@notes)
+      `).run({
+        id: c.id, name: c.name, email: c.email||'',
+        license_key: c.license_key, plan: c.plan||'basic',
+        max_sessions: c.max_sessions||2, max_msg_per_day: c.max_msg_per_day||500,
+        active: c.active??1, expires_at: c.expires_at||null, notes: c.notes||'',
+      });
+    } else {
+      this._db.prepare(`
+        UPDATE reseller_clients SET name=@name,email=@email,plan=@plan,
+          max_sessions=@max_sessions,max_msg_per_day=@max_msg_per_day,
+          active=@active,expires_at=@expires_at,notes=@notes
+        WHERE id=@id
+      `).run({
+        id: c.id, name: c.name, email: c.email||'', plan: c.plan||'basic',
+        max_sessions: c.max_sessions||2, max_msg_per_day: c.max_msg_per_day||500,
+        active: c.active??1, expires_at: c.expires_at||null, notes: c.notes||'',
+      });
+    }
+    return this.resellerClientGet(c.id);
+  }
+
+  resellerClientDelete(id) {
+    this._db.prepare('DELETE FROM client_usage WHERE client_id=?').run(id);
+    this._db.prepare('DELETE FROM reseller_clients WHERE id=?').run(id);
+  }
+
+  resellerClientUsage(clientId, days = 30) {
+    const from = new Date(); from.setDate(from.getDate() - days);
+    return this._db.prepare(
+      'SELECT * FROM client_usage WHERE client_id=? AND date>=? ORDER BY date ASC'
+    ).all(clientId, from.toISOString().slice(0, 10));
+  }
+
+  resellerBumpUsage(clientId) {
+    const today = new Date().toISOString().slice(0, 10);
+    this._db.prepare(`
+      INSERT INTO client_usage (client_id, date, messages_sent, sessions_used)
+      VALUES (?,?,1,0)
+      ON CONFLICT(client_id,date) DO UPDATE SET messages_sent=messages_sent+1
+    `).run(clientId, today);
+  }
+
+  resellerStats() {
+    const total   = this._db.prepare('SELECT COUNT(*) AS n FROM reseller_clients').get()?.n || 0;
+    const active  = this._db.prepare('SELECT COUNT(*) AS n FROM reseller_clients WHERE active=1').get()?.n || 0;
+    const today   = new Date().toISOString().slice(0, 10);
+    const msgs    = this._db.prepare(
+      'SELECT COALESCE(SUM(messages_sent),0) AS n FROM client_usage WHERE date=?'
+    ).get(today)?.n || 0;
+    return { total, active, messages_today: msgs };
+  }
+
+  _genLicenseKey() {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    const seg   = (n) => Array.from({ length: n }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+    return `FT-${seg(4)}-${seg(4)}-${seg(4)}-${seg(4)}`;
+  }
+
+  // ─── Branding ─────────────────────────────────────────────────────────────
+  brandingGet() {
+    return {
+      app_name:     this.settingGet('brand_app_name')     || 'Fast Tech',
+      logo_path:    this.settingGet('brand_logo_path')    || '',
+      primary_color:this.settingGet('brand_primary_color')|| '#6366f1',
+      footer_text:  this.settingGet('brand_footer_text')  || 'Powered by Fast Tech',
+      show_powered: this.settingGet('brand_show_powered') !== '0',
+    };
+  }
+
+  brandingSave({ app_name, logo_path, primary_color, footer_text, show_powered }) {
+    if (app_name     !== undefined) this.settingSet('brand_app_name',     app_name);
+    if (logo_path    !== undefined) this.settingSet('brand_logo_path',    logo_path);
+    if (primary_color!== undefined) this.settingSet('brand_primary_color',primary_color);
+    if (footer_text  !== undefined) this.settingSet('brand_footer_text',  footer_text);
+    if (show_powered !== undefined) this.settingSet('brand_show_powered', show_powered ? '1' : '0');
+    return this.brandingGet();
   }
 }
 
