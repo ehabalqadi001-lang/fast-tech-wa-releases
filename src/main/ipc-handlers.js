@@ -59,6 +59,7 @@ function register(ipcMain, { db, waApi, waSvc, engine, scraper, scheduler, aiSvc
     antiBanSvc.on('session:suspended', (d) => _pushAll('antiban:suspended',   d));
     antiBanSvc.on('warmup:complete',   (d) => _pushAll('antiban:warmup:complete', d));
     antiBanSvc.on('rate-limit',        (d) => _pushAll('antiban:rate-limit',  d));
+    antiBanSvc.on('adaptive:adjusted', (d) => _pushAll('antiban:adaptive',    d));
   }
 
   function handle(channel, fn) {
@@ -235,7 +236,7 @@ function register(ipcMain, { db, waApi, waSvc, engine, scraper, scheduler, aiSvc
   });
 
   handle('messages:getHistory', (phone) => db.messageHistory(phone));
-  handle('messages:getStats',   ()      => db.messageStats());
+  handle('messages:getStats',   ()      => ({ ok: true, data: db.messageStats() }));
   handle('messages:search',       ({ query, limit }) => db.messagesFtsSearch(query, limit || 50));
   handle('messages:inboxSearch',  ({ query, limit }) => db.incomingMessagesFtsSearch(query, limit || 50));
   handle('campaigns:list',      ()      => db.campaignList());
@@ -1237,6 +1238,11 @@ function register(ipcMain, { db, waApi, waSvc, engine, scraper, scheduler, aiSvc
   handle('antiban:clearEvents', () => {
     db.antiBanEventClear();
     return { ok: true };
+  });
+
+  handle('antiban:adaptiveStatus', () => {
+    if (!antiBanSvc || typeof antiBanSvc.getAdaptiveStatus !== 'function') return {};
+    return antiBanSvc.getAdaptiveStatus();
   });
 
   // ── Phase 5: Chatbot Builder ──────────────────────────────────────────────

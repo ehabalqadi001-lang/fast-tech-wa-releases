@@ -1685,14 +1685,16 @@ async function loadDevices() {
   const stateBadge = { ready:'bg-g', qr:'bg-y', initializing:'bg-y', authenticated:'bg-y',
     disconnected:'bg-r', stopped:'', logged_out:'', auth_failed:'bg-r', error:'bg-r' };
 
-  // Fetch health scores in one call for all cards
-  let _healthMap = {};
+  // Fetch health scores + adaptive status in parallel
+  let _healthMap = {}, _adaptiveMap = {};
   if (IS_ELECTRON) {
-    try {
-      const hr = await BE.antiBan.getSessions();
-      const hs = Array.isArray(hr) ? hr : (hr?.data || []);
-      hs.forEach(h => { _healthMap[h.id] = h; });
-    } catch (_) {}
+    await Promise.all([
+      BE.antiBan.getSessions().then(hr => {
+        const hs = Array.isArray(hr) ? hr : (hr?.data || []);
+        hs.forEach(h => { _healthMap[h.id] = h; });
+      }).catch(() => {}),
+      BE.antiBan.adaptiveStatus().then(am => { _adaptiveMap = am || {}; }).catch(() => {}),
+    ]);
   }
 
   const cards = sessions.map(s => {
@@ -1704,8 +1706,10 @@ async function loadDevices() {
     const health  = hd?.healthScore ?? null;
     const hColor  = health === null ? 'var(--ts)' : health >= 70 ? '#22c55e' : health >= 40 ? '#f59e0b' : '#ef4444';
     const hLabel  = health === null ? '' : health >= 70 ? '✅' : health >= 40 ? '⚠️' : '🚫';
-    const isBanned = hd?.banDetected;
+    const isBanned   = hd?.banDetected;
     const inCooldown = hd?.suspended && !isBanned;
+    const adp        = _adaptiveMap[s.id];
+    const isAdapted  = adp?.override;
     return `
       <div class="ac" style="flex-direction:column;align-items:flex-start;gap:8px;min-height:160px">
         <div class="flex ic jb wf">
@@ -1713,6 +1717,7 @@ async function loadDevices() {
           <div class="flex gap4 ic">
             ${isBanned   ? `<span class="bge bg-r f10">🚫 محظور</span>` : ''}
             ${inCooldown ? `<span class="bge bg-y f10">⏸️ موقوف</span>` : ''}
+            ${isAdapted  ? `<span class="bge bg-y f10" title="تم تعديل التأخير تلقائياً — معدل الخطأ ${adp.errRate}%">🛡️ ${adp.override}</span>` : ''}
             <span class="bge ${badge} f11">${lbl}</span>
           </div>
         </div>
@@ -1845,6 +1850,12 @@ if (IS_ELECTRON) {
   });
 
   BE.on('wa:stateChange', () => loadDevices());
+
+  BE.on('antiban:adaptive', (d) => {
+    const dir = d.direction === 'up' ? '⬆️ تصعيد' : '⬇️ استعادة';
+    showN(`🛡️ Anti-Ban تكيّفي`, `${dir} للجلسة — بروفايل: ${d.profile} (خطأ ${d.errRate}%)`, 'warn');
+    if (document.getElementById('p-devices')?.classList.contains('on')) loadDevices();
+  });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -4073,7 +4084,9 @@ async function reloadConversation(phone) {
     const time = m.created_at ? new Date(m.created_at).toLocaleString('ar') : '';
     const bg   = out ? 'rgba(99,102,241,.1)' : 'rgba(255,255,255,.04)';
     const align= out ? 'flex-end' : 'flex-start';
-    return `<div style="display:flex;justify-content:${align}">
+    const dir  = out ? 'out' : 'in';
+    const body = (m.body||'').slice(0, 300);
+    return `<div style="display:flex;justify-content:${align}" data-dir="${dir}" data-body="${escH(body)}">
       <div style="max-width:80%;background:${bg};border:1px solid rgba(var(--ar),.12);border-radius:10px;padding:10px 14px">
         <div class="f11 ts mb4">${out ? '📤 أنت' : '📩 ' + escH(phone)} · ${time}</div>
         <div class="f12" style="white-space:pre-wrap">${escH(m.body||'')}</div>
@@ -4091,8 +4104,49 @@ async function sendConvReply() {
   const r = await safeIpc(() => BE.wa.send.text({ sessionId: session, to: _convPhone, body }));
   if (r) {
     document.getElementById('conv-reply-input').value = '';
+    _hideSmartSuggestions();
     await reloadConversation(_convPhone);
   }
+}
+
+function _hideSmartSuggestions() {
+  const el = document.getElementById('conv-smart-suggestions');
+  if (el) { el.style.display = 'none'; el.innerHTML = ''; }
+}
+
+async function getSmartReplies() {
+  if (!IS_ELECTRON) return;
+  const btn  = document.getElementById('conv-smart-btn');
+  const sugEl= document.getElementById('conv-smart-suggestions');
+  if (!btn || !sugEl) return;
+
+  btn.disabled  = true;
+  btn.textContent = '⏳';
+  sugEl.style.display = 'flex';
+  sugEl.innerHTML = '<span class="f11 ts" style="padding:4px">جارٍ التفكير...</span>';
+
+  // Build conversation array from rendered thread
+  const thread = document.getElementById('conv-thread');
+  const conversation = [];
+  if (thread) {
+    thread.querySelectorAll('[data-dir]').forEach(el => {
+      conversation.push({ dir: el.dataset.dir, body: el.dataset.body || '' });
+    });
+  }
+
+  const res = await safeIpc(() => BE.ai.smartReplies({ conversation, contactName: _convPhone }));
+  btn.disabled  = false;
+  btn.textContent = '🤖';
+
+  const suggestions = res?.suggestions || [];
+  if (!suggestions.length) {
+    sugEl.innerHTML = '<span class="f11 ts" style="padding:4px">لا توجد اقتراحات</span>';
+    return;
+  }
+  sugEl.innerHTML = suggestions.map(s =>
+    `<button class="btn bo bsm" style="font-size:11px;padding:4px 10px;white-space:nowrap"
+             onclick="document.getElementById('conv-reply-input').value=${JSON.stringify(s)};_hideSmartSuggestions()">${escH(s)}</button>`
+  ).join('');
 }
 
 // ══════════════════════════════════════════════════════════════════════════

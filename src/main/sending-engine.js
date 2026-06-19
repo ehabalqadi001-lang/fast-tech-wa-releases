@@ -189,7 +189,10 @@ class SendingEngine extends EventEmitter {
           try { this._db.campaignScriptIncrSent(item.campaign_id, scriptIndex); } catch (_) {}
         }
       }
-      if (this._ab) this._ab.recordSend(sessionId);
+      if (this._ab) {
+        this._ab.recordSend(sessionId);
+        if (typeof this._ab.recordSendResult === 'function') this._ab.recordSendResult(sessionId, true);
+      }
 
       this.emit('sent', { itemId: item.id, recipient: item.recipient, sessionId, waId, scriptIndex });
       console.log(`[Engine] Sent → ${item.recipient} via ${sessionId} [script ${scriptIndex}]`);
@@ -224,6 +227,7 @@ class SendingEngine extends EventEmitter {
         } else {
           this._ab.recordError(sessionId, 'send_error');
         }
+        if (typeof this._ab.recordSendResult === 'function') this._ab.recordSendResult(sessionId, false);
       }
 
       if (attempts >= (item.max_attempts || 3)) {

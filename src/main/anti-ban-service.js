@@ -60,6 +60,8 @@ class AntiBanService extends EventEmitter {
     this._settings = {};     // cached settings from DB
     this._cronJob  = null;
     this._cronHour = null;
+    // Adaptive Anti-Ban: rolling window per session
+    this._adaptive = new Map(); // sessionId → { results: bool[], override: string|null }
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -350,17 +352,93 @@ class AntiBanService extends EventEmitter {
    * Halves the range if a session's health is low (SLOW_BELOW).
    */
   getDelay(sessionId) {
-    const profile = DELAY_PROFILES[this._settings.delayProfile] || DELAY_PROFILES.normal;
+    let profileName = this._settings.delayProfile || 'normal';
+
+    // Apply adaptive override (escalated profile) if present
+    if (sessionId && this._adaptive.has(sessionId)) {
+      const adp = this._adaptive.get(sessionId);
+      if (adp.override) profileName = adp.override;
+    }
+
+    const profile = DELAY_PROFILES[profileName] || DELAY_PROFILES.normal;
+
     if (sessionId) {
       const session = this._db.sessionGetAntiBan(sessionId);
       const health  = session?.health_score ?? 80;
       if (health < HEALTH.SLOW_BELOW) {
-        // Low-health session: force at least SLOW profile
         const slow = DELAY_PROFILES.slow;
         return { min: Math.max(profile.min, slow.min), max: Math.max(profile.max, slow.max) };
       }
     }
     return profile;
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // ADAPTIVE ANTI-BAN
+  // ══════════════════════════════════════════════════════════════════════════
+
+  // Profile escalation order (from most permissive to most restrictive)
+  static _PROFILE_ORDER = ['fast', 'normal', 'slow', 'stealth'];
+
+  /**
+   * Record the result of a send attempt for adaptive analysis.
+   * @param {string} sessionId
+   * @param {boolean} success  true = sent OK, false = failed/error
+   */
+  recordSendResult(sessionId, success) {
+    if (!sessionId) return;
+    if (!this._adaptive.has(sessionId)) {
+      this._adaptive.set(sessionId, { results: [], override: null });
+    }
+    const state = this._adaptive.get(sessionId);
+    state.results.push(success);
+    if (state.results.length > 30) state.results.shift(); // rolling window of 30
+
+    this._adaptiveCheck(sessionId, state);
+  }
+
+  _adaptiveCheck(sessionId, state) {
+    if (state.results.length < 10) return; // need at least 10 data points
+
+    const errors  = state.results.filter(r => !r).length;
+    const total   = state.results.length;
+    const errRate = errors / total;
+
+    const baseProfile  = this._settings.delayProfile || 'normal';
+    const order        = AntiBanService._PROFILE_ORDER;
+    const currentIdx   = order.indexOf(state.override || baseProfile);
+
+    if (errRate > 0.30 && currentIdx < order.length - 1) {
+      // Error rate > 30% — escalate to next slower profile
+      const newProfile = order[currentIdx + 1];
+      if (newProfile !== state.override) {
+        state.override = newProfile;
+        console.log(`[AntiBan] Adaptive: session ${sessionId} escalated to "${newProfile}" (errRate=${Math.round(errRate*100)}%)`);
+        this.emit('adaptive:adjusted', { sessionId, profile: newProfile, errRate: Math.round(errRate*100), direction: 'up' });
+      }
+    } else if (errRate < 0.10 && state.override && currentIdx > order.indexOf(baseProfile)) {
+      // Error rate < 10% — step back toward base profile
+      const newProfile = order[currentIdx - 1];
+      const resolved   = newProfile === baseProfile ? null : newProfile;
+      state.override   = resolved;
+      console.log(`[AntiBan] Adaptive: session ${sessionId} restored to "${resolved || baseProfile}" (errRate=${Math.round(errRate*100)}%)`);
+      this.emit('adaptive:adjusted', { sessionId, profile: resolved || baseProfile, errRate: Math.round(errRate*100), direction: 'down' });
+    }
+  }
+
+  /** Returns per-session adaptive status for the renderer */
+  getAdaptiveStatus() {
+    const result = {};
+    for (const [id, state] of this._adaptive) {
+      const errors  = state.results.filter(r => !r).length;
+      const total   = state.results.length;
+      result[id] = {
+        override:  state.override,
+        errRate:   total ? Math.round(errors / total * 100) : 0,
+        samples:   total,
+      };
+    }
+    return result;
   }
 
   // ══════════════════════════════════════════════════════════════════════════

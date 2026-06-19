@@ -232,6 +232,7 @@ contextBridge.exposeInMainWorld('ftwa', {
     enableWarmup:    (id)          => ipcRenderer.invoke('antiban:enableWarmup',     id),
     disableWarmup:   (id)          => ipcRenderer.invoke('antiban:disableWarmup',    id),
     clearEvents:     ()            => ipcRenderer.invoke('antiban:clearEvents'),
+    adaptiveStatus:  ()            => ipcRenderer.invoke('antiban:adaptiveStatus'),
   },
 
   // ── License ───────────────────────────────────────────────────────────────
@@ -375,6 +376,7 @@ contextBridge.exposeInMainWorld('ftwa', {
       'antiban:suspended',
       'antiban:warmup:complete',
       'antiban:rate-limit',
+      'antiban:adaptive',
       // Campaign progress
       'campaign:progress:live',
       // AI streaming
