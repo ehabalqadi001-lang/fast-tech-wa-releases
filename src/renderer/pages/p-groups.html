@@ -3,7 +3,8 @@
     <div class="ph-l"><div class="ph-ic">🏘️</div><div><h1>GROUPS</h1><p id="groups-subtitle">سحب بيانات المجموعات من WhatsApp</p></div></div>
     <div class="flex gap8">
       <button class="btn bo bsm" onclick="exportGroupsExcel()">📊 تصدير Excel</button>
-      <button class="btn bp bsm" onclick="nav('campaigns')">📢 إرسال للمجموعات</button>
+      <button class="btn bp bsm" onclick="_groupsSelected.size>0 ? openSendToGroupBulk() : beErr('حدد مجموعة أو أكثر من القائمة أولاً')">📤 إرسال للمحددة</button>
+      <button class="btn bo bsm" onclick="nav('engine')">⚡ محرك الإرسال</button>
     </div>
   </div>
 

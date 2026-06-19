@@ -219,6 +219,7 @@ function register(ipcMain, { db, waApi, waSvc, engine, scraper, scheduler, aiSvc
   handle('messages:getHistory', (phone) => db.messageHistory(phone));
   handle('messages:getStats',   ()      => db.messageStats());
   handle('messages:search',     ({ query, limit }) => db.messagesFtsSearch(query, limit || 50));
+  handle('campaigns:list',      ()      => db.campaignList());
 
   // ══════════════════════════════════════════════════════════════════════════
   // SCHEDULER

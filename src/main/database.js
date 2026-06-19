@@ -631,6 +631,25 @@ class Db {
       this.settingSet('db_version', '15');
       v = 15;
     }
+
+    if (v < 16) {
+      // Add media_path to scheduled_tasks so scheduler can attach files
+      const stCols = this._db.pragma('table_info(scheduled_tasks)').map(c => c.name);
+      if (!stCols.includes('media_path'))
+        this._db.exec(`ALTER TABLE scheduled_tasks ADD COLUMN media_path TEXT`);
+      if (!stCols.includes('session_id'))
+        this._db.exec(`ALTER TABLE scheduled_tasks ADD COLUMN session_id TEXT`);
+      // Add reply_to / notes to incoming_messages for inbox enhancements
+      const imCols = this._db.pragma('table_info(incoming_messages)').map(c => c.name);
+      if (!imCols.includes('assigned_agent_id'))
+        this._db.exec(`ALTER TABLE incoming_messages ADD COLUMN assigned_agent_id TEXT`);
+      if (!imCols.includes('label'))
+        this._db.exec(`ALTER TABLE incoming_messages ADD COLUMN label TEXT DEFAULT 'none'`);
+      if (!imCols.includes('replied'))
+        this._db.exec(`ALTER TABLE incoming_messages ADD COLUMN replied INTEGER DEFAULT 0`);
+      this.settingSet('db_version', '16');
+      v = 16;
+    }
   }
 
   // ─── FTS Search ───────────────────────────────────────────────────────────

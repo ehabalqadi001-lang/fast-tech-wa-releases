@@ -61,6 +61,10 @@ contextBridge.exposeInMainWorld('ftwa', {
     search:      (query, limit) => ipcRenderer.invoke('messages:search',      { query, limit }),
   },
 
+  campaigns: {
+    list: () => ipcRenderer.invoke('campaigns:list'),
+  },
+
   // ── Scheduler ─────────────────────────────────────────────────────────────
   scheduler: {
     list:     ()      => ipcRenderer.invoke('scheduler:list'),

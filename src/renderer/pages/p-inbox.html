@@ -81,6 +81,24 @@
   </div>
 </div>
 
+<!-- MODAL: Enroll from inbox into sequence -->
+<div class="mo" id="m-enroll-inbox">
+  <div class="md" style="max-width:420px">
+    <div class="md-tt">🔄 تسجيل في تسلسل أتمتة</div>
+    <div class="f12 ts mb14">سيتم إضافة الرقم <b class="ta" id="enroll-phone-display">—</b> إلى التسلسل المحدد</div>
+    <div class="fg">
+      <label class="fl">اختر التسلسل</label>
+      <select id="enroll-seq-sel" class="fc">
+        <option value="">جاري التحميل...</option>
+      </select>
+    </div>
+    <div class="md-cl">
+      <button class="btn bo" onclick="closeM('m-enroll-inbox')">إلغاء</button>
+      <button class="btn bp" onclick="confirmEnrollFromInbox()">🔄 تسجيل</button>
+    </div>
+  </div>
+</div>
+
 <!-- ══════════════════════════════════════════════════════════════════════ -->
 <!-- PAGE: ANTI-BAN                                                        -->
 <!-- ══════════════════════════════════════════════════════════════════════ -->

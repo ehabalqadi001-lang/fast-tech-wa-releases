@@ -133,6 +133,20 @@
       <span>⏳ متبقي: <b id="eng-prog-left">0</b></span>
     </div>
   </div>
+
+  <!-- Campaign History (inline so user doesn't need to navigate) -->
+  <div class="card" style="margin-top:8px">
+    <div class="ct jb">
+      <span>📋 سجل الحملات</span>
+      <div class="flex gap8">
+        <button class="btn bo bsm" onclick="retryFailedMessages()">🔁 إعادة الفاشلة</button>
+        <button class="btn bo bsm" onclick="loadCampaigns()">🔄 تحديث</button>
+      </div>
+    </div>
+    <div id="campaigns-list">
+      <div style="text-align:center;padding:28px;opacity:.5" class="f12 ts">جاري تحميل الحملات...</div>
+    </div>
+  </div>
 </div>
 
 <!-- ══════════════════════════════════════════════════════════════════════ -->

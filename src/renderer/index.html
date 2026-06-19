@@ -48,47 +48,60 @@
 
 <!-- ═══════ SIDEBAR ═══════ -->
 <aside id="sb">
+  <!-- 1. لوحة التحكم -->
   <div class="nb-sec">
     <div class="nb-hd">لوحة التحكم</div>
     <div class="ni on" onclick="nav('dashboard')"><span class="ni-ic">📊</span><span class="ni-lb">Dashboard</span></div>
   </div>
   <div class="ndiv"></div>
+  <!-- 2. الأجهزة والحسابات -->
   <div class="nb-sec">
-    <div class="nb-hd">إدارة الحسابات</div>
-    <div class="ni" onclick="nav('accounts')"><span class="ni-ic">📱</span><span class="ni-lb">الحسابات</span><span class="nb-badge" id="nb-accounts">0</span></div>
+    <div class="nb-hd">الأجهزة والحسابات</div>
+    <div class="ni" onclick="nav('devices')"><span class="ni-ic">📲</span><span class="ni-lb">أجهزة Web QR</span><span class="nb-badge" id="nb-devices">0</span></div>
+    <div class="ni" onclick="nav('accounts')"><span class="ni-ic">📱</span><span class="ni-lb">حسابات Cloud API</span><span class="nb-badge" id="nb-accounts">0</span></div>
+    <div class="ni" onclick="nav('antiban')"><span class="ni-ic">🛡️</span><span class="ni-lb">حماية Anti-Ban</span></div>
+  </div>
+  <div class="ndiv"></div>
+  <!-- 3. جهات الاتصال -->
+  <div class="nb-sec">
+    <div class="nb-hd">جهات الاتصال والمجموعات</div>
     <div class="ni" onclick="nav('contacts')"><span class="ni-ic">👥</span><span class="ni-lb">جهات الاتصال</span></div>
     <div class="ni" onclick="nav('groups')"><span class="ni-ic">🏘️</span><span class="ni-lb">المجموعات</span></div>
   </div>
   <div class="ndiv"></div>
+  <!-- 4. الإرسال والحملات -->
   <div class="nb-sec">
-    <div class="nb-hd">الرسائل والحملات</div>
+    <div class="nb-hd">الإرسال والحملات</div>
+    <div class="ni" onclick="nav('engine')"><span class="ni-ic">⚡</span><span class="ni-lb">محرك الإرسال</span></div>
     <div class="ni" onclick="nav('campaigns')"><span class="ni-ic">📢</span><span class="ni-lb">الحملات</span></div>
     <div class="ni" onclick="nav('scheduler')"><span class="ni-ic">📅</span><span class="ni-lb">الجدولة</span><span class="nb-badge" id="nb-scheduler">0</span></div>
     <div class="ni" onclick="nav('templates')"><span class="ni-ic">📝</span><span class="ni-lb">القوالب</span></div>
     <div class="ni" onclick="nav('media')"><span class="ni-ic">🖼️</span><span class="ni-lb">مكتبة الوسائط</span></div>
   </div>
   <div class="ndiv"></div>
+  <!-- 5. صندوق الوارد -->
   <div class="nb-sec">
-    <div class="nb-hd">الأدوات المتقدمة</div>
-    <div class="ni" onclick="nav('ai')"><span class="ni-ic">🤖</span><span class="ni-lb">مساعد AI</span></div>
-    <div class="ni" onclick="nav('crm')"><span class="ni-ic">🔗</span><span class="ni-lb">ربط CRM</span></div>
-    <div class="ni" onclick="nav('reports')"><span class="ni-ic">📈</span><span class="ni-lb">التقارير</span></div>
-  </div>
-  <div class="ndiv"></div>
-  <div class="nb-sec">
-    <div class="nb-hd">واتساب ويب — QR</div>
-    <div class="ni" onclick="nav('devices')"><span class="ni-ic">📲</span><span class="ni-lb">الأجهزة</span><span class="nb-badge" id="nb-devices">0</span></div>
-    <div class="ni" onclick="nav('engine')"><span class="ni-ic">⚡</span><span class="ni-lb">محرك الإرسال</span></div>
+    <div class="nb-hd">التواصل</div>
     <div class="ni" onclick="nav('inbox')"><span class="ni-ic">📩</span><span class="ni-lb">صندوق الوارد</span><span class="nb-badge" id="nb-inbox" style="display:none">0</span></div>
-    <div class="ni" onclick="nav('antiban')"><span class="ni-ic">🛡️</span><span class="ni-lb">حماية Anti-Ban</span></div>
+    <div class="ni" onclick="nav('chatbot')"><span class="ni-ic">🤖</span><span class="ni-lb">روبوت الدردشة</span></div>
   </div>
   <div class="ndiv"></div>
+  <!-- 6. الأتمتة والذكاء -->
   <div class="nb-sec">
-    <div class="nb-hd">الفريق والأتمتة</div>
-    <div class="ni" onclick="nav('team')"><span class="ni-ic">👨‍💼</span><span class="ni-lb">إدارة الفريق</span><span class="nb-badge" id="nb-team" style="display:none">0</span></div>
+    <div class="nb-hd">الأتمتة والذكاء</div>
     <div class="ni" onclick="nav('sequences')"><span class="ni-ic">🔄</span><span class="ni-lb">تسلسلات الأتمتة</span><span class="nb-badge" id="nb-sequences" style="display:none">0</span></div>
+    <div class="ni" onclick="nav('ai')"><span class="ni-ic">✨</span><span class="ni-lb">مساعد AI</span></div>
+    <div class="ni" onclick="nav('team')"><span class="ni-ic">👨‍💼</span><span class="ni-lb">إدارة الفريق</span><span class="nb-badge" id="nb-team" style="display:none">0</span></div>
   </div>
   <div class="ndiv"></div>
+  <!-- 7. التحليلات والأدوات -->
+  <div class="nb-sec">
+    <div class="nb-hd">التحليلات والأدوات</div>
+    <div class="ni" onclick="nav('reports')"><span class="ni-ic">📈</span><span class="ni-lb">التقارير</span></div>
+    <div class="ni" onclick="nav('crm')"><span class="ni-ic">🔗</span><span class="ni-lb">ربط CRM</span></div>
+  </div>
+  <div class="ndiv"></div>
+  <!-- 8. الريسيلر -->
   <div class="nb-sec">
     <div class="nb-hd">الريسيلر</div>
     <div class="ni" onclick="nav('reseller')"><span class="ni-ic">🏪</span><span class="ni-lb">لوحة الريسيلر</span><span class="nb-badge" id="nb-reseller" style="display:none">0</span></div>

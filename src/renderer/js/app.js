@@ -4,6 +4,40 @@ const IS_ELECTRON = !!BE;
 function beErr(msg) { showN('خطأ', msg, '❌'); }
 function beOk(msg)  { showN('نجاح', msg, '✅'); }
 
+// ── Shared media picker utilities ──────────────────────────────────────────
+const _mediaIcons = { image: '🖼️', video: '🎬', document: '📎' };
+
+async function _pickMediaFile(filterType = 'all') {
+  if (!IS_ELECTRON) return null;
+  const filterMap = {
+    all:      [{ name: 'وسائط', extensions: ['jpg','jpeg','png','gif','webp','mp4','mov','avi','pdf','docx','xlsx','pptx','zip','rar'] }],
+    image:    [{ name: 'صور',   extensions: ['jpg','jpeg','png','gif','webp'] }],
+    video:    [{ name: 'فيديو', extensions: ['mp4','avi','mov','mkv','3gp'] }],
+    document: [{ name: 'مستندات', extensions: ['pdf','docx','xlsx','pptx','txt','zip','rar'] }],
+  };
+  return await BE.openFile({ filters: filterMap[filterType] || filterMap.all });
+}
+
+function _mediaTypeFromPath(fp) {
+  const ext = fp.split('.').pop().toLowerCase();
+  if (['jpg','jpeg','png','gif','webp'].includes(ext)) return 'image';
+  if (['mp4','mov','avi','mkv','3gp'].includes(ext)) return 'video';
+  return 'document';
+}
+
+// ── Shared session select helper ───────────────────────────────────────────
+function _fillSessionSelect(selId, sessions, placeholder = 'اختر جلسة...') {
+  const sel = document.getElementById(selId);
+  if (!sel) return;
+  sel.innerHTML = `<option value="">${placeholder}</option>`;
+  sessions.forEach(s => {
+    const o = document.createElement('option');
+    o.value = s.id;
+    o.textContent = `📱 ${s.name || s.id}${s.phone ? ' (+' + s.phone + ')' : ''}`;
+    sel.appendChild(o);
+  });
+}
+
 // ── Real header stats ──────────────────────────────────────────────────────
 async function updateStats() {
   if (!IS_ELECTRON) return;
@@ -694,24 +728,51 @@ async function deduplicateContacts() {
 // ── Campaigns ──────────────────────────────────────────────────────────────
 async function loadCampaigns() {
   if (!IS_ELECTRON) return;
-  const r = await BE.messages.getStats();
   const el = document.getElementById('campaigns-list');
   if (!el) return;
-  if (!r.ok) {
-    el.innerHTML = '<div class="f12 ts" style="padding:18px;text-align:center">لا توجد بيانات</div>';
-    return;
-  }
-  const s = r.data;
+
+  const [statsR, listR] = await Promise.all([BE.messages.getStats(), BE.campaigns.list()]);
+  const s = statsR.ok ? statsR.data : {};
+  const campaigns = Array.isArray(listR) ? listR : [];
+
   const sub = document.getElementById('campaigns-subtitle');
-  if (sub) sub.textContent = `إجمالي المُرسَل: ${(s.sent||0).toLocaleString()} رسالة`;
-  el.innerHTML = `
-    <div class="flex gap20" style="padding:18px 0;border-bottom:1px solid rgba(var(--ar),.08)">
+  if (sub) sub.textContent = `إجمالي المُرسَل: ${(s.sent||0).toLocaleString()} رسالة — ${campaigns.length} حملة`;
+
+  const statsHtml = `
+    <div class="flex gap20 mb14" style="padding:12px 0;border-bottom:1px solid rgba(var(--ar),.08)">
       <div><div class="ta fm f13">${(s.sent||0).toLocaleString()}</div><div class="f11 ts">إجمالي مُرسَل</div></div>
       <div><div class="fm f13" style="color:#3b82f6">${(s.read_count||0).toLocaleString()}</div><div class="f11 ts">مقروء</div></div>
       <div><div class="fm f13" style="color:#bf00ff">${(s.replies||0).toLocaleString()}</div><div class="f11 ts">ردود</div></div>
       <div><div class="fm f13" style="color:#ef4444">${(s.failed||0).toLocaleString()}</div><div class="f11 ts">فاشل</div></div>
-    </div>
-    <div class="f12 ts mt14">لعرض تفاصيل الحملات والإرسال الجماعي — استخدم <button class="btn bo bsm" onclick="nav('engine')">⚡ محرك الإرسال</button></div>`;
+    </div>`;
+
+  if (!campaigns.length) {
+    el.innerHTML = statsHtml + '<div class="f12 ts" style="padding:18px;text-align:center;opacity:.6">لا توجد حملات — ابدأ إرسالاً جماعياً من محرك الإرسال</div>';
+    return;
+  }
+
+  const statusMap = { pending:'⏳ انتظار', running:'⚡ جارٍ', done:'✅ مكتمل', failed:'❌ فاشل', paused:'⏸️ متوقف' };
+  const statusColor = { pending:'#f59e0b', running:'var(--acc)', done:'#22c55e', failed:'#ef4444', paused:'#94a3b8' };
+  const rows = campaigns.slice(0, 50).map(c => {
+    const pct   = c.total > 0 ? Math.round((c.sent || 0) / c.total * 100) : 0;
+    const color = statusColor[c.status] || '#94a3b8';
+    const dt    = c.created_at ? new Date(c.created_at).toLocaleString('ar') : '';
+    return `<div style="padding:10px 0;border-bottom:1px solid rgba(var(--ar),.06)">
+      <div class="flex ic jb mb4">
+        <span class="f12 fw7">${c.name || 'حملة'}</span>
+        <span class="f11" style="color:${color}">${statusMap[c.status] || c.status}</span>
+      </div>
+      <div style="background:rgba(var(--ar),.08);border-radius:4px;height:6px;overflow:hidden;margin-bottom:4px">
+        <div style="height:100%;background:${color};width:${pct}%;transition:width .4s"></div>
+      </div>
+      <div class="flex ic jb f11 ts">
+        <span>${(c.sent||0).toLocaleString()} / ${(c.total||0).toLocaleString()} رسالة (${pct}%)</span>
+        <span>${dt}</span>
+      </div>
+    </div>`;
+  }).join('');
+
+  el.innerHTML = statsHtml + rows;
 }
 
 function setCampaignsView(view) {
@@ -1006,15 +1067,9 @@ function updateSchPreview() {
 }
 
 async function pickSchMedia() {
-  if (!IS_ELECTRON) return;
-  const fp = await BE.openFile({ filters:[
-    { name:'وسائط', extensions:['jpg','jpeg','png','gif','mp4','mov','pdf','doc','docx','xls','xlsx','zip'] }
-  ]});
+  const fp = await _pickMediaFile();
   if (!fp) return;
-  const ext = fp.split('.').pop().toLowerCase();
-  const type = ['jpg','jpeg','png','gif','webp'].includes(ext) ? 'image'
-             : ['mp4','mov','avi'].includes(ext) ? 'video'
-             : 'document';
+  const type = _mediaTypeFromPath(fp);
   document.getElementById('sch-media-path').value = fp;
   document.getElementById('sch-media-type').value = type;
   document.getElementById('sch-media-label').textContent = fp.split(/[\\/]/).pop();
@@ -1672,20 +1727,8 @@ async function loadDevices() {
 
 function _populateSessionSelects(sessions) {
   const readySessions = sessions.filter(s => s.state === 'ready' || s.active);
-  ['eng-session','inbox-filter'].forEach(selId => {
-    const sel = document.getElementById(selId);
-    if (!sel) return;
-    const first = sel.options[0];
-    sel.innerHTML = '';
-    sel.appendChild(first);
-    readySessions.forEach(s => {
-      const opt = document.createElement('option');
-      opt.value = s.id;
-      opt.textContent = `📱 ${s.name}${s.phone ? ' ('+s.phone+')' : ''}`;
-      sel.appendChild(opt);
-    });
-  });
-  // Refresh A/B account checkboxes
+  _fillSessionSelect('eng-session',   readySessions, 'كل الجلسات');
+  _fillSessionSelect('inbox-filter',  readySessions, 'كل الجلسات');
   refreshAccCheckList(readySessions);
 }
 
@@ -1832,11 +1875,9 @@ async function clearEngineQueue() {
 }
 
 async function pickEngineMedia() {
-  if (!IS_ELECTRON) { beOk('اختيار ملف (وضع العرض)'); return; }
-  const fp = await BE.openFile({ filters:[
-    { name: 'Media', extensions: ['jpg','jpeg','png','gif','mp4','pdf','doc','docx'] }
-  ]});
-  if (fp) document.getElementById('eng-media-path').value = fp;
+  const fp = await _pickMediaFile();
+  if (!fp) return;
+  document.getElementById('eng-media-path').value = fp;
 }
 
 async function importEngineContacts() {
@@ -2061,11 +2102,10 @@ function removeAbSlot(slotId) {
 }
 
 async function pickAbSlotMedia(btn) {
-  if (!IS_ELECTRON) { beOk('اختيار ملف متاح في النسخة الكاملة فقط'); return; }
   const slot  = btn.closest('.ab-slot');
   const input = slot?.querySelector('.ab-media');
   if (!input) return;
-  const fp = await BE.openFile({ filters:[{ name: 'Media', extensions: ['jpg','jpeg','png','gif','mp4','pdf','doc','docx'] }] });
+  const fp = await _pickMediaFile();
   if (fp) input.value = fp;
 }
 
@@ -2355,6 +2395,8 @@ async function loadInbox() {
       !m.read ? `<button class="btn bo bsm" onclick="markMsgRead('${m.id}',this)" title="تحديد كمقروء">✔</button>` : '',
       `<button class="btn bp bsm" onclick="openReplyModal('${m.id}','${phone}','${bodySnippet.replace(/'/g,'')}','${sessionLabel}')" title="رد">↩️ رد</button>`,
       `<button class="btn bo bsm" onclick="openConversation('${phone}')" title="عرض المحادثة">💬</button>`,
+      `<button class="btn bo bsm" onclick="openAssignModal('${phone}')" title="تعيين لعضو فريق">👤</button>`,
+      `<button class="btn bo bsm" onclick="openEnrollFromInbox('${phone}')" title="تسجيل في تسلسل">🔄</button>`,
     ].join(' ');
     return `<tr style="${!m.read ? 'background:rgba(var(--ar),.04)' : ''}">
       <td class="f11 ts" style="white-space:nowrap">${sessionLabel}</td>
@@ -2368,18 +2410,9 @@ async function loadInbox() {
   : '<tr><td colspan="6" style="text-align:center;padding:32px;opacity:.5">لا توجد رسائل</td></tr>';
 
   // Populate session filter dropdown if empty
-  const filterSel = document.getElementById('inbox-filter');
-  if (filterSel && filterSel.options.length <= 1) {
+  if (document.getElementById('inbox-filter')?.options.length <= 1) {
     const sessR = await BE.wa.sessions.list();
-    if (sessR.ok) {
-      sessR.data.forEach(s => {
-        if (!filterSel.querySelector(`option[value="${s.id}"]`)) {
-          const o = document.createElement('option');
-          o.value = s.id; o.textContent = '📱 ' + (s.name || s.id);
-          filterSel.appendChild(o);
-        }
-      });
-    }
+    if (sessR.ok) _fillSessionSelect('inbox-filter', sessR.data.filter(s=>s.state==='ready'), 'كل الأجهزة');
   }
 }
 
@@ -2448,6 +2481,31 @@ async function sendInboxReply() {
   }
 }
 
+// ── Enroll contact from inbox into a sequence ────────────────────────────
+let _enrollInboxPhone = '';
+async function openEnrollFromInbox(phone) {
+  _enrollInboxPhone = phone;
+  const sel = document.getElementById('enroll-seq-sel');
+  if (!sel) { beErr('عنصر القائمة غير موجود — أعد تحميل الصفحة'); return; }
+  sel.innerHTML = '<option value="">جاري التحميل...</option>';
+  if (IS_ELECTRON) {
+    const r = await BE.sequences.list();
+    const seqs = r.ok ? (r.data||[]).filter(s=>s.active) : [];
+    sel.innerHTML = seqs.length
+      ? '<option value="">اختر تسلسلاً...</option>' + seqs.map(s=>`<option value="${s.id}">${s.name}</option>`).join('')
+      : '<option value="">لا توجد تسلسلات نشطة</option>';
+  }
+  document.getElementById('enroll-phone-display').textContent = '+' + phone;
+  openM('m-enroll-inbox');
+}
+async function confirmEnrollFromInbox() {
+  const seqId = document.getElementById('enroll-seq-sel').value;
+  if (!seqId) { beErr('اختر تسلسلاً'); return; }
+  const r = await BE.sequences.enroll({ sequenceId: seqId, phone: _enrollInboxPhone, sessionId: '' });
+  if (r.ok) { beOk('تم تسجيل الرقم في التسلسل'); closeM('m-enroll-inbox'); }
+  else beErr(r.error || 'فشل التسجيل');
+}
+
 // ── Utility ────────────────────────────────────────────────────────────────
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
@@ -2471,7 +2529,7 @@ window._pg_reports   = () => { loadReportStats(); loadReports(); loadAuditLog();
 window._pg_settings  = () => { loadSettings(); loadDevApiSettings(); };
 window._pg_chatbot   = () => { loadChatbotFlows(); };
 window._pg_devices   = () => { loadDevices(); };
-window._pg_engine    = () => { loadDevices(); loadEngineStats(); _ensureAbInit(); };
+window._pg_engine    = () => { loadDevices(); loadEngineStats(); _ensureAbInit(); loadCampaigns(); };
 window._pg_inbox     = () => { loadInbox(); };
 window._pg_antiban   = () => { loadAntiBan(); };
 window._pg_media     = () => { loadMedia(); };
@@ -2869,21 +2927,12 @@ async function bulkExportSelected() {
 let _sendToGroupTargets = [];
 
 async function _populateSendToGroupSessions() {
-  const sel = document.getElementById('stg-session');
-  sel.innerHTML = '<option value="">اختر جهاز Web...</option>';
-  if (!IS_ELECTRON) return;
+  if (!IS_ELECTRON) { _fillSessionSelect('stg-session', [], 'اختر جهاز Web...'); return; }
   const r = await BE.wa.sessions.list();
-  if (r.ok) {
-    (r.data || []).filter(s => s.status === 'ready').forEach(s => {
-      const o = document.createElement('option');
-      o.value = s.id;
-      o.textContent = `📱 ${s.name || s.id}${s.phone ? ' (+' + s.phone + ')' : ''}`;
-      sel.appendChild(o);
-    });
-    // Pre-select the session chosen in the groups page
-    const pageSession = document.getElementById('groups-session-sel')?.value;
-    if (pageSession) sel.value = pageSession;
-  }
+  const ready = r.ok ? (r.data || []).filter(s => s.status === 'ready') : [];
+  _fillSessionSelect('stg-session', ready, 'اختر جهاز Web...');
+  const pageSession = document.getElementById('groups-session-sel')?.value;
+  if (pageSession) document.getElementById('stg-session').value = pageSession;
 }
 
 function _stgResetMedia() {
@@ -2895,31 +2944,18 @@ function _stgResetMedia() {
 }
 
 async function pickStgMedia(type) {
-  if (!IS_ELECTRON) { beErr('اختيار الملف متاح فقط في تطبيق Electron'); return; }
-  const filters = {
-    image:    [{ name: 'صور', extensions: ['jpg','jpeg','png','gif','webp'] }],
-    video:    [{ name: 'فيديو', extensions: ['mp4','avi','mov','mkv','3gp'] }],
-    document: [{ name: 'ملفات', extensions: ['pdf','docx','xlsx','pptx','txt','zip','rar'] }],
-  };
-  const icons  = { image: '🖼️', video: '🎬', document: '📎' };
-  try {
-    const result = await window.ftwa.openFile({ filters: filters[type] || [] });
-    if (!result || result.canceled || !result.filePaths?.length) return;
-    const filePath = result.filePaths[0];
-    const fileName = filePath.split(/[\\/]/).pop();
-    const fileExt  = fileName.split('.').pop().toLowerCase();
-
-    document.getElementById('stg-media-path').value        = filePath;
-    document.getElementById('stg-media-name').textContent  = fileName;
-    document.getElementById('stg-media-size').textContent  = '.' + fileExt.toUpperCase();
-    document.getElementById('stg-media-icon').textContent  = icons[type] || '📄';
-    document.getElementById('stg-media-preview').style.display = 'flex';
-    document.getElementById('stg-clear-media').style.display   = 'inline-flex';
-    document.getElementById('stg-body-label').textContent  = 'التعليق (Caption) — اختياري';
-    document.getElementById('stg-body').placeholder        = 'أضف تعليقاً للمرفق... (اختياري)';
-  } catch (e) {
-    beErr('فشل اختيار الملف: ' + e.message);
-  }
+  const fp = await _pickMediaFile(type);
+  if (!fp) return;
+  const fileName = fp.split(/[\\/]/).pop();
+  const fileExt  = fileName.split('.').pop().toLowerCase();
+  document.getElementById('stg-media-path').value        = fp;
+  document.getElementById('stg-media-name').textContent  = fileName;
+  document.getElementById('stg-media-size').textContent  = '.' + fileExt.toUpperCase();
+  document.getElementById('stg-media-icon').textContent  = _mediaIcons[type] || '📄';
+  document.getElementById('stg-media-preview').style.display = 'flex';
+  document.getElementById('stg-clear-media').style.display   = 'inline-flex';
+  document.getElementById('stg-body-label').textContent  = 'التعليق (Caption) — اختياري';
+  document.getElementById('stg-body').placeholder        = 'أضف تعليقاً للمرفق... (اختياري)';
 }
 
 function clearStgMedia() {
