@@ -782,11 +782,17 @@ function register(ipcMain, { db, waApi, waSvc, engine, scraper, scheduler, aiSvc
     const firstMedia = allScripts[0]?.mediaPath || opts.mediaPath || null;
 
     const campaignId = uuidv4();
+    // Only set account_id if sessionId is a Cloud API account (in accounts table).
+    // Web session IDs live in wa_sessions — passing them causes a FOREIGN KEY violation.
+    const campaignAccountId = (() => {
+      if (!opts.sessionId) return null;
+      try { return db.accountGet(opts.sessionId) ? opts.sessionId : null; } catch (_) { return null; }
+    })();
     db.campaignCreate({
       id:           campaignId,
       name:         opts.campaignName || `حملة ${new Date().toLocaleDateString('ar')}`,
       type:         'individual',
-      account_id:   opts.sessionId || null,
+      account_id:   campaignAccountId,
       message_body: firstText,
       media_path:   firstMedia,
       media_type:   null,

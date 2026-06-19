@@ -2960,7 +2960,8 @@ async function sendToGroupConfirm() {
 
   const payload = {
     recipients:   _sendToGroupTargets,
-    scripts:      [body],
+    body:         body || null,
+    scripts:      body ? [body] : [],
     sessionId,
     delayMin,
     delayMax,
@@ -2968,15 +2969,14 @@ async function sendToGroupConfirm() {
   };
   if (mediaPath) payload.mediaPath = mediaPath;
 
-  const r = await BE.wa.send.bulk(payload);
-
-  if (r.ok) {
+  try {
+    const r = await BE.wa.send.bulk(payload);
     const mediaNote = mediaPath ? ' مع مرفق' : '';
     beOk(`✅ تم إضافة ${_sendToGroupTargets.length} مجموعة للقائمة${mediaNote} — الإرسال جارٍ`);
     nav('engine');
     setTimeout(loadEngineStats, 2000);
-  } else {
-    beErr('فشل الإرسال: ' + (r.error || 'خطأ غير معروف'));
+  } catch (e) {
+    beErr('فشل الإرسال: ' + (e.message || 'خطأ غير معروف'));
   }
 }
 
