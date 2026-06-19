@@ -273,7 +273,7 @@ Requirements:
 
   // ─── Gemini implementation ────────────────────────────────────────────────
   async _geminiChat(messages, apiKey, systemPrompt) {
-    if (!apiKey) throw new Error('مفتاح Gemini API غير محدد. يرجى إضافته في الإعدادات.');
+    if (!apiKey) throw new Error('مفتاح Gemini API غير محدد — أضفه من صفحة الإعدادات ← مفاتيح AI.');
 
     const geminiModel = this._db.settingGet('ai_gemini_model') || 'gemini-2.0-flash';
     const genAI = new GoogleGenerativeAI(apiKey);
@@ -292,7 +292,6 @@ Requirements:
     const history = [];
     for (const msg of rawHistory) {
       if (history.length > 0 && history[history.length - 1].role === msg.role) {
-        // Insert a placeholder for the missing opposite role
         const placeholder = msg.role === 'user' ? 'model' : 'user';
         history.push({ role: placeholder, parts: [{ text: '...' }] });
       }
@@ -301,16 +300,34 @@ Requirements:
 
     const lastMsg = messages[messages.length - 1];
 
-    const chat = model.startChat({ history });
-    const result = await chat.sendMessage(lastMsg.content);
-    const text = result.response.text();
+    try {
+      const chat = model.startChat({ history });
+      const result = await chat.sendMessage(lastMsg.content);
+      const text = result.response.text();
+      return { role: 'assistant', content: text };
+    } catch (e) {
+      throw new Error(this._normalizeGeminiError(e));
+    }
+  }
 
-    return { role: 'assistant', content: text };
+  _normalizeGeminiError(e) {
+    const msg = e?.message || String(e);
+    if (msg.includes('API_KEY_INVALID') || msg.includes('API key not valid'))
+      return 'مفتاح Gemini API غير صالح — افتح الإعدادات ← مفاتيح AI وأدخل مفتاحاً صحيحاً من console.cloud.google.com';
+    if (msg.includes('QUOTA_EXCEEDED') || msg.includes('quota') || msg.includes('429'))
+      return 'تم تجاوز الحد اليومي لـ Gemini API — حاول لاحقاً أو استخدم Claude بدلاً.';
+    if (msg.includes('PERMISSION_DENIED') || msg.includes('403'))
+      return 'المفتاح لا يملك صلاحية Gemini API — تأكد من تفعيل Generative Language API في Google Cloud.';
+    if (msg.includes('MODEL_NOT_FOUND') || msg.includes('models/') || msg.includes('404'))
+      return 'النموذج المحدد غير متاح — افتح الإعدادات وغيّر نموذج Gemini إلى gemini-2.0-flash.';
+    if (msg.includes('RESOURCE_EXHAUSTED'))
+      return 'موارد Gemini API مستنفدة مؤقتاً — انتظر دقيقة ثم حاول مجدداً.';
+    return 'خطأ في Gemini API — ' + msg.split('\n')[0].slice(0, 120);
   }
 
   // ─── Claude implementation ────────────────────────────────────────────────
   async _claudeChat(messages, apiKey, systemPrompt) {
-    if (!apiKey) throw new Error('مفتاح Claude API غير محدد. يرجى إضافته في الإعدادات.');
+    if (!apiKey) throw new Error('مفتاح Claude API غير محدد — أضفه من صفحة الإعدادات ← مفاتيح AI.');
 
     const client = new Anthropic({ apiKey });
 
@@ -326,10 +343,27 @@ Requirements:
     };
     if (systemPrompt) params.system = systemPrompt;
 
-    const response = await client.messages.create(params);
-    const text = response.content?.[0]?.text || '';
+    try {
+      const response = await client.messages.create(params);
+      const text = response.content?.[0]?.text || '';
+      return { role: 'assistant', content: text };
+    } catch (e) {
+      throw new Error(this._normalizeClaudeError(e));
+    }
+  }
 
-    return { role: 'assistant', content: text };
+  _normalizeClaudeError(e) {
+    const msg = e?.message || String(e);
+    const status = e?.status;
+    if (status === 401 || msg.includes('authentication') || msg.includes('API key'))
+      return 'مفتاح Claude API غير صالح — افتح الإعدادات ← مفاتيح AI وأدخل مفتاحاً صحيحاً من console.anthropic.com';
+    if (status === 429 || msg.includes('rate_limit') || msg.includes('overloaded'))
+      return 'Claude مشغول حالياً — حاول بعد لحظات أو استخدم Gemini بدلاً.';
+    if (status === 403)
+      return 'المفتاح لا يملك صلاحية هذا النموذج — تحقق من خطة Claude API.';
+    if (status === 400)
+      return 'طلب غير صالح لـ Claude API — حاول مجدداً.';
+    return 'خطأ في Claude API — ' + msg.split('\n')[0].slice(0, 120);
   }
 }
 

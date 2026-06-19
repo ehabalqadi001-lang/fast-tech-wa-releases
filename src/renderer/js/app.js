@@ -63,7 +63,10 @@ async function sendAI() {
       } else if (ev.type === 'error') {
         BE.off('ai:stream:event', handler);
         _aiMsgs.pop();
-        if (bub) bub.textContent = '⚠️ ' + ev.text;
+        if (bub) {
+          const needsSettings = (ev.text||'').includes('الإعدادات') || (ev.text||'').includes('غير محدد') || (ev.text||'').includes('غير صالح');
+          bub.innerHTML = `<span style="color:#f87171">⚠️ ${(ev.text||'خطأ').replace(/</g,'&lt;')}</span>${needsSettings ? `<br><button class="btn bo bsm mt8" style="font-size:10px" onclick="nav('settings')">⚙️ فتح الإعدادات</button>` : ''}`;
+        }
       }
     });
     BE.ai.streamChat({ messages: _aiMsgs });
@@ -76,12 +79,16 @@ async function sendAI() {
         if (bub) bub.innerHTML = r.data.content.replace(/</g,'&lt;').replace(/\n/g,'<br>');
       } else {
         _aiMsgs.pop();
-        if (bub) bub.textContent = '⚠️ ' + (r.error||'خطأ');
+        if (bub) {
+          const errMsg = r.error || 'خطأ غير معروف';
+          const needsSettings = errMsg.includes('الإعدادات') || errMsg.includes('غير محدد') || errMsg.includes('غير صالح');
+          bub.innerHTML = `<span style="color:#f87171">⚠️ ${errMsg.replace(/</g,'&lt;')}</span>${needsSettings ? `<br><button class="btn bo bsm mt8" style="font-size:10px" onclick="nav('settings')">⚙️ فتح الإعدادات</button>` : ''}`;
+        }
       }
     } catch(e) {
       _aiMsgs.pop();
       const bub = document.getElementById(typId)?.querySelector('.ai-bub');
-      if (bub) bub.textContent = '⚠️ ' + e.message;
+      if (bub) bub.innerHTML = `<span style="color:#f87171">⚠️ ${(e.message||'خطأ').replace(/</g,'&lt;')}</span>`;
     }
   }
   chat.scrollTop = chat.scrollHeight;
