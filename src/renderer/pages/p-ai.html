@@ -26,6 +26,13 @@
           <button class="btn bo bsm wf" onclick="aiCmd('اكتب رسالة بالإنجليزية والعربية معاً')">🌐 رسالة ثنائية</button>
         </div>
       </div>
+      <!-- AI Campaign Optimizer (Phase 4) -->
+      <div class="card">
+        <div class="ct">🎯 محسّن الحملة بـ AI</div>
+        <div class="f11 ts mb10">حلّل أداء حملاتك واحصل على توصيات لتحسين معدل الاستجابة</div>
+        <button class="btn bp wf bsm" onclick="runAICampaignOptimizer()">⚡ تحليل الحملات الآن</button>
+        <div id="ai-campaign-analysis" style="display:none;margin-top:12px"></div>
+      </div>
       <div class="card">
         <div class="ct">⚙️ إعدادات AI</div>
         <div class="fg"><label class="fl">المزوّد المفضل</label><select id="ai-model-pref" class="fc"><option value="gemini">Google Gemini</option><option value="claude">Anthropic Claude</option></select></div>
@@ -47,3 +54,7 @@
 </div>
 
 <!-- ══ CRM ══ -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!-- PAGE: CHATBOT BUILDER                                                    -->
+<!-- (accessed via nav('chatbot') — embedded below p-ai for simplicity)       -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->

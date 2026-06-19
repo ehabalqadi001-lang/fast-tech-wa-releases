@@ -239,6 +239,32 @@ contextBridge.exposeInMainWorld('ftwa', {
     openExternal:    (url) => ipcRenderer.invoke('license:openExternal', url),
   },
 
+  // ── Phase 5: Chatbot Builder ──────────────────────────────────────────────
+  chatbot: {
+    list:   ()        => ipcRenderer.invoke('chatbot:list'),
+    get:    (id)      => ipcRenderer.invoke('chatbot:get',    { id }),
+    save:   (payload) => ipcRenderer.invoke('chatbot:save',   payload),
+    delete: (id)      => ipcRenderer.invoke('chatbot:delete', { id }),
+  },
+
+  // ── Phase 5: Advanced Analytics ───────────────────────────────────────────
+  analytics: {
+    funnel:  (days) => ipcRenderer.invoke('analytics:funnel',  { days }),
+    heatmap: (days) => ipcRenderer.invoke('analytics:heatmap', { days }),
+  },
+
+  // ── Phase 5: Reports PDF Export ───────────────────────────────────────────
+  reports: {
+    exportPDF: () => ipcRenderer.invoke('reports:exportPDF'),
+  },
+
+  // ── Phase 5: API Developer Mode ───────────────────────────────────────────
+  devApi: {
+    getKey:    ()      => ipcRenderer.invoke('api:getKey'),
+    setKey:    (key)   => ipcRenderer.invoke('api:setKey',    { key }),
+    getStatus: ()      => ipcRenderer.invoke('api:getStatus'),
+  },
+
   // ── Audit Log ─────────────────────────────────────────────────────────────
   audit: {
     list:   (limit)   => ipcRenderer.invoke('audit:list',   { limit }),

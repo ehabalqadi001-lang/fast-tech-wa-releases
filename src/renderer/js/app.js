@@ -2460,8 +2460,9 @@ window._pg_ai        = () => {
   document.getElementById('ai-input')?.addEventListener('keypress', e => { if(e.key==='Enter') sendAI(); });
 };
 window._pg_crm       = () => { loadCRM(); };
-window._pg_reports   = () => { loadReportStats(); loadReports(); loadAuditLog(); loadUsageChart(); calcCost(); };
-window._pg_settings  = () => { loadSettings(); };
+window._pg_reports   = () => { loadReportStats(); loadReports(); loadAuditLog(); loadUsageChart(); calcCost(); loadAnalyticsFunnel(); loadHeatmap(); };
+window._pg_settings  = () => { loadSettings(); loadDevApiSettings(); };
+window._pg_chatbot   = () => { loadChatbotFlows(); };
 window._pg_devices   = () => { loadDevices(); };
 window._pg_engine    = () => { loadDevices(); loadEngineStats(); _ensureAbInit(); };
 window._pg_inbox     = () => { loadInbox(); };
@@ -4051,6 +4052,249 @@ function calcCost() {
   const cost    = (msgs * (COST_PER_MSG[type] || 0.02)).toFixed(2);
   const el      = document.getElementById('cost-result');
   if (el) el.textContent = `${parseFloat(cost).toLocaleString()} $`;
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// PHASE 5 — ADVANCED ANALYTICS (FUNNEL + HEATMAP)
+// ══════════════════════════════════════════════════════════════════════════
+async function loadAnalyticsFunnel() {
+  if (!IS_ELECTRON) return;
+  const r = await BE.analytics.funnel(30);
+  const el = document.getElementById('funnel-chart');
+  if (!r.ok || !el) return;
+  const d = r.data;
+  const steps = [
+    { label:'📤 مُرسَل', n:d.sent, color:'var(--acc)' },
+    { label:'📬 مُستلَم', n:d.delivered, color:'#3b82f6' },
+    { label:'👁️ مقروء', n:d.read, color:'#8b5cf6' },
+    { label:'💬 ردود', n:d.replied, color:'#22c55e' },
+  ];
+  const maxVal = Math.max(d.sent, 1);
+  el.innerHTML = steps.map(s => {
+    const pct = Math.round(s.n / maxVal * 100);
+    return `<div>
+      <div class="flex ic jb f12 mb4"><span>${s.label}</span><span class="fm" style="color:${s.color}">${s.n.toLocaleString()} (${pct}%)</span></div>
+      <div style="background:rgba(var(--ar),.08);border-radius:4px;height:20px;overflow:hidden">
+        <div style="width:${pct}%;height:100%;background:${s.color};transition:width .4s ease;border-radius:4px"></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function loadHeatmap() {
+  if (!IS_ELECTRON) return;
+  const r = await BE.analytics.heatmap(30);
+  const el = document.getElementById('heatmap-chart');
+  if (!r.ok || !el) return;
+  const data = r.data;
+  const hours = Array.from({length:24}, (_,i)=>i);
+  const days  = ['أحد','إثنين','ثلاثاء','أربعاء','خميس','جمعة','سبت'];
+  const lookup = {};
+  data.forEach(row => { lookup[`${row.dow}-${row.hour}`] = row.count; });
+  const maxCount = Math.max(...data.map(d=>d.count), 1);
+  let html = '<table style="border-collapse:collapse;font-size:10px">';
+  html += '<tr><th style="padding:2px 6px"></th>' + hours.map(h=>`<th style="padding:2px 4px;text-align:center;color:var(--ts)">${h}:00</th>`).join('') + '</tr>';
+  for (let dow = 0; dow <= 6; dow++) {
+    html += `<tr><td style="padding:2px 8px;white-space:nowrap;color:var(--ts)">${days[dow]}</td>`;
+    for (const h of hours) {
+      const key = `${dow}-${h.toString().padStart(2,'0')}`;
+      const cnt = lookup[key] || 0;
+      const alpha = cnt ? (0.15 + (cnt/maxCount) * 0.85).toFixed(2) : '0.03';
+      html += `<td title="${days[dow]} ${h}:00 — ${cnt} رسالة" style="width:18px;height:18px;background:rgba(var(--ar),${alpha});border-radius:3px;margin:1px"></td>`;
+    }
+    html += '</tr>';
+  }
+  html += '</table>';
+  el.innerHTML = html;
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// PHASE 5 — CHATBOT BUILDER
+// ══════════════════════════════════════════════════════════════════════════
+let _editingFlowId = null;
+let _chatbotNodes  = [];
+
+async function loadChatbotFlows() {
+  if (!IS_ELECTRON) return;
+  const r = await BE.chatbot.list();
+  const el = document.getElementById('chatbot-flows-list');
+  const cnt = document.getElementById('chatbot-count');
+  if (!el) return;
+  if (!r.ok) { el.innerHTML = '<div class="f12 ts" style="padding:20px;text-align:center">تعذر التحميل</div>'; return; }
+  const flows = r.data;
+  if (cnt) cnt.textContent = `${flows.length} تدفق`;
+  el.innerHTML = flows.length ? flows.map(f => `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;background:${f.active?'rgba(var(--ar),.02)':'rgba(var(--ar),.005)'}">
+      <div>
+        <div class="fw6 f13">${esc(f.name)}</div>
+        <div class="f11 ts mt2">كلمات مفتاحية: ${esc(f.trigger_keywords||'—')}</div>
+      </div>
+      <div class="flex gap8 ic">
+        <span class="bge ${f.active?'bg-g':'bg-r'} f11">${f.active?'نشط':'موقوف'}</span>
+        <button class="btn bo bsm" onclick="editChatbotFlow('${f.id}')">✏️ تعديل</button>
+        <button class="btn bd bsm" onclick="deleteChatbotFlow('${f.id}')">🗑️</button>
+      </div>
+    </div>`).join('')
+    : '<div class="f12 ts" style="padding:32px;text-align:center">لا توجد تدفقات — اضغط ➕ تدفق جديد</div>';
+}
+
+function newChatbotFlow() {
+  _editingFlowId = null;
+  _chatbotNodes  = [{ id: '1', type: 'message', content: '' }];
+  document.getElementById('chatbot-flow-name').value     = '';
+  document.getElementById('chatbot-flow-keywords').value = '';
+  document.getElementById('chatbot-editor').style.display = '';
+  renderChatbotNodes();
+}
+
+async function editChatbotFlow(id) {
+  if (!IS_ELECTRON) return;
+  const r = await BE.chatbot.get(id);
+  if (!r.ok || !r.data) return;
+  const flow = r.data;
+  _editingFlowId = id;
+  _chatbotNodes  = JSON.parse(flow.nodes_json || '[]');
+  document.getElementById('chatbot-flow-name').value     = flow.name || '';
+  document.getElementById('chatbot-flow-keywords').value = flow.trigger_keywords || '';
+  document.getElementById('chatbot-editor').style.display = '';
+  renderChatbotNodes();
+}
+
+async function deleteChatbotFlow(id) {
+  if (!confirm('حذف هذا التدفق نهائياً؟')) return;
+  if (!IS_ELECTRON) return;
+  await BE.chatbot.delete(id);
+  loadChatbotFlows();
+  beOk('تم حذف التدفق');
+}
+
+function closeChatbotEditor() {
+  document.getElementById('chatbot-editor').style.display = 'none';
+  _editingFlowId = null;
+  _chatbotNodes  = [];
+}
+
+function addChatbotNode() {
+  const id = String(Date.now());
+  _chatbotNodes.push({ id, type: 'message', content: '' });
+  renderChatbotNodes();
+}
+
+function removeChatbotNode(id) {
+  _chatbotNodes = _chatbotNodes.filter(n => n.id !== id);
+  renderChatbotNodes();
+}
+
+function renderChatbotNodes() {
+  const el = document.getElementById('chatbot-nodes-container');
+  if (!el) return;
+  el.innerHTML = _chatbotNodes.map((node, i) => `
+    <div style="border:1px solid var(--border);border-radius:10px;padding:14px;position:relative">
+      <div class="flex ic jb mb10">
+        <span class="bge bg-b f11">خطوة ${i+1}</span>
+        <button class="btn bd bsm" onclick="removeChatbotNode('${node.id}')">✕</button>
+      </div>
+      <div class="g2">
+        <div class="fg">
+          <label class="fl">نوع الخطوة</label>
+          <select class="fc" onchange="_chatbotNodes[${i}].type=this.value;renderChatbotNodes()">
+            <option value="message" ${node.type==='message'?'selected':''}>📨 رسالة نصية</option>
+            <option value="condition" ${node.type==='condition'?'selected':''}>❓ شرط (إذا تضمّن)</option>
+            <option value="delay" ${node.type==='delay'?'selected':''}>⏱️ تأخير</option>
+            <option value="template" ${node.type==='template'?'selected':''}>📋 قالب محفوظ</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label class="fl">${node.type==='delay'?'التأخير (ثانية)':node.type==='condition'?'الكلمة أو العبارة':'نص الرسالة'}</label>
+          ${node.type==='message'||node.type==='template'
+            ? `<textarea class="fc" rows="3" oninput="_chatbotNodes[${i}].content=this.value">${esc(node.content||'')}</textarea>`
+            : `<input class="fc" value="${esc(node.content||'')}" oninput="_chatbotNodes[${i}].content=this.value">`}
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+async function saveChatbotFlow() {
+  const name     = document.getElementById('chatbot-flow-name')?.value.trim();
+  const keywords = document.getElementById('chatbot-flow-keywords')?.value.trim();
+  if (!name) { beErr('أدخل اسم التدفق'); return; }
+  if (!IS_ELECTRON) { beOk('حفظ (وضع العرض)'); return; }
+  const payload = {
+    id:               _editingFlowId || undefined,
+    name,
+    nodes_json:       JSON.stringify(_chatbotNodes),
+    trigger_keywords: keywords,
+    active:           1,
+  };
+  const r = await BE.chatbot.save(payload);
+  if (r.ok) {
+    beOk('تم حفظ التدفق');
+    closeChatbotEditor();
+    loadChatbotFlows();
+    BE.audit.log({ event_type: 'chatbot_save', description: `حفظ تدفق: ${name}` });
+  } else {
+    beErr('تعذر الحفظ');
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// PHASE 5 — PDF EXPORT
+// ══════════════════════════════════════════════════════════════════════════
+async function exportReportPDF() {
+  if (!IS_ELECTRON) { beErr('تصدير PDF يتطلب تطبيق سطح المكتب'); return; }
+  beOk('جارٍ تصدير التقرير كـ PDF...');
+  const r = await BE.reports.exportPDF();
+  if (r.ok) { beOk(`تم التصدير: ${r.data}`); }
+  else { beErr('تعذر تصدير PDF: ' + (r.error || 'خطأ')); }
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// PHASE 5 — DEVELOPER API MODE
+// ══════════════════════════════════════════════════════════════════════════
+async function loadDevApiSettings() {
+  if (!IS_ELECTRON) return;
+  const r = await BE.devApi.getKey();
+  if (r.ok && r.data) {
+    const el = document.getElementById('dev-api-key');
+    if (el) el.value = r.data;
+    updateApiDocsUrl(r.data);
+  }
+}
+
+function updateApiDocsUrl(key) {
+  const el = document.getElementById('dev-api-docs-url');
+  if (!el) return;
+  el.textContent = key ? `Docs: http://localhost:3001/api/docs  |  Authorization: Bearer ${key.slice(0,8)}...` : '';
+}
+
+function generateApiKey() {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  const key   = Array.from({ length: 32 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+  const el    = document.getElementById('dev-api-key');
+  if (el) el.value = key;
+  updateApiDocsUrl(key);
+}
+
+async function saveApiKey() {
+  const key = document.getElementById('dev-api-key')?.value.trim();
+  if (!key) { beErr('أدخل مفتاح API أولاً'); return; }
+  if (!IS_ELECTRON) { beOk('حفظ (وضع العرض)'); return; }
+  const r = await BE.devApi.setKey(key);
+  if (r.ok) { beOk('تم حفظ مفتاح API'); updateApiDocsUrl(key); BE.audit.log({ event_type: 'api_key_update', description: 'تحديث مفتاح API المطوّر' }); }
+}
+
+function copyApiKey() {
+  const val = document.getElementById('dev-api-key')?.value;
+  if (val) { navigator.clipboard.writeText(val).then(() => beOk('تم نسخ المفتاح')).catch(() => beErr('تعذر النسخ')); }
+}
+
+// ── Engine: Interactive Messages Toggle ──────────────────────────────────
+function toggleInteractiveMode() {
+  const tg    = document.getElementById('eng-interactive-toggle');
+  const panel = document.getElementById('eng-interactive-panel');
+  if (!tg || !panel) return;
+  tg.classList.toggle('on');
+  panel.style.display = tg.classList.contains('on') ? '' : 'none';
 }
 
 // ── Boot ─────────────────────────────────────────────────────────────────

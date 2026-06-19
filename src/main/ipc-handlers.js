@@ -1185,6 +1185,42 @@ function register(ipcMain, { db, waApi, waSvc, engine, scraper, scheduler, aiSvc
     return { ok: true };
   });
 
+  // ── Phase 5: Chatbot Builder ──────────────────────────────────────────────
+  handle('chatbot:list',   ()        => ({ ok: true, data: db.chatbotList() }));
+  handle('chatbot:get',    ({ id })  => ({ ok: true, data: db.chatbotGet(id) }));
+  handle('chatbot:save',   (payload) => {
+    db.chatbotSave(payload);
+    return { ok: true };
+  });
+  handle('chatbot:delete', ({ id })  => { db.chatbotDelete(id); return { ok: true }; });
+
+  // ── Phase 5: PDF Export (Electron print-to-PDF) ────────────────────────
+  handle('reports:exportPDF', async () => {
+    const { BrowserWindow } = require('electron');
+    const win = BrowserWindow.getFocusedWindow();
+    if (!win) return { ok: false, error: 'No active window' };
+    try {
+      const data   = await win.webContents.printToPDF({ printBackground: true, pageSize: 'A4' });
+      const fs     = require('fs');
+      const path   = require('path');
+      const os     = require('os');
+      const outPath = path.join(os.homedir(), 'Desktop', `ftwa-report-${Date.now()}.pdf`);
+      fs.writeFileSync(outPath, data);
+      return { ok: true, data: outPath };
+    } catch (e) {
+      return { ok: false, error: e.message };
+    }
+  });
+
+  // ── Phase 5: Advanced Analytics — funnel ──────────────────────────────────
+  handle('analytics:funnel',   ({ days } = {}) => ({ ok: true, data: db.analyticsFunnel(days || 30) }));
+  handle('analytics:heatmap',  ({ days } = {}) => ({ ok: true, data: db.analyticsHeatmap(days || 30) }));
+
+  // ── Phase 5: API Developer Mode ────────────────────────────────────────────
+  handle('api:getKey',  ()      => ({ ok: true, data: db.settingGet('dev_api_key') || '' }));
+  handle('api:setKey',  ({ key }) => { db.settingSet('dev_api_key', key); return { ok: true }; });
+  handle('api:getStatus', ()    => ({ ok: true, data: { enabled: !!db.settingGet('dev_api_key') } }));
+
   // ── AI Phase 4 — Intelligence features ───────────────────────────────────
   handle('ai:classify',        ({ text })       => aiSvc.classifyReply(text));
   handle('ai:smartReplies',    (payload)        => aiSvc.smartReplySuggestions(payload));
