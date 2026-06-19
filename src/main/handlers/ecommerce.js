@@ -166,7 +166,7 @@ function register(ctx) {
   });
 
   // ── CHECKOUT ───────────────────────────────────────────────────────────────
-  handle('ec:checkout', async ({ customer_data, shipping_address, delivery_notes, coupon_code, use_loyalty_points, items, wa_session_id }) => {
+  handle('ec:checkout', async ({ customer_data, shipping_address, delivery_notes, coupon_code, use_loyalty_points, items, wa_session_id, payment_method }) => {
     if (!items?.length) throw new Error('السلة فارغة');
     if (!customer_data?.name || !customer_data?.phone) throw new Error('بيانات العميل مطلوبة');
 
@@ -233,7 +233,7 @@ function register(ctx) {
       id: orderId, order_number: orderNumber,
       customer_id: customer.id,
       customer_snapshot: JSON.stringify({ id: customer.id, name: customer.name, phone: customer.phone, email: customer.email }),
-      status: 'pending', payment_method: 'cod', payment_status: 'pending',
+      status: 'pending', payment_method: payment_method||'cash_on_delivery', payment_status: 'pending',
       items: JSON.stringify(orderItems),
       subtotal, discount_amount: discountAmount + loyaltyDiscount,
       coupon_code: coupon_code||null, shipping_fee: shippingFee, total_amount: totalAmount,
@@ -313,6 +313,7 @@ function register(ctx) {
 
   // ── COUPONS ────────────────────────────────────────────────────────────────
   handle('ec:coupons:list',   ()     => db.ecCouponList());
+  handle('ec:coupons:get',    (id)   => db.ecCouponGet(id));
   handle('ec:coupons:save',   (data) => {
     if (!data.code?.trim()) throw new Error('كود الخصم مطلوب');
     const row = { code: data.code.toUpperCase().trim(), type: data.type||'percentage', value: parseFloat(data.value)||0, min_order_amount: parseFloat(data.min_order_amount)||0, max_uses: data.max_uses ? parseInt(data.max_uses) : null, applicable_products: j(data.applicable_products), applicable_categories: j(data.applicable_categories), starts_at: data.starts_at||null, expires_at: data.expires_at||null };
@@ -329,7 +330,8 @@ function register(ctx) {
   handle('ec:loyalty:history',   (id)  => db.ecLoyaltyTransactionList(id));
 
   // ── SHIPPING ZONES ─────────────────────────────────────────────────────────
-  handle('ec:shipping:list',   ()     => db.ecShippingZoneList());
+  // Admin list returns ALL zones (including inactive); shop uses ecShippingZoneList (active only)
+  handle('ec:shipping:list',   ()     => db._db.prepare('SELECT * FROM ec_shipping_zones ORDER BY name').all());
   handle('ec:shipping:save',   (data) => {
     const row = { name: data.name, governorates: j(data.governorates), base_fee: parseFloat(data.base_fee)||0, free_shipping_above: data.free_shipping_above ? parseFloat(data.free_shipping_above) : null, estimated_days_min: parseInt(data.estimated_days_min)||1, estimated_days_max: parseInt(data.estimated_days_max)||3 };
     if (data.id) { db.ecShippingZoneUpdate(data.id, { ...row, is_active: data.is_active!==false?1:0 }); return { ok: true }; }

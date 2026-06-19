@@ -38,7 +38,7 @@ async function ecCustLoad() {
     const custs = r.data || [];
     document.getElementById('ec-cust-count').textContent = `${custs.length} عميل`;
     if (!custs.length) { document.getElementById('ec-cust-table').innerHTML = '<div class="ta ts f12 py20">لا يوجد عملاء</div>'; return; }
-    document.getElementById('ec-cust-table').innerHTML = `<table class="tbl"><thead><tr><th>الاسم</th><th>الهاتف</th><th>الطلبات</th><th>إجمالي الإنفاق</th><th>نقاط الولاء</th><th>منذ</th><th></th></tr></thead><tbody>${custs.map(c=>`<tr><td class="fw7">${c.name||'—'}</td><td class="fm f12">${c.phone}</td><td class="ta">${c.total_orders||0}</td><td class="ta fw7">${(c.total_spent||0).toFixed(2)} ج.م</td><td class="ta" style="color:#8b5cf6;font-weight:700">${c.loyalty_points||0}</td><td class="f11 ts">${new Date(c.created_at).toLocaleDateString('ar')}</td><td><button class="btn bo bsm" onclick="ecCustOpen('${c.id}')">عرض</button></td></tr>`).join('')}</tbody></table>`;
+    document.getElementById('ec-cust-table').innerHTML = `<table class="tbl"><thead><tr><th>الاسم</th><th>الهاتف</th><th>الطلبات</th><th>إجمالي الإنفاق</th><th>نقاط الولاء</th><th>منذ</th><th></th></tr></thead><tbody>${custs.map(c=>`<tr><td class="fw7">${c.name||'—'}</td><td class="fm f12">${c.phone}</td><td class="ta">${c.total_orders||0}</td><td class="ta fw7">${(c.total_spent||0).toFixed(2)} ج.م</td><td class="ta fw7" style="color:#8b5cf6">${c.loyalty_points||0}</td><td class="f11 ts">${new Date(c.created_at).toLocaleDateString('ar')}</td><td><button class="btn bo bsm" onclick="ecCustOpen('${c.id}')">عرض</button></td></tr>`).join('')}</tbody></table>`;
   } catch(e) { console.error('[EC-Customers]', e); }
 }
 
@@ -56,13 +56,11 @@ async function ecCustOpen(id) {
       <div><div class="f11 ts mb4">البريد الإلكتروني</div><div>${c.email||'—'}</div></div>
       <div><div class="f11 ts mb4">إجمالي الطلبات</div><div class="fw7">${c.total_orders||0}</div></div>
       <div><div class="f11 ts mb4">إجمالي الإنفاق</div><div class="fw7 fc-g">${(c.total_spent||0).toFixed(2)} ج.م</div></div>
-      <div><div class="f11 ts mb4">نقاط الولاء</div><div class="fw7 f18" style="color:#8b5cf6">${c.loyalty_points||0}</div></div>
-      <div><div class="f11 ts mb4">مستوى الولاء</div><div>${c.loyalty_tier||'عادي'}</div></div>
+      <div><div class="f11 ts mb4">نقاط الولاء الحالية</div><div class="fw7 f18" style="color:#8b5cf6">${c.loyalty_points||0}</div></div>
       <div><div class="f11 ts mb4">عميل منذ</div><div>${new Date(c.created_at).toLocaleDateString('ar')}</div></div>
       ${c.last_order_at ? `<div><div class="f11 ts mb4">آخر طلب</div><div>${new Date(c.last_order_at).toLocaleDateString('ar')}</div></div>` : ''}
     </div>
-    ${c.address ? `<div><div class="f11 ts mb4">العنوان</div><div>${c.address}</div></div>` : ''}
-    ${c.notes ? `<div class="mt8"><div class="f11 ts mb4">ملاحظات</div><div>${c.notes}</div></div>` : ''}
+    ${c.notes ? `<div class="mt4"><div class="f11 ts mb4">ملاحظات</div><div>${c.notes}</div></div>` : ''}
   `;
   openM('m-ec-cust');
 }
@@ -71,7 +69,12 @@ async function ecCustAddPoints() {
   if (!_ecCustCurrent) return;
   const pts = parseInt(document.getElementById('ec-cust-points-val').value) || 0;
   if (!pts) { beErr('أدخل عدد النقاط'); return; }
-  const r = await BE.ec.loyalty.addTransaction({ customer_id: _ecCustCurrent.id, points: pts, type: 'manual', description: 'نقاط يدوية من الإدارة' });
+  // preload: BE.ec.customers.loyaltyAdjust({customerId, points, description})
+  const r = await BE.ec.customers.loyaltyAdjust({
+    customerId:  _ecCustCurrent.id,
+    points:      pts,
+    description: 'نقاط يدوية من الإدارة',
+  });
   if (r.ok) { beOk(`تم إضافة ${pts} نقطة للعميل`); closeM('m-ec-cust'); ecCustLoad(); }
   else beErr(r.error);
 }

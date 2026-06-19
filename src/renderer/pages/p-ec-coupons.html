@@ -18,19 +18,18 @@
     <div class="modal-body">
       <input type="hidden" id="ec-coup-id">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div><label class="lbl">كود الكوبون *</label><input id="ec-coup-code" class="inp w100" placeholder="SUMMER20"></div>
+        <div><label class="lbl">كود الكوبون *</label><input id="ec-coup-code" class="inp w100" placeholder="SUMMER20" style="text-transform:uppercase"></div>
         <div><label class="lbl">النوع</label>
           <select id="ec-coup-type" class="inp w100">
             <option value="percentage">نسبة مئوية %</option>
             <option value="fixed">مبلغ ثابت ج.م</option>
           </select>
         </div>
-        <div><label class="lbl">قيمة الخصم *</label><input id="ec-coup-value" class="inp w100" type="number" placeholder="0"></div>
-        <div><label class="lbl">الحد الأدنى للطلب</label><input id="ec-coup-min" class="inp w100" type="number" placeholder="0"></div>
-        <div><label class="lbl">الحد الأقصى للخصم</label><input id="ec-coup-max-disc" class="inp w100" type="number" placeholder="لا يوجد"></div>
-        <div><label class="lbl">حد الاستخدام</label><input id="ec-coup-max-use" class="inp w100" type="number" placeholder="غير محدود"></div>
+        <div><label class="lbl">قيمة الخصم *</label><input id="ec-coup-value" class="inp w100" type="number" min="0" step="0.01" placeholder="0"></div>
+        <div><label class="lbl">الحد الأدنى للطلب</label><input id="ec-coup-min" class="inp w100" type="number" min="0" placeholder="0"></div>
+        <div><label class="lbl">حد الاستخدام</label><input id="ec-coup-max-use" class="inp w100" type="number" min="0" placeholder="غير محدود"></div>
         <div><label class="lbl">تاريخ الانتهاء</label><input id="ec-coup-exp" class="inp w100" type="date"></div>
-        <div class="flex ic gap8 mt20"><input type="checkbox" id="ec-coup-active"><label for="ec-coup-active">مفعّل</label></div>
+        <div class="flex ic gap8 mt8"><input type="checkbox" id="ec-coup-active" checked><label for="ec-coup-active">كوبون مفعّل</label></div>
       </div>
       <div class="mt12"><label class="lbl">الوصف</label><input id="ec-coup-desc" class="inp w100" placeholder="تخفيض الصيف..."></div>
     </div>
@@ -42,58 +41,63 @@
 </div>
 
 <script>
+let _ecCoupList = [];
+
 async function ecCoupLoad() {
   if (!IS_ELECTRON) return;
   try {
     const r = await BE.ec.coupons.list();
-    const coupons = r.data || [];
-    document.getElementById('ec-coup-count').textContent = `${coupons.length} كوبون`;
-    if (!coupons.length) { document.getElementById('ec-coup-table').innerHTML = '<div class="ta ts f12 py20">لا توجد كوبونات</div>'; return; }
-    document.getElementById('ec-coup-table').innerHTML = `<table class="tbl"><thead><tr><th>الكود</th><th>النوع</th><th>القيمة</th><th>الحد الأدنى</th><th>الاستخدام</th><th>الانتهاء</th><th>الحالة</th><th></th></tr></thead><tbody>${coupons.map(c=>`<tr><td class="fw7 fm">${c.code}</td><td>${c.discount_type==='percentage'?'%':'ج.م'}</td><td class="fw7">${c.discount_value}${c.discount_type==='percentage'?'%':' ج.م'}</td><td>${c.min_order_amount||'—'}</td><td>${c.used_count||0}${c.max_uses?'/'+c.max_uses:''}</td><td class="f11 ts">${c.expires_at?new Date(c.expires_at).toLocaleDateString('ar'):'—'}</td><td><span class="bge f11" style="background:${c.is_active?'#10b98120':'#ef444420'};color:${c.is_active?'#10b981':'#ef4444'}">${c.is_active?'نشط':'موقف'}</span></td><td class="flex gap4"><button class="btn bo bsm" onclick="ecCoupOpenForm('${c.id}')">تعديل</button><button class="btn bsm" style="background:#ef444420;color:#ef4444" onclick="ecCoupDelete('${c.id}','${c.code}')">حذف</button></td></tr>`).join('')}</tbody></table>`;
+    _ecCoupList = r.data || [];
+    document.getElementById('ec-coup-count').textContent = `${_ecCoupList.length} كوبون`;
+    if (!_ecCoupList.length) { document.getElementById('ec-coup-table').innerHTML = '<div class="ta ts f12 py20">لا توجد كوبونات</div>'; return; }
+    // DB fields: code, type (not discount_type), value (not discount_value), min_order_amount, max_uses, is_active
+    document.getElementById('ec-coup-table').innerHTML = `<table class="tbl"><thead><tr><th>الكود</th><th>النوع</th><th>القيمة</th><th>الحد الأدنى</th><th>الاستخدام</th><th>الانتهاء</th><th>الحالة</th><th></th></tr></thead><tbody>${_ecCoupList.map(c=>`<tr><td class="fw7 fm">${c.code}</td><td>${c.type==='percentage'?'%':'ج.م'}</td><td class="fw7">${c.value}${c.type==='percentage'?'%':' ج.م'}</td><td>${c.min_order_amount||'—'}</td><td>${c.used_count||0}${c.max_uses?'/'+c.max_uses:''}</td><td class="f11 ts">${c.expires_at?new Date(c.expires_at).toLocaleDateString('ar'):'—'}</td><td><span class="bge f11" style="background:${c.is_active?'#10b98120':'#ef444420'};color:${c.is_active?'#10b981':'#ef4444'}">${c.is_active?'نشط':'موقف'}</span></td><td class="flex gap4"><button class="btn bo bsm" onclick="ecCoupOpenForm('${c.id}')">تعديل</button><button class="btn bsm" style="background:#ef444420;color:#ef4444" onclick="ecCoupDelete('${c.id}','${c.code}')">حذف</button></td></tr>`).join('')}</tbody></table>`;
   } catch(e) { console.error('[EC-Coupons]', e); }
 }
 
-async function ecCoupOpenForm(id) {
+function ecCoupOpenForm(id) {
   if (id) {
-    const r = await BE.ec.coupons.get(id);
-    if (!r.ok) { beErr(r.error); return; }
-    const c = r.data;
+    // find from cached list (no separate get endpoint needed)
+    const c = _ecCoupList.find(x => x.id === id);
+    if (!c) { beErr('تعذر تحميل الكوبون'); return; }
     document.getElementById('ec-coup-form-title').textContent = 'تعديل الكوبون';
     document.getElementById('ec-coup-id').value       = c.id;
     document.getElementById('ec-coup-code').value     = c.code;
-    document.getElementById('ec-coup-type').value     = c.discount_type;
-    document.getElementById('ec-coup-value').value    = c.discount_value;
+    document.getElementById('ec-coup-type').value     = c.type;          // DB: type (not discount_type)
+    document.getElementById('ec-coup-value').value    = c.value;         // DB: value (not discount_value)
     document.getElementById('ec-coup-min').value      = c.min_order_amount||'';
-    document.getElementById('ec-coup-max-disc').value = c.max_discount_amount||'';
     document.getElementById('ec-coup-max-use').value  = c.max_uses||'';
     document.getElementById('ec-coup-exp').value      = c.expires_at ? c.expires_at.split('T')[0] : '';
     document.getElementById('ec-coup-active').checked = !!c.is_active;
     document.getElementById('ec-coup-desc').value     = c.description||'';
   } else {
     document.getElementById('ec-coup-form-title').textContent = 'كوبون جديد';
-    ['ec-coup-id','ec-coup-code','ec-coup-value','ec-coup-min','ec-coup-max-disc','ec-coup-max-use','ec-coup-exp','ec-coup-desc'].forEach(i=>{ document.getElementById(i).value=''; });
-    document.getElementById('ec-coup-type').value     = 'percentage';
+    ['ec-coup-id','ec-coup-code','ec-coup-value','ec-coup-min','ec-coup-max-use','ec-coup-exp','ec-coup-desc'].forEach(i=>{ document.getElementById(i).value=''; });
+    document.getElementById('ec-coup-type').value    = 'percentage';
     document.getElementById('ec-coup-active').checked = true;
   }
   openM('m-ec-coup');
 }
 
 async function ecCoupSave() {
-  const id = document.getElementById('ec-coup-id').value;
+  const id   = document.getElementById('ec-coup-id').value;
   const code = document.getElementById('ec-coup-code').value.trim().toUpperCase();
   if (!code) { beErr('أدخل كود الكوبون'); return; }
+  const val  = parseFloat(document.getElementById('ec-coup-value').value);
+  if (!val)  { beErr('أدخل قيمة الخصم'); return; }
   const data = {
+    id: id || undefined,
     code,
-    discount_type:      document.getElementById('ec-coup-type').value,
-    discount_value:     parseFloat(document.getElementById('ec-coup-value').value)||0,
-    min_order_amount:   parseFloat(document.getElementById('ec-coup-min').value)||null,
-    max_discount_amount:parseFloat(document.getElementById('ec-coup-max-disc').value)||null,
-    max_uses:           parseInt(document.getElementById('ec-coup-max-use').value)||null,
-    expires_at:         document.getElementById('ec-coup-exp').value || null,
-    is_active:          document.getElementById('ec-coup-active').checked ? 1 : 0,
-    description:        document.getElementById('ec-coup-desc').value.trim(),
+    type:              document.getElementById('ec-coup-type').value,    // DB field: type
+    value:             val,                                               // DB field: value
+    min_order_amount:  parseFloat(document.getElementById('ec-coup-min').value)||0,
+    max_uses:          parseInt(document.getElementById('ec-coup-max-use').value)||null,
+    expires_at:        document.getElementById('ec-coup-exp').value || null,
+    is_active:         document.getElementById('ec-coup-active').checked,
+    description:       document.getElementById('ec-coup-desc').value.trim()||null,
   };
-  const r = id ? await BE.ec.coupons.update(id, data) : await BE.ec.coupons.create(data);
+  // preload: BE.ec.coupons.save(data) — handler checks data.id for create vs update
+  const r = await BE.ec.coupons.save(data);
   if (r.ok) { beOk(id ? 'تم تحديث الكوبون' : 'تم إضافة الكوبون'); closeM('m-ec-coup'); ecCoupLoad(); }
   else beErr(r.error);
 }

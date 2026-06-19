@@ -9,7 +9,7 @@
       <option value="">جميع الفئات</option>
     </select>
     <input id="ec-shop-search" class="inp" placeholder="بحث عن منتج..." style="width:200px" oninput="ecShopLoad()">
-    <button class="btn bp" id="ec-cart-btn" onclick="ecCartOpen()">🛒 السلة <span id="ec-cart-badge" class="nb-badge" style="display:none">0</span></button>
+    <button class="btn bp" onclick="ecCartOpen()">🛒 السلة <span id="ec-cart-badge" class="nb-badge" style="display:none">0</span></button>
   </div>
 </div>
 
@@ -33,7 +33,6 @@
       <button class="btn bo bsm" onclick="ecCouponApply()">تطبيق</button>
     </div>
     <div id="ec-cart-discount-row" style="display:none" class="flex jb mb8 fc-r"><span>الخصم</span><span id="ec-cart-discount-val"></span></div>
-    <div class="flex jb mb8"><span class="ts">الشحن</span><span id="ec-cart-ship-cost" class="fw7">0 ج.م</span></div>
     <div class="flex jb fw7 f16 mb16"><span>الإجمالي</span><span id="ec-cart-total" class="fc-g"></span></div>
     <button class="btn bp w100 f14" onclick="ecCheckoutOpen()">إتمام الطلب ←</button>
   </div>
@@ -49,18 +48,14 @@
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         <div><label class="lbl">الاسم *</label><input id="ec-co-name" class="inp w100" placeholder="اسم العميل"></div>
         <div><label class="lbl">رقم الهاتف *</label><input id="ec-co-phone" class="inp w100" placeholder="01xxxxxxxxx"></div>
-        <div class="span2"><label class="lbl">العنوان</label><input id="ec-co-addr" class="inp w100" placeholder="الشارع، المنطقة، المدينة"></div>
+        <div class="span2"><label class="lbl">العنوان (الشارع / المنطقة / المدينة)</label><input id="ec-co-addr" class="inp w100" placeholder="مثال: 5 شارع النيل، الدقي، الجيزة"></div>
+        <div><label class="lbl">المحافظة</label><input id="ec-co-gov" class="inp w100" placeholder="الجيزة"></div>
         <div><label class="lbl">طريقة الدفع</label>
           <select id="ec-co-pay" class="inp w100">
             <option value="cash_on_delivery">الدفع عند الاستلام</option>
             <option value="bank_transfer">تحويل بنكي</option>
             <option value="vodafone_cash">فودافون كاش</option>
             <option value="instapay">إنستاباي</option>
-          </select>
-        </div>
-        <div><label class="lbl">منطقة الشحن</label>
-          <select id="ec-co-ship" class="inp w100" onchange="ecCoShipChanged()">
-            <option value="">اختر منطقة...</option>
           </select>
         </div>
         <div class="span2"><label class="lbl">ملاحظات</label><textarea id="ec-co-notes" class="inp w100" rows="2" placeholder="أي ملاحظات خاصة بالطلب..."></textarea></div>
@@ -82,16 +77,13 @@
 </div>
 
 <script>
-let _ecCart = []; // [{product, qty}]
+let _ecCart = [];       // [{product, qty}]
 let _ecCouponData = null;
-let _ecShipZones = [];
-let _ecShipCost = 0;
 
 async function ecShopLoadCats() {
   const r = await BE.ec.categories.list();
   const cats = r.data || [];
-  const opts = '<option value="">جميع الفئات</option>' + cats.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
-  document.getElementById('ec-shop-cat-filter').innerHTML = opts;
+  document.getElementById('ec-shop-cat-filter').innerHTML = '<option value="">جميع الفئات</option>' + cats.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
 }
 
 async function ecShopLoad() {
@@ -103,44 +95,40 @@ async function ecShopLoad() {
     const prods = r.data || [];
     const grid = document.getElementById('ec-shop-grid');
     if (!prods.length) { grid.innerHTML = '<div class="ta ts f12 py20" style="grid-column:1/-1">لا توجد منتجات</div>'; return; }
-    grid.innerHTML = prods.map(p=>`
-      <div class="card" style="padding:0;overflow:hidden;cursor:pointer" onclick="ecShopAddToCart('${p.id}')">
-        ${p.image_url ? `<img src="${p.image_url}" style="width:100%;height:160px;object-fit:cover">` : `<div style="height:120px;background:var(--bg2);display:flex;align-items:center;justify-content:center;font-size:32px">🛍️</div>`}
+    grid.innerHTML = prods.map(p=>{
+      const imgs = (() => { try { return JSON.parse(p.images||'[]'); } catch(_) { return []; } })();
+      const imgUrl = imgs[0]?.url || p.image_url || '';
+      const inStock = p.stock_quantity > 0;
+      return `<div class="card" style="padding:0;overflow:hidden">
+        ${imgUrl ? `<img src="${imgUrl}" style="width:100%;height:160px;object-fit:cover">` : `<div style="height:120px;background:var(--bg2);display:flex;align-items:center;justify-content:center;font-size:32px">🛍️</div>`}
         <div style="padding:12px">
           <div class="fw7 mb4">${p.name}</div>
-          ${p.description ? `<div class="f11 ts mb8" style="overflow:hidden;max-height:40px">${p.description}</div>` : ''}
-          <div class="flex jb ic">
-            <div>
-              <span class="fw7 fc-g">${(p.price||0).toFixed(2)} ج.م</span>
-              ${p.compare_at_price ? `<span class="f11 ts" style="text-decoration:line-through;margin-right:6px">${(p.compare_at_price).toFixed(0)}</span>` : ''}
-            </div>
-            <div class="f11 ts">${p.stock_quantity > 0 ? `متاح: ${p.stock_quantity}` : '<span class="fc-r">نفد</span>'}</div>
+          ${p.description ? `<div class="f11 ts mb8" style="overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${p.description}</div>` : ''}
+          <div class="flex jb ic mb8">
+            <div><span class="fw7 fc-g">${(p.price||0).toFixed(2)} ج.م</span>${p.compare_price?`<span class="f11 ts" style="text-decoration:line-through;margin-right:6px">${(p.compare_price).toFixed(0)}</span>`:''}</div>
+            <div class="f11 ${inStock?'ts':'fc-r'}">${inStock?`متاح: ${p.stock_quantity}`:'نفد المخزون'}</div>
           </div>
-          <button class="btn bp w100 mt8 bsm" onclick="event.stopPropagation();ecShopAddToCart('${p.id}',1)">+ أضف للسلة</button>
-        </div>
-      </div>`).join('');
+          <button class="btn bp w100 bsm" ${inStock?`onclick="ecShopAdd('${p.id}')"`:'disabled style="opacity:.4"'}>+ أضف للسلة</button>
+        </div></div>`;
+    }).join('');
     document.getElementById('ec-shop-subtitle').textContent = `${prods.length} منتج متاح`;
   } catch(e) { console.error('[EC-Shop]', e); }
 }
 
-// Store product data cache
 let _ecProdCache = {};
-async function ecShopAddToCart(productId, qty=1) {
+async function ecShopAdd(productId) {
   if (!IS_ELECTRON) return;
   let prod = _ecProdCache[productId];
   if (!prod) {
     const r = await BE.ec.products.get(productId);
-    if (!r.ok || !r.data) { beErr('تعذر تحميل المنتج'); return; }
+    if (!r.ok) { beErr('تعذر تحميل المنتج'); return; }
     prod = r.data;
     _ecProdCache[productId] = prod;
   }
-  if (prod.stock_quantity <= 0) { beErr('هذا المنتج غير متاح حالياً'); return; }
-  const existing = _ecCart.find(i => i.product.id === productId);
-  if (existing) {
-    existing.qty = Math.min(existing.qty + qty, prod.stock_quantity);
-  } else {
-    _ecCart.push({ product: prod, qty });
-  }
+  if (prod.stock_quantity <= 0) { beErr('هذا المنتج غير متاح'); return; }
+  const ex = _ecCart.find(i => i.product.id === productId);
+  if (ex) { ex.qty = Math.min(ex.qty + 1, prod.stock_quantity); }
+  else     { _ecCart.push({ product: prod, qty: 1 }); }
   ecCartUpdate();
   showN('تمت الإضافة', prod.name, '🛒');
 }
@@ -154,15 +142,10 @@ function ecCartUpdate() {
 }
 
 function ecCartRender() {
-  const items = document.getElementById('ec-cart-items');
+  const items  = document.getElementById('ec-cart-items');
   const footer = document.getElementById('ec-cart-footer');
   const empty  = document.getElementById('ec-cart-empty');
-  if (!_ecCart.length) {
-    items.innerHTML = '';
-    footer.style.display = 'none';
-    empty.style.display  = 'block';
-    return;
-  }
+  if (!_ecCart.length) { items.innerHTML=''; footer.style.display='none'; empty.style.display='block'; return; }
   empty.style.display  = 'none';
   footer.style.display = 'block';
   items.innerHTML = _ecCart.map((item,i) => `
@@ -177,15 +160,19 @@ function ecCartRender() {
       <div class="fw7 ts" style="min-width:60px;text-align:left">${((item.product.price||0)*item.qty).toFixed(2)}</div>
     </div>`).join('');
   const subtotal = _ecCart.reduce((s,i) => s+(i.product.price||0)*i.qty, 0);
-  const discount = _ecCouponData ? (_ecCouponData.discount_type==='percentage' ? subtotal*_ecCouponData.discount_value/100 : _ecCouponData.discount_value) : 0;
-  const total    = Math.max(0, subtotal - discount + _ecShipCost);
+  const discount = _ecCouponData
+    ? (_ecCouponData.type==='percentage'
+        ? Math.min(subtotal * _ecCouponData.value / 100, subtotal)
+        : _ecCouponData.value)
+    : 0;
   document.getElementById('ec-cart-subtotal').textContent = subtotal.toFixed(2) + ' ج.م';
-  document.getElementById('ec-cart-total').textContent    = total.toFixed(2) + ' ج.م';
+  document.getElementById('ec-cart-total').textContent    = Math.max(0, subtotal - discount).toFixed(2) + ' ج.م';
   if (_ecCouponData) {
     document.getElementById('ec-cart-discount-row').style.display = 'flex';
     document.getElementById('ec-cart-discount-val').textContent   = '- ' + discount.toFixed(2) + ' ج.م';
+  } else {
+    document.getElementById('ec-cart-discount-row').style.display = 'none';
   }
-  document.getElementById('ec-cart-ship-cost').textContent = _ecShipCost.toFixed(2) + ' ج.م';
 }
 
 function ecCartQty(i, d) { _ecCart[i].qty = Math.max(1, Math.min(_ecCart[i].qty + d, _ecCart[i].product.stock_quantity)); ecCartUpdate(); }
@@ -197,33 +184,29 @@ async function ecCouponApply() {
   const code = document.getElementById('ec-cart-coupon').value.trim().toUpperCase();
   if (!code) return;
   const subtotal = _ecCart.reduce((s,i) => s+(i.product.price||0)*i.qty, 0);
-  const r = await BE.ec.coupon.validate(code, subtotal);
-  if (r.ok) { _ecCouponData = r.data; beOk('تم تطبيق الكوبون!'); ecCartRender(); }
-  else { _ecCouponData = null; beErr(r.error || 'كوبون غير صالح'); }
+  // preload: validate(data) — must pass ONE object {code, subtotal}
+  const r = await BE.ec.coupon.validate({ code, subtotal });
+  if (r.ok && r.data?.valid) {
+    _ecCouponData = r.data.coupon;
+    beOk(`✅ كوبون مطبّق — خصم ${r.data.discount?.toFixed(2)} ج.م`);
+    ecCartRender();
+  } else {
+    _ecCouponData = null;
+    beErr(r.data?.error || r.error || 'كوبون غير صالح');
+  }
 }
 
-async function ecCheckoutOpen() {
+function ecCheckoutOpen() {
   if (!_ecCart.length) { beErr('السلة فارغة'); return; }
-  // Load shipping zones
-  const sz = await BE.ec.shipping.list();
-  _ecShipZones = (sz.data||[]).filter(z=>z.is_active);
-  const shipOpts = '<option value="">اختر منطقة...</option>' + _ecShipZones.map(z=>`<option value="${z.id}" data-cost="${z.cost}">${z.name} — ${(z.cost||0).toFixed(0)} ج.م</option>`).join('');
-  document.getElementById('ec-co-ship').innerHTML = shipOpts;
-  // Build summary
   const subtotal = _ecCart.reduce((s,i) => s+(i.product.price||0)*i.qty, 0);
-  const discount = _ecCouponData ? (_ecCouponData.discount_type==='percentage' ? subtotal*_ecCouponData.discount_value/100 : _ecCouponData.discount_value) : 0;
-  document.getElementById('ec-co-summary').innerHTML = `
-    ${_ecCart.map(i=>`<div class="flex jb f12"><span>${i.product.name} × ${i.qty}</span><span>${((i.product.price||0)*i.qty).toFixed(2)} ج.م</span></div>`).join('')}
-    <div class="flex jb fw7 mt8"><span>المجموع</span><span>${(subtotal - discount).toFixed(2)} ج.م</span></div>
-  `;
+  const discount = _ecCouponData
+    ? (_ecCouponData.type==='percentage' ? Math.min(subtotal*_ecCouponData.value/100, subtotal) : _ecCouponData.value)
+    : 0;
+  document.getElementById('ec-co-summary').innerHTML =
+    _ecCart.map(i=>`<div class="flex jb f12"><span>${i.product.name} × ${i.qty}</span><span>${((i.product.price||0)*i.qty).toFixed(2)} ج.م</span></div>`).join('') +
+    (discount ? `<div class="flex jb f12 fc-r"><span>الخصم</span><span>- ${discount.toFixed(2)} ج.م</span></div>` : '') +
+    `<div class="flex jb fw7 mt8"><span>المجموع</span><span>${Math.max(0, subtotal - discount).toFixed(2)} ج.م</span></div>`;
   openM('m-ec-checkout');
-}
-
-function ecCoShipChanged() {
-  const sel = document.getElementById('ec-co-ship');
-  const opt = sel.options[sel.selectedIndex];
-  _ecShipCost = parseFloat(opt.dataset.cost||'0') || 0;
-  ecCartRender();
 }
 
 async function ecCheckoutSubmit() {
@@ -231,34 +214,33 @@ async function ecCheckoutSubmit() {
   const phone = document.getElementById('ec-co-phone').value.trim();
   if (!name)  { beErr('أدخل اسم العميل'); return; }
   if (!phone) { beErr('أدخل رقم الهاتف'); return; }
-  const shipId = document.getElementById('ec-co-ship').value;
-  const items = _ecCart.map(i => ({ product_id: i.product.id, name: i.product.name, quantity: i.qty, unit_price: i.product.price||0 }));
+
+  const street      = document.getElementById('ec-co-addr').value.trim();
+  const governorate = document.getElementById('ec-co-gov').value.trim();
+
+  // Match handler signature: {customer_data, shipping_address, delivery_notes, coupon_code, items, wa_session_id}
   const payload = {
-    customer_name:   name,
-    customer_phone:  phone,
-    delivery_address:document.getElementById('ec-co-addr').value.trim(),
+    customer_data: { name, phone },
+    shipping_address: street ? { street, governorate, city: governorate } : null,
+    delivery_notes:  document.getElementById('ec-co-notes').value.trim() || null,
     payment_method:  document.getElementById('ec-co-pay').value,
-    shipping_zone_id:shipId || null,
-    notes:           document.getElementById('ec-co-notes').value.trim(),
     coupon_code:     _ecCouponData ? document.getElementById('ec-cart-coupon').value.trim().toUpperCase() : null,
-    items,
+    items: _ecCart.map(i => ({ product_id: i.product.id, quantity: i.qty })),
   };
+
   try {
     const r = await BE.ec.checkout(payload);
     if (!r.ok) { beErr(r.error || 'فشل إنشاء الطلب'); return; }
     const order = r.data;
     beOk(`✅ تم إنشاء الطلب: ${order.order_number}`);
-    // Trigger WA if checked
-    if (document.getElementById('ec-co-send-wa').checked && order.id) {
-      await BE.ec.orders.triggerWaConfirmation(order.id).catch(()=>{});
+    if (document.getElementById('ec-co-send-wa').checked && order.order_id) {
+      await BE.ec.orders.triggerWaConfirmation({ orderId: order.order_id }).catch(()=>{});
     }
     _ecCart = [];
     _ecCouponData = null;
-    _ecShipCost = 0;
     ecCartUpdate();
     ecCartClose();
     closeM('m-ec-checkout');
-    // Navigate to orders to see the new order
     setTimeout(() => nav('ec-orders'), 500);
   } catch(e) { beErr(e.message); }
 }

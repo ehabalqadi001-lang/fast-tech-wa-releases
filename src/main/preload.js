@@ -395,6 +395,7 @@ contextBridge.exposeInMainWorld('ftwa', {
     // Coupons
     coupons: {
       list:   ()     => ipcRenderer.invoke('ec:coupons:list'),
+      get:    (id)   => ipcRenderer.invoke('ec:coupons:get',    id),
       save:   (data) => ipcRenderer.invoke('ec:coupons:save',   data),
       delete: (id)   => ipcRenderer.invoke('ec:coupons:delete', id),
     },

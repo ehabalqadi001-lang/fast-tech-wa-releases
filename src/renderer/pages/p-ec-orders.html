@@ -22,7 +22,7 @@
   <div id="ec-ord-table">
     <div class="ta ts f12 py20">جارٍ تحميل الطلبات...</div>
   </div>
-  <div class="flex jb ic mt12" id="ec-ord-pager" style="display:none!important">
+  <div class="flex jb ic mt12" id="ec-ord-pager" style="display:none">
     <button class="btn bo bsm" id="ec-ord-prev" onclick="ecOrdPage(-1)">السابق</button>
     <span class="f12 ts" id="ec-ord-page-info"></span>
     <button class="btn bo bsm" id="ec-ord-next" onclick="ecOrdPage(1)">التالي</button>
@@ -49,7 +49,7 @@
       <div class="flex gap8">
         <input id="ec-ord-tracking" class="inp" placeholder="رقم التتبع..." style="width:160px">
         <button class="btn bo" onclick="ecOrdUpdateTracking()">حفظ التتبع</button>
-        <button class="btn" style="background:#25d366;color:#fff" onclick="ecOrdSendWa()">📱 إرسال واتساب</button>
+        <button class="btn" style="background:#25d366;color:#fff" onclick="ecOrdSendWa()">📱 واتساب</button>
       </div>
     </div>
   </div>
@@ -65,26 +65,16 @@ async function ecOrdLoad() {
   const status = document.getElementById('ec-ord-status-filter').value;
   const search = document.getElementById('ec-ord-search').value.trim();
   try {
-    const r = await BE.ec.orders.list({ status: status||undefined, search: search||undefined, page: _ecOrdPage, limit: _ecOrdPerPage });
+    const r = await BE.ec.orders.list({ status: status||undefined, search: search||undefined, limit: _ecOrdPerPage });
     const orders = r.data || [];
-    const total  = r.total || orders.length;
-    document.getElementById('ec-ord-count').textContent = `${total} طلب`;
+    document.getElementById('ec-ord-count').textContent = `${orders.length} طلب`;
     if (!orders.length) {
       document.getElementById('ec-ord-table').innerHTML = '<div class="ta ts f12 py20">لا توجد طلبات</div>';
       document.getElementById('ec-ord-pager').style.display = 'none';
       return;
     }
-    document.getElementById('ec-ord-table').innerHTML = `<table class="tbl"><thead><tr><th>رقم الطلب</th><th>العميل</th><th>الهاتف</th><th>المبلغ</th><th>الدفع</th><th>الحالة</th><th>التاريخ</th><th></th></tr></thead><tbody>${orders.map(o=>`<tr><td class="fw7 fm">${o.order_number}</td><td>${o.customer_name||'—'}</td><td class="fm f12">${o.customer_phone||'—'}</td><td class="fw7">${(o.total_amount||0).toFixed(2)} ج.م</td><td class="f12 ts">${o.payment_method||'—'}</td><td><span class="bge f11" style="background:${EC_SC[o.status]||'#888'}20;color:${EC_SC[o.status]||'#888'}">${EC_SL[o.status]||o.status}</span></td><td class="f11 ts">${new Date(o.created_at).toLocaleDateString('ar')}</td><td><button class="btn bo bsm" onclick="ecOrdersOpenDetail('${o.id}')">عرض</button></td></tr>`).join('')}</tbody></table>`;
-    const pages = Math.ceil(total / _ecOrdPerPage);
-    if (pages > 1) {
-      document.getElementById('ec-ord-pager').style.display = 'flex';
-      document.getElementById('ec-ord-page-info').textContent = `صفحة ${_ecOrdPage} من ${pages}`;
-      document.getElementById('ec-ord-prev').disabled = _ecOrdPage <= 1;
-      document.getElementById('ec-ord-next').disabled = _ecOrdPage >= pages;
-    } else {
-      document.getElementById('ec-ord-pager').style.display = 'none';
-    }
-    // Auto-open if navigated from dashboard
+    document.getElementById('ec-ord-table').innerHTML = `<table class="tbl"><thead><tr><th>رقم الطلب</th><th>العميل</th><th>الهاتف</th><th>المبلغ</th><th>الحالة</th><th>التاريخ</th><th></th></tr></thead><tbody>${orders.map(o=>`<tr><td class="fw7 fm">${o.order_number}</td><td>${o.customer_name||'—'}</td><td class="fm f12">${o.customer_phone||'—'}</td><td class="fw7">${(o.total_amount||0).toFixed(2)} ج.م</td><td><span class="bge f11" style="background:${EC_SC[o.status]||'#888'}20;color:${EC_SC[o.status]||'#888'}">${EC_SL[o.status]||o.status}</span></td><td class="f11 ts">${new Date(o.created_at).toLocaleDateString('ar')}</td><td><button class="btn bo bsm" onclick="ecOrdersOpenDetail('${o.id}')">عرض</button></td></tr>`).join('')}</tbody></table>`;
+    document.getElementById('ec-ord-pager').style.display = 'none';
     if (window._ecViewOrderId) { const id = window._ecViewOrderId; window._ecViewOrderId = null; ecOrdersOpenDetail(id); }
   } catch(e) { console.error('[EC-Orders]', e); }
 }
@@ -93,7 +83,6 @@ function ecOrdPage(d) { _ecOrdPage = Math.max(1, _ecOrdPage + d); ecOrdLoad(); }
 
 async function ecOrdersOpenDetail(id) {
   if (!IS_ELECTRON) return;
-  window.ecOrdersOpenDetail = ecOrdersOpenDetail;
   try {
     const r = await BE.ec.orders.get(id);
     if (!r.ok) { beErr(r.error); return; }
@@ -102,24 +91,25 @@ async function ecOrdersOpenDetail(id) {
     document.getElementById('ec-ord-detail-title').textContent = `طلب رقم: ${o.order_number}`;
     document.getElementById('ec-ord-status-sel').value = o.status;
     document.getElementById('ec-ord-tracking').value = o.tracking_number||'';
-    const items = JSON.parse(o.items_json||'[]');
-    const addr  = JSON.parse(o.delivery_address||'{}');
+    // items is stored as JSON string in the 'items' column
+    const items = (() => { try { return JSON.parse(o.items||'[]'); } catch(_) { return []; } })();
+    const addr  = (() => { try { return JSON.parse(o.shipping_address||'{}'); } catch(_) { return {}; } })();
     document.getElementById('ec-ord-detail-body').innerHTML = `
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
         <div><div class="f11 ts mb4">العميل</div><div class="fw7">${o.customer_name||'—'}</div><div class="f12 ts">${o.customer_phone||''}</div></div>
         <div><div class="f11 ts mb4">التاريخ</div><div>${new Date(o.created_at).toLocaleString('ar')}</div></div>
         <div><div class="f11 ts mb4">طريقة الدفع</div><div>${o.payment_method||'—'}</div></div>
-        <div><div class="f11 ts mb4">منطقة الشحن</div><div>${o.shipping_zone||'—'}</div></div>
-        ${addr.street ? `<div class="span2"><div class="f11 ts mb4">العنوان</div><div>${addr.street||''} ${addr.city||''} ${addr.area||''}</div></div>` : ''}
-        ${o.delivery_notes ? `<div class="span2"><div class="f11 ts mb4">ملاحظات التسليم</div><div>${o.delivery_notes}</div></div>` : ''}
+        <div><div class="f11 ts mb4">حالة الواتساب</div><div>${o.wa_confirmation_status||'—'}</div></div>
+        ${(addr.street||addr.city) ? `<div class="span2"><div class="f11 ts mb4">العنوان</div><div>${addr.street||''} ${addr.city||''} ${addr.area||addr.governorate||''}</div></div>` : ''}
+        ${o.delivery_notes ? `<div class="span2"><div class="f11 ts mb4">ملاحظات</div><div>${o.delivery_notes}</div></div>` : ''}
       </div>
       <div class="fw7 mb8">المنتجات</div>
       <table class="tbl mb12"><thead><tr><th>المنتج</th><th>الكمية</th><th>السعر</th><th>المجموع</th></tr></thead><tbody>
-        ${items.map(i=>`<tr><td>${i.name||i.product_id}</td><td>${i.quantity}</td><td>${(i.unit_price||0).toFixed(2)}</td><td>${((i.unit_price||0)*(i.quantity||1)).toFixed(2)}</td></tr>`).join('')}
+        ${items.map(i=>`<tr><td>${i.name||i.product_id}</td><td>${i.quantity}</td><td>${(i.price||i.unit_price||0).toFixed(2)}</td><td>${((i.price||i.unit_price||0)*(i.quantity||1)).toFixed(2)}</td></tr>`).join('')}
       </tbody></table>
       <div class="flex jb"><span class="ts">المجموع الفرعي</span><span>${(o.subtotal||0).toFixed(2)} ج.م</span></div>
       ${o.discount_amount ? `<div class="flex jb"><span class="ts">الخصم</span><span class="fc-r">- ${(o.discount_amount||0).toFixed(2)} ج.م</span></div>` : ''}
-      ${o.shipping_cost ? `<div class="flex jb"><span class="ts">الشحن</span><span>${(o.shipping_cost||0).toFixed(2)} ج.م</span></div>` : ''}
+      ${o.shipping_fee ? `<div class="flex jb"><span class="ts">الشحن</span><span>${(o.shipping_fee||0).toFixed(2)} ج.م</span></div>` : ''}
       <div class="flex jb fw7 mt8"><span>الإجمالي</span><span>${(o.total_amount||0).toFixed(2)} ج.م</span></div>
       ${o.tracking_number ? `<div class="mt8 ts f12">رقم التتبع: <span class="fm fw7">${o.tracking_number}</span></div>` : ''}
     `;
@@ -130,22 +120,25 @@ async function ecOrdersOpenDetail(id) {
 async function ecOrdUpdateStatus() {
   if (!_ecOrdCurrent) return;
   const status = document.getElementById('ec-ord-status-sel').value;
-  const r = await BE.ec.orders.updateStatus(_ecOrdCurrent.id, status);
+  // preload: updateStatus(data) expects object {id, status}
+  const r = await BE.ec.orders.updateStatus({ id: _ecOrdCurrent.id, status });
   if (r.ok) { beOk('تم تحديث حالة الطلب'); closeM('m-ec-order'); ecOrdLoad(); }
   else beErr(r.error);
 }
 
 async function ecOrdUpdateTracking() {
   if (!_ecOrdCurrent) return;
-  const tracking = document.getElementById('ec-ord-tracking').value.trim();
-  const r = await BE.ec.orders.updateTracking(_ecOrdCurrent.id, tracking);
+  const tracking_number = document.getElementById('ec-ord-tracking').value.trim();
+  // preload: updateTracking(data) expects object {id, tracking_number}
+  const r = await BE.ec.orders.updateTracking({ id: _ecOrdCurrent.id, tracking_number });
   if (r.ok) { beOk('تم حفظ رقم التتبع'); }
   else beErr(r.error);
 }
 
 async function ecOrdSendWa() {
   if (!_ecOrdCurrent) return;
-  const r = await BE.ec.orders.triggerWaConfirmation(_ecOrdCurrent.id);
+  // preload: triggerWaConfirmation(data) expects object {orderId}
+  const r = await BE.ec.orders.triggerWaConfirmation({ orderId: _ecOrdCurrent.id });
   if (r.ok) { beOk('تم إرسال رسالة التأكيد عبر واتساب'); closeM('m-ec-order'); }
   else beErr(r.error || 'تعذر إرسال رسالة واتساب');
 }
