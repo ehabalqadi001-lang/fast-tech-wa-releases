@@ -1,0 +1,271 @@
+<!-- E-Commerce Storefront (Catalog + Cart + Checkout) -->
+<div class="page-hd">
+  <div>
+    <h1 class="page-tt">🏪 المتجر</h1>
+    <p class="page-st" id="ec-shop-subtitle">تصفح المنتجات وإنشاء الطلبات</p>
+  </div>
+  <div class="flex gap8 ic">
+    <select id="ec-shop-cat-filter" class="inp" style="width:160px" onchange="ecShopLoad()">
+      <option value="">جميع الفئات</option>
+    </select>
+    <input id="ec-shop-search" class="inp" placeholder="بحث عن منتج..." style="width:200px" oninput="ecShopLoad()">
+    <button class="btn bp" id="ec-cart-btn" onclick="ecCartOpen()">🛒 السلة <span id="ec-cart-badge" class="nb-badge" style="display:none">0</span></button>
+  </div>
+</div>
+
+<!-- Product Grid -->
+<div id="ec-shop-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;margin-bottom:24px">
+  <div class="ta ts f12 py20" style="grid-column:1/-1">جارٍ تحميل المنتجات...</div>
+</div>
+
+<!-- Cart Sidebar -->
+<div id="ec-cart-sidebar" style="display:none;position:fixed;top:0;right:0;width:380px;height:100vh;background:var(--bg1);border-left:1px solid var(--bdr);z-index:200;overflow-y:auto;padding:24px;box-shadow:-4px 0 20px rgba(0,0,0,.4)">
+  <div class="flex jb ic mb16">
+    <div class="fw7 f16">🛒 السلة</div>
+    <button class="btn-x" onclick="ecCartClose()">×</button>
+  </div>
+  <div id="ec-cart-items"></div>
+  <div id="ec-cart-footer" style="display:none">
+    <hr style="border-color:var(--bdr);margin:16px 0">
+    <div class="flex jb mb8"><span class="ts">المجموع الفرعي</span><span id="ec-cart-subtotal" class="fw7"></span></div>
+    <div class="flex ic gap8 mb8">
+      <input id="ec-cart-coupon" class="inp" placeholder="كود الخصم..." style="flex:1">
+      <button class="btn bo bsm" onclick="ecCouponApply()">تطبيق</button>
+    </div>
+    <div id="ec-cart-discount-row" style="display:none" class="flex jb mb8 fc-r"><span>الخصم</span><span id="ec-cart-discount-val"></span></div>
+    <div class="flex jb mb8"><span class="ts">الشحن</span><span id="ec-cart-ship-cost" class="fw7">0 ج.م</span></div>
+    <div class="flex jb fw7 f16 mb16"><span>الإجمالي</span><span id="ec-cart-total" class="fc-g"></span></div>
+    <button class="btn bp w100 f14" onclick="ecCheckoutOpen()">إتمام الطلب ←</button>
+  </div>
+  <div id="ec-cart-empty" class="ta ts py40" style="display:none">السلة فارغة</div>
+</div>
+<div id="ec-cart-overlay" onclick="ecCartClose()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:199"></div>
+
+<!-- Checkout Modal -->
+<div class="modal" id="m-ec-checkout" style="display:none">
+  <div class="modal-box" style="max-width:560px">
+    <div class="modal-hd">إتمام الطلب<button class="btn-x" onclick="closeM('m-ec-checkout')">×</button></div>
+    <div class="modal-body">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div><label class="lbl">الاسم *</label><input id="ec-co-name" class="inp w100" placeholder="اسم العميل"></div>
+        <div><label class="lbl">رقم الهاتف *</label><input id="ec-co-phone" class="inp w100" placeholder="01xxxxxxxxx"></div>
+        <div class="span2"><label class="lbl">العنوان</label><input id="ec-co-addr" class="inp w100" placeholder="الشارع، المنطقة، المدينة"></div>
+        <div><label class="lbl">طريقة الدفع</label>
+          <select id="ec-co-pay" class="inp w100">
+            <option value="cash_on_delivery">الدفع عند الاستلام</option>
+            <option value="bank_transfer">تحويل بنكي</option>
+            <option value="vodafone_cash">فودافون كاش</option>
+            <option value="instapay">إنستاباي</option>
+          </select>
+        </div>
+        <div><label class="lbl">منطقة الشحن</label>
+          <select id="ec-co-ship" class="inp w100" onchange="ecCoShipChanged()">
+            <option value="">اختر منطقة...</option>
+          </select>
+        </div>
+        <div class="span2"><label class="lbl">ملاحظات</label><textarea id="ec-co-notes" class="inp w100" rows="2" placeholder="أي ملاحظات خاصة بالطلب..."></textarea></div>
+      </div>
+      <div class="mt12 card" style="padding:12px">
+        <div class="fw7 mb8">ملخص الطلب</div>
+        <div id="ec-co-summary"></div>
+      </div>
+      <div class="flex ic gap8 mt8">
+        <input type="checkbox" id="ec-co-send-wa" checked>
+        <label for="ec-co-send-wa" class="f12">إرسال تأكيد واتساب للعميل تلقائياً</label>
+      </div>
+    </div>
+    <div class="modal-ft flex gap8 jb">
+      <button class="btn bo" onclick="closeM('m-ec-checkout')">إلغاء</button>
+      <button class="btn bp" onclick="ecCheckoutSubmit()">تأكيد الطلب</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let _ecCart = []; // [{product, qty}]
+let _ecCouponData = null;
+let _ecShipZones = [];
+let _ecShipCost = 0;
+
+async function ecShopLoadCats() {
+  const r = await BE.ec.categories.list();
+  const cats = r.data || [];
+  const opts = '<option value="">جميع الفئات</option>' + cats.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+  document.getElementById('ec-shop-cat-filter').innerHTML = opts;
+}
+
+async function ecShopLoad() {
+  if (!IS_ELECTRON) return;
+  const search = document.getElementById('ec-shop-search').value.trim();
+  const catId  = document.getElementById('ec-shop-cat-filter').value;
+  try {
+    const r = await BE.ec.products.list({ status:'active', search: search||undefined, category_id: catId||undefined });
+    const prods = r.data || [];
+    const grid = document.getElementById('ec-shop-grid');
+    if (!prods.length) { grid.innerHTML = '<div class="ta ts f12 py20" style="grid-column:1/-1">لا توجد منتجات</div>'; return; }
+    grid.innerHTML = prods.map(p=>`
+      <div class="card" style="padding:0;overflow:hidden;cursor:pointer" onclick="ecShopAddToCart('${p.id}')">
+        ${p.image_url ? `<img src="${p.image_url}" style="width:100%;height:160px;object-fit:cover">` : `<div style="height:120px;background:var(--bg2);display:flex;align-items:center;justify-content:center;font-size:32px">🛍️</div>`}
+        <div style="padding:12px">
+          <div class="fw7 mb4">${p.name}</div>
+          ${p.description ? `<div class="f11 ts mb8" style="overflow:hidden;max-height:40px">${p.description}</div>` : ''}
+          <div class="flex jb ic">
+            <div>
+              <span class="fw7 fc-g">${(p.price||0).toFixed(2)} ج.م</span>
+              ${p.compare_at_price ? `<span class="f11 ts" style="text-decoration:line-through;margin-right:6px">${(p.compare_at_price).toFixed(0)}</span>` : ''}
+            </div>
+            <div class="f11 ts">${p.stock_quantity > 0 ? `متاح: ${p.stock_quantity}` : '<span class="fc-r">نفد</span>'}</div>
+          </div>
+          <button class="btn bp w100 mt8 bsm" onclick="event.stopPropagation();ecShopAddToCart('${p.id}',1)">+ أضف للسلة</button>
+        </div>
+      </div>`).join('');
+    document.getElementById('ec-shop-subtitle').textContent = `${prods.length} منتج متاح`;
+  } catch(e) { console.error('[EC-Shop]', e); }
+}
+
+// Store product data cache
+let _ecProdCache = {};
+async function ecShopAddToCart(productId, qty=1) {
+  if (!IS_ELECTRON) return;
+  let prod = _ecProdCache[productId];
+  if (!prod) {
+    const r = await BE.ec.products.get(productId);
+    if (!r.ok || !r.data) { beErr('تعذر تحميل المنتج'); return; }
+    prod = r.data;
+    _ecProdCache[productId] = prod;
+  }
+  if (prod.stock_quantity <= 0) { beErr('هذا المنتج غير متاح حالياً'); return; }
+  const existing = _ecCart.find(i => i.product.id === productId);
+  if (existing) {
+    existing.qty = Math.min(existing.qty + qty, prod.stock_quantity);
+  } else {
+    _ecCart.push({ product: prod, qty });
+  }
+  ecCartUpdate();
+  showN('تمت الإضافة', prod.name, '🛒');
+}
+
+function ecCartUpdate() {
+  const badge = document.getElementById('ec-cart-badge');
+  const total = _ecCart.reduce((s,i) => s+i.qty, 0);
+  badge.textContent = total;
+  badge.style.display = total ? 'inline-flex' : 'none';
+  ecCartRender();
+}
+
+function ecCartRender() {
+  const items = document.getElementById('ec-cart-items');
+  const footer = document.getElementById('ec-cart-footer');
+  const empty  = document.getElementById('ec-cart-empty');
+  if (!_ecCart.length) {
+    items.innerHTML = '';
+    footer.style.display = 'none';
+    empty.style.display  = 'block';
+    return;
+  }
+  empty.style.display  = 'none';
+  footer.style.display = 'block';
+  items.innerHTML = _ecCart.map((item,i) => `
+    <div class="flex ic gap8 py8 border-b">
+      <div style="flex:1"><div class="fw7 f13">${item.product.name}</div><div class="f12 ts">${(item.product.price||0).toFixed(2)} ج.م</div></div>
+      <div class="flex ic gap4">
+        <button class="btn bo bsm" onclick="ecCartQty(${i},-1)" style="padding:2px 8px">−</button>
+        <span class="fw7 f13" style="min-width:24px;text-align:center">${item.qty}</span>
+        <button class="btn bo bsm" onclick="ecCartQty(${i},1)" style="padding:2px 8px">+</button>
+        <button class="btn bsm" style="background:#ef444420;color:#ef4444;padding:2px 8px" onclick="ecCartRemove(${i})">×</button>
+      </div>
+      <div class="fw7 ts" style="min-width:60px;text-align:left">${((item.product.price||0)*item.qty).toFixed(2)}</div>
+    </div>`).join('');
+  const subtotal = _ecCart.reduce((s,i) => s+(i.product.price||0)*i.qty, 0);
+  const discount = _ecCouponData ? (_ecCouponData.discount_type==='percentage' ? subtotal*_ecCouponData.discount_value/100 : _ecCouponData.discount_value) : 0;
+  const total    = Math.max(0, subtotal - discount + _ecShipCost);
+  document.getElementById('ec-cart-subtotal').textContent = subtotal.toFixed(2) + ' ج.م';
+  document.getElementById('ec-cart-total').textContent    = total.toFixed(2) + ' ج.م';
+  if (_ecCouponData) {
+    document.getElementById('ec-cart-discount-row').style.display = 'flex';
+    document.getElementById('ec-cart-discount-val').textContent   = '- ' + discount.toFixed(2) + ' ج.م';
+  }
+  document.getElementById('ec-cart-ship-cost').textContent = _ecShipCost.toFixed(2) + ' ج.م';
+}
+
+function ecCartQty(i, d) { _ecCart[i].qty = Math.max(1, Math.min(_ecCart[i].qty + d, _ecCart[i].product.stock_quantity)); ecCartUpdate(); }
+function ecCartRemove(i) { _ecCart.splice(i, 1); ecCartUpdate(); }
+function ecCartOpen()  { document.getElementById('ec-cart-sidebar').style.display='block'; document.getElementById('ec-cart-overlay').style.display='block'; ecCartRender(); }
+function ecCartClose() { document.getElementById('ec-cart-sidebar').style.display='none';  document.getElementById('ec-cart-overlay').style.display='none'; }
+
+async function ecCouponApply() {
+  const code = document.getElementById('ec-cart-coupon').value.trim().toUpperCase();
+  if (!code) return;
+  const subtotal = _ecCart.reduce((s,i) => s+(i.product.price||0)*i.qty, 0);
+  const r = await BE.ec.coupon.validate(code, subtotal);
+  if (r.ok) { _ecCouponData = r.data; beOk('تم تطبيق الكوبون!'); ecCartRender(); }
+  else { _ecCouponData = null; beErr(r.error || 'كوبون غير صالح'); }
+}
+
+async function ecCheckoutOpen() {
+  if (!_ecCart.length) { beErr('السلة فارغة'); return; }
+  // Load shipping zones
+  const sz = await BE.ec.shipping.list();
+  _ecShipZones = (sz.data||[]).filter(z=>z.is_active);
+  const shipOpts = '<option value="">اختر منطقة...</option>' + _ecShipZones.map(z=>`<option value="${z.id}" data-cost="${z.cost}">${z.name} — ${(z.cost||0).toFixed(0)} ج.م</option>`).join('');
+  document.getElementById('ec-co-ship').innerHTML = shipOpts;
+  // Build summary
+  const subtotal = _ecCart.reduce((s,i) => s+(i.product.price||0)*i.qty, 0);
+  const discount = _ecCouponData ? (_ecCouponData.discount_type==='percentage' ? subtotal*_ecCouponData.discount_value/100 : _ecCouponData.discount_value) : 0;
+  document.getElementById('ec-co-summary').innerHTML = `
+    ${_ecCart.map(i=>`<div class="flex jb f12"><span>${i.product.name} × ${i.qty}</span><span>${((i.product.price||0)*i.qty).toFixed(2)} ج.م</span></div>`).join('')}
+    <div class="flex jb fw7 mt8"><span>المجموع</span><span>${(subtotal - discount).toFixed(2)} ج.م</span></div>
+  `;
+  openM('m-ec-checkout');
+}
+
+function ecCoShipChanged() {
+  const sel = document.getElementById('ec-co-ship');
+  const opt = sel.options[sel.selectedIndex];
+  _ecShipCost = parseFloat(opt.dataset.cost||'0') || 0;
+  ecCartRender();
+}
+
+async function ecCheckoutSubmit() {
+  const name  = document.getElementById('ec-co-name').value.trim();
+  const phone = document.getElementById('ec-co-phone').value.trim();
+  if (!name)  { beErr('أدخل اسم العميل'); return; }
+  if (!phone) { beErr('أدخل رقم الهاتف'); return; }
+  const shipId = document.getElementById('ec-co-ship').value;
+  const items = _ecCart.map(i => ({ product_id: i.product.id, name: i.product.name, quantity: i.qty, unit_price: i.product.price||0 }));
+  const payload = {
+    customer_name:   name,
+    customer_phone:  phone,
+    delivery_address:document.getElementById('ec-co-addr').value.trim(),
+    payment_method:  document.getElementById('ec-co-pay').value,
+    shipping_zone_id:shipId || null,
+    notes:           document.getElementById('ec-co-notes').value.trim(),
+    coupon_code:     _ecCouponData ? document.getElementById('ec-cart-coupon').value.trim().toUpperCase() : null,
+    items,
+  };
+  try {
+    const r = await BE.ec.checkout(payload);
+    if (!r.ok) { beErr(r.error || 'فشل إنشاء الطلب'); return; }
+    const order = r.data;
+    beOk(`✅ تم إنشاء الطلب: ${order.order_number}`);
+    // Trigger WA if checked
+    if (document.getElementById('ec-co-send-wa').checked && order.id) {
+      await BE.ec.orders.triggerWaConfirmation(order.id).catch(()=>{});
+    }
+    _ecCart = [];
+    _ecCouponData = null;
+    _ecShipCost = 0;
+    ecCartUpdate();
+    ecCartClose();
+    closeM('m-ec-checkout');
+    // Navigate to orders to see the new order
+    setTimeout(() => nav('ec-orders'), 500);
+  } catch(e) { beErr(e.message); }
+}
+
+window.addEventListener('page:ec-shop', async () => {
+  await ecShopLoadCats();
+  ecShopLoad();
+  ecCartUpdate();
+});
+</script>

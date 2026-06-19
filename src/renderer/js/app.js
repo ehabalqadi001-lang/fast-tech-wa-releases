@@ -5410,3 +5410,42 @@ function drawSparkline(svgId, data, color) {
   });
   svg.innerHTML = `<polyline points="${pts.join(' ')}" fill="none" stroke="${color || 'var(--acc)'}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>`;
 }
+
+// ══════════════════════════════════════════════════════════════════════════
+// E-COMMERCE — Page init hooks (called by nav() after dynamic load)
+// ══════════════════════════════════════════════════════════════════════════
+window['_pg_ec-dashboard'] = () => { if (typeof ecDashLoad === 'function') ecDashLoad(); };
+window['_pg_ec-orders']    = () => { if (typeof ecOrdLoad  === 'function') ecOrdLoad();  };
+window['_pg_ec-products']  = () => {
+  if (typeof ecProdLoadCats === 'function') ecProdLoadCats();
+  if (typeof ecProdLoad     === 'function') ecProdLoad();
+};
+window['_pg_ec-customers'] = () => { if (typeof ecCustLoad === 'function') ecCustLoad(); };
+window['_pg_ec-coupons']   = () => { if (typeof ecCoupLoad === 'function') ecCoupLoad(); };
+window['_pg_ec-shipping']  = () => { if (typeof ecShipLoad === 'function') ecShipLoad(); };
+window['_pg_ec-shop']      = () => {
+  if (typeof ecShopLoadCats === 'function') ecShopLoadCats();
+  if (typeof ecShopLoad     === 'function') ecShopLoad();
+  if (typeof ecCartUpdate   === 'function') ecCartUpdate();
+};
+
+// ── E-Commerce push notifications ─────────────────────────────────────────
+if (IS_ELECTRON) {
+  BE.on('ec:order:confirmed', (d) => {
+    showN('✅ تم تأكيد الطلب', `الطلب ${d?.order_number || ''} تم تأكيده عبر واتساب`, '📦');
+    const badge = document.getElementById('nb-ec-orders');
+    if (badge) badge.style.display = 'none';
+  });
+  BE.on('ec:order:cancelled', (d) => {
+    showN('❌ تم إلغاء الطلب', `الطلب ${d?.order_number || ''} تم إلغاؤه من قبل العميل`, '📦');
+  });
+  BE.on('ec:order:new', (d) => {
+    const badge = document.getElementById('nb-ec-orders');
+    if (badge) {
+      const n = parseInt(badge.textContent || '0') + 1;
+      badge.textContent = n;
+      badge.style.display = 'inline-flex';
+    }
+    showN('📦 طلب جديد', `طلب جديد: ${d?.order_number || ''}`, '🛍️');
+  });
+}

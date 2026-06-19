@@ -341,6 +341,96 @@ contextBridge.exposeInMainWorld('ftwa', {
     save: (data) => ipcRenderer.invoke('branding:save', data),
   },
 
+  // ── E-Commerce ────────────────────────────────────────────────────────────
+  ec: {
+    // Categories
+    categories: {
+      list:   ()      => ipcRenderer.invoke('ec:categories:list'),
+      save:   (data)  => ipcRenderer.invoke('ec:categories:save',   data),
+      delete: (id)    => ipcRenderer.invoke('ec:categories:delete', id),
+    },
+    // Products
+    products: {
+      list:        (opts)  => ipcRenderer.invoke('ec:products:list',        opts),
+      get:         (id)    => ipcRenderer.invoke('ec:products:get',         id),
+      featured:    ()      => ipcRenderer.invoke('ec:products:featured'),
+      lowStock:    ()      => ipcRenderer.invoke('ec:products:lowStock'),
+      save:        (data)  => ipcRenderer.invoke('ec:products:save',        data),
+      delete:      (id)    => ipcRenderer.invoke('ec:products:delete',      id),
+      adjustStock: (data)  => ipcRenderer.invoke('ec:products:adjustStock', data),
+      uploadImage: (data)  => ipcRenderer.invoke('ec:products:uploadImage', data),
+    },
+    // Variants
+    variants: {
+      save:   (data) => ipcRenderer.invoke('ec:variants:save',   data),
+      delete: (id)   => ipcRenderer.invoke('ec:variants:delete', id),
+    },
+    // Customers
+    customers: {
+      list:          (opts) => ipcRenderer.invoke('ec:customers:list',          opts),
+      get:           (id)   => ipcRenderer.invoke('ec:customers:get',           id),
+      save:          (data) => ipcRenderer.invoke('ec:customers:save',          data),
+      loyaltyAdjust: (data) => ipcRenderer.invoke('ec:customers:loyaltyAdjust', data),
+    },
+    // Cart
+    cart: {
+      get:   (data) => ipcRenderer.invoke('ec:cart:get',    data),
+      upsert:(data) => ipcRenderer.invoke('ec:cart:upsert', data),
+      clear: (data) => ipcRenderer.invoke('ec:cart:clear',  data),
+    },
+    // Coupon
+    coupon: {
+      validate: (data) => ipcRenderer.invoke('ec:coupon:validate', data),
+    },
+    // Checkout
+    checkout: (data) => ipcRenderer.invoke('ec:checkout', data),
+    // Orders
+    orders: {
+      list:                (opts) => ipcRenderer.invoke('ec:orders:list',                opts),
+      get:                 (id)   => ipcRenderer.invoke('ec:orders:get',                 id),
+      updateStatus:        (data) => ipcRenderer.invoke('ec:orders:updateStatus',        data),
+      updateTracking:      (data) => ipcRenderer.invoke('ec:orders:updateTracking',      data),
+      triggerWaConfirmation:(data)=> ipcRenderer.invoke('ec:orders:triggerWaConfirmation',data),
+    },
+    // Coupons
+    coupons: {
+      list:   ()     => ipcRenderer.invoke('ec:coupons:list'),
+      save:   (data) => ipcRenderer.invoke('ec:coupons:save',   data),
+      delete: (id)   => ipcRenderer.invoke('ec:coupons:delete', id),
+    },
+    // Loyalty
+    loyalty: {
+      config:     ()      => ipcRenderer.invoke('ec:loyalty:config'),
+      saveConfig: (data)  => ipcRenderer.invoke('ec:loyalty:saveConfig', data),
+      history:    (id)    => ipcRenderer.invoke('ec:loyalty:history',    id),
+    },
+    // Shipping
+    shipping: {
+      list:      ()      => ipcRenderer.invoke('ec:shipping:list'),
+      save:      (data)  => ipcRenderer.invoke('ec:shipping:save',      data),
+      delete:    (id)    => ipcRenderer.invoke('ec:shipping:delete',    id),
+      calculate: (data)  => ipcRenderer.invoke('ec:shipping:calculate', data),
+    },
+    // Reviews
+    reviews: {
+      list:    (productId) => ipcRenderer.invoke('ec:reviews:list',    productId),
+      pending: ()          => ipcRenderer.invoke('ec:reviews:pending'),
+      save:    (data)      => ipcRenderer.invoke('ec:reviews:save',    data),
+      approve: (id)        => ipcRenderer.invoke('ec:reviews:approve', id),
+    },
+    // Analytics
+    analytics: {
+      overview:    ()      => ipcRenderer.invoke('ec:analytics:overview'),
+      salesByDay:  (days)  => ipcRenderer.invoke('ec:analytics:salesByDay',  days),
+      topProducts: (limit) => ipcRenderer.invoke('ec:analytics:topProducts', limit),
+    },
+    // WA Bot
+    bot: {
+      list:       ()   => ipcRenderer.invoke('ec:bot:list'),
+      getByOrder: (id) => ipcRenderer.invoke('ec:bot:getByOrder', id),
+    },
+  },
+
   // ── Push notifications from main ──────────────────────────────────────────
   on: (channel, cb) => {
     const allowed = [
@@ -381,6 +471,10 @@ contextBridge.exposeInMainWorld('ftwa', {
       'campaign:progress:live',
       // AI streaming
       'ai:stream:event',
+      // E-Commerce / WA Bot
+      'ec:order:confirmed',
+      'ec:order:cancelled',
+      'ec:order:new',
     ];
     if (allowed.includes(channel)) {
       // Wrap cb so we can remove it by reference via off()

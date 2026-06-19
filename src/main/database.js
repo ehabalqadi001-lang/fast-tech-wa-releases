@@ -682,6 +682,235 @@ class Db {
       this.settingSet('db_version', '17');
       v = 17;
     }
+
+    if (v < 18) {
+      // ── E-Commerce Module (ec_ tables) ──────────────────────────────────────
+      this._db.exec(`
+        CREATE TABLE IF NOT EXISTS ec_categories (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          name_ar TEXT,
+          slug TEXT UNIQUE NOT NULL,
+          description TEXT,
+          image_url TEXT,
+          parent_id TEXT REFERENCES ec_categories(id),
+          sort_order INTEGER DEFAULT 0,
+          is_active INTEGER DEFAULT 1,
+          created_at TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS ec_products (
+          id TEXT PRIMARY KEY,
+          category_id TEXT REFERENCES ec_categories(id),
+          name TEXT NOT NULL,
+          name_ar TEXT,
+          slug TEXT UNIQUE NOT NULL,
+          description TEXT,
+          description_ar TEXT,
+          product_type TEXT DEFAULT 'physical',
+          price REAL NOT NULL,
+          compare_price REAL,
+          cost_price REAL,
+          sku TEXT UNIQUE,
+          barcode TEXT,
+          stock_quantity INTEGER DEFAULT 0,
+          low_stock_threshold INTEGER DEFAULT 5,
+          track_inventory INTEGER DEFAULT 1,
+          weight_grams INTEGER,
+          digital_file_url TEXT,
+          digital_file_expires_hours INTEGER DEFAULT 48,
+          images TEXT DEFAULT '[]',
+          tags TEXT DEFAULT '[]',
+          meta_title TEXT,
+          meta_description TEXT,
+          is_active INTEGER DEFAULT 1,
+          is_featured INTEGER DEFAULT 0,
+          created_at TEXT DEFAULT (datetime('now')),
+          updated_at TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS ec_product_variants (
+          id TEXT PRIMARY KEY,
+          product_id TEXT REFERENCES ec_products(id) ON DELETE CASCADE,
+          name TEXT NOT NULL,
+          options TEXT NOT NULL,
+          price REAL,
+          stock_quantity INTEGER DEFAULT 0,
+          sku TEXT,
+          image_url TEXT,
+          is_active INTEGER DEFAULT 1
+        );
+
+        CREATE TABLE IF NOT EXISTS ec_customers (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          email TEXT,
+          phone TEXT NOT NULL UNIQUE,
+          phone_verified INTEGER DEFAULT 0,
+          addresses TEXT DEFAULT '[]',
+          notes TEXT,
+          total_orders INTEGER DEFAULT 0,
+          total_spent REAL DEFAULT 0,
+          loyalty_points INTEGER DEFAULT 0,
+          tags TEXT DEFAULT '[]',
+          source TEXT DEFAULT 'manual',
+          created_at TEXT DEFAULT (datetime('now')),
+          updated_at TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS ec_orders (
+          id TEXT PRIMARY KEY,
+          order_number TEXT UNIQUE NOT NULL,
+          customer_id TEXT REFERENCES ec_customers(id),
+          customer_snapshot TEXT NOT NULL,
+          status TEXT DEFAULT 'pending',
+          payment_method TEXT DEFAULT 'cod',
+          payment_status TEXT DEFAULT 'pending',
+          items TEXT NOT NULL,
+          subtotal REAL NOT NULL,
+          discount_amount REAL DEFAULT 0,
+          coupon_code TEXT,
+          shipping_fee REAL DEFAULT 0,
+          total_amount REAL NOT NULL,
+          shipping_address TEXT,
+          delivery_notes TEXT,
+          tracking_number TEXT,
+          shipping_provider TEXT,
+          wa_confirmation_status TEXT DEFAULT 'not_sent',
+          wa_session_id TEXT,
+          internal_notes TEXT,
+          cancelled_reason TEXT,
+          shipped_at TEXT,
+          delivered_at TEXT,
+          created_at TEXT DEFAULT (datetime('now')),
+          updated_at TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS ec_order_history (
+          id TEXT PRIMARY KEY,
+          order_id TEXT REFERENCES ec_orders(id) ON DELETE CASCADE,
+          status TEXT NOT NULL,
+          note TEXT,
+          created_by TEXT,
+          created_at TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS ec_carts (
+          id TEXT PRIMARY KEY,
+          session_token TEXT,
+          customer_id TEXT REFERENCES ec_customers(id),
+          items TEXT DEFAULT '[]',
+          coupon_code TEXT,
+          loyalty_points_used INTEGER DEFAULT 0,
+          expires_at TEXT DEFAULT (datetime('now', '+7 days')),
+          created_at TEXT DEFAULT (datetime('now')),
+          updated_at TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS ec_coupons (
+          id TEXT PRIMARY KEY,
+          code TEXT UNIQUE NOT NULL,
+          type TEXT NOT NULL,
+          value REAL NOT NULL,
+          min_order_amount REAL DEFAULT 0,
+          max_uses INTEGER,
+          used_count INTEGER DEFAULT 0,
+          applicable_products TEXT DEFAULT '[]',
+          applicable_categories TEXT DEFAULT '[]',
+          starts_at TEXT,
+          expires_at TEXT,
+          is_active INTEGER DEFAULT 1,
+          created_at TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS ec_loyalty_transactions (
+          id TEXT PRIMARY KEY,
+          customer_id TEXT REFERENCES ec_customers(id) ON DELETE CASCADE,
+          order_id TEXT REFERENCES ec_orders(id),
+          type TEXT NOT NULL,
+          points INTEGER NOT NULL,
+          balance_after INTEGER NOT NULL,
+          description TEXT,
+          created_at TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS ec_loyalty_config (
+          id TEXT PRIMARY KEY DEFAULT 'singleton',
+          points_per_egp REAL DEFAULT 1,
+          egp_per_point REAL DEFAULT 0.5,
+          min_redeem_points INTEGER DEFAULT 100,
+          max_redeem_percent INTEGER DEFAULT 20,
+          is_active INTEGER DEFAULT 1,
+          updated_at TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS ec_shipping_zones (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          governorates TEXT DEFAULT '[]',
+          base_fee REAL NOT NULL,
+          free_shipping_above REAL,
+          estimated_days_min INTEGER DEFAULT 1,
+          estimated_days_max INTEGER DEFAULT 3,
+          is_active INTEGER DEFAULT 1
+        );
+
+        CREATE TABLE IF NOT EXISTS ec_reviews (
+          id TEXT PRIMARY KEY,
+          product_id TEXT REFERENCES ec_products(id) ON DELETE CASCADE,
+          customer_id TEXT REFERENCES ec_customers(id),
+          order_id TEXT REFERENCES ec_orders(id),
+          rating INTEGER CHECK (rating BETWEEN 1 AND 5),
+          comment TEXT,
+          is_approved INTEGER DEFAULT 0,
+          created_at TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS ec_wishlists (
+          id TEXT PRIMARY KEY,
+          customer_id TEXT REFERENCES ec_customers(id) ON DELETE CASCADE,
+          product_id TEXT REFERENCES ec_products(id) ON DELETE CASCADE,
+          created_at TEXT DEFAULT (datetime('now')),
+          UNIQUE(customer_id, product_id)
+        );
+
+        -- WhatsApp order confirmation bot tables
+        CREATE TABLE IF NOT EXISTS wa_order_confirmations (
+          id TEXT PRIMARY KEY,
+          session_id TEXT,
+          ec_order_id TEXT REFERENCES ec_orders(id),
+          customer_phone TEXT NOT NULL,
+          customer_name TEXT,
+          status TEXT DEFAULT 'pending_confirmation',
+          collected_data TEXT DEFAULT '{}',
+          location_lat REAL,
+          location_lng REAL,
+          location_address TEXT,
+          current_step INTEGER DEFAULT 0,
+          is_active INTEGER DEFAULT 1,
+          expires_at TEXT,
+          created_at TEXT DEFAULT (datetime('now')),
+          updated_at TEXT DEFAULT (datetime('now'))
+        );
+
+        -- Indexes for e-commerce performance
+        CREATE INDEX IF NOT EXISTS idx_ec_products_cat      ON ec_products(category_id, is_active);
+        CREATE INDEX IF NOT EXISTS idx_ec_products_active   ON ec_products(is_active, is_featured);
+        CREATE INDEX IF NOT EXISTS idx_ec_orders_customer   ON ec_orders(customer_id, created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_ec_orders_status     ON ec_orders(status, created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_ec_customers_phone   ON ec_customers(phone);
+        CREATE INDEX IF NOT EXISTS idx_wa_confirmations     ON wa_order_confirmations(customer_phone, is_active);
+      `);
+
+      // Seed default loyalty config
+      const hasLoyalty = this._db.prepare('SELECT id FROM ec_loyalty_config WHERE id=?').get('singleton');
+      if (!hasLoyalty) {
+        this._db.prepare(`INSERT INTO ec_loyalty_config (id) VALUES ('singleton')`).run();
+      }
+
+      this.settingSet('db_version', '18');
+      v = 18;
+    }
   }
 
   // ─── FTS Search ───────────────────────────────────────────────────────────
@@ -2084,6 +2313,196 @@ class Db {
     if (footer_text  !== undefined) this.settingSet('brand_footer_text',  footer_text);
     if (show_powered !== undefined) this.settingSet('brand_show_powered', show_powered ? '1' : '0');
     return this.brandingGet();
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // E-COMMERCE: CATEGORIES
+  // ═══════════════════════════════════════════════════════════════════════════
+  ecCategoryList() { return this._db.prepare('SELECT * FROM ec_categories ORDER BY sort_order, name').all(); }
+  ecCategoryGet(id) { return this._db.prepare('SELECT * FROM ec_categories WHERE id=?').get(id); }
+  ecCategoryCreate(c) { return this._db.prepare(`INSERT INTO ec_categories (id,name,name_ar,slug,description,image_url,parent_id,sort_order) VALUES (@id,@name,@name_ar,@slug,@description,@image_url,@parent_id,@sort_order)`).run(c); }
+  ecCategoryUpdate(id, c) { return this._db.prepare(`UPDATE ec_categories SET name=@name,name_ar=@name_ar,slug=@slug,description=@description,image_url=@image_url,parent_id=@parent_id,sort_order=@sort_order,is_active=@is_active WHERE id=?`).run({...c}, id); }
+  ecCategoryDelete(id) { return this._db.prepare('UPDATE ec_categories SET is_active=0 WHERE id=?').run(id); }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // E-COMMERCE: PRODUCTS
+  // ═══════════════════════════════════════════════════════════════════════════
+  ecProductList(opts = {}) {
+    let sql = 'SELECT p.*, c.name AS category_name FROM ec_products p LEFT JOIN ec_categories c ON c.id=p.category_id WHERE 1=1';
+    const params = [];
+    if (opts.category_id)  { sql += ' AND p.category_id=?'; params.push(opts.category_id); }
+    if (opts.is_featured)  { sql += ' AND p.is_featured=1'; }
+    if (opts.in_stock)     { sql += ' AND p.stock_quantity > 0'; }
+    if (opts.product_type) { sql += ' AND p.product_type=?'; params.push(opts.product_type); }
+    if (opts.is_active !== undefined) { sql += ' AND p.is_active=?'; params.push(opts.is_active ? 1 : 0); }
+    else { sql += ' AND p.is_active=1'; }
+    if (opts.search)       { sql += ' AND (p.name LIKE ? OR p.name_ar LIKE ? OR p.sku LIKE ?)'; const s = `%${opts.search}%`; params.push(s, s, s); }
+    sql += ' ORDER BY p.is_featured DESC, p.created_at DESC';
+    if (opts.limit) { sql += ' LIMIT ?'; params.push(opts.limit); }
+    return this._db.prepare(sql).all(...params);
+  }
+  ecProductGet(id) {
+    const p = this._db.prepare('SELECT p.*, c.name AS category_name FROM ec_products p LEFT JOIN ec_categories c ON c.id=p.category_id WHERE p.id=?').get(id);
+    if (p) p.variants = this._db.prepare('SELECT * FROM ec_product_variants WHERE product_id=? AND is_active=1').all(id);
+    return p;
+  }
+  ecProductGetBySlug(slug) {
+    const p = this._db.prepare('SELECT p.*, c.name AS category_name FROM ec_products p LEFT JOIN ec_categories c ON c.id=p.category_id WHERE p.slug=?').get(slug);
+    if (p) p.variants = this._db.prepare('SELECT * FROM ec_product_variants WHERE product_id=? AND is_active=1').all(p.id);
+    return p;
+  }
+  ecProductCreate(p) { return this._db.prepare(`INSERT INTO ec_products (id,category_id,name,name_ar,slug,description,description_ar,product_type,price,compare_price,cost_price,sku,barcode,stock_quantity,low_stock_threshold,track_inventory,weight_grams,images,tags,meta_title,meta_description,is_active,is_featured) VALUES (@id,@category_id,@name,@name_ar,@slug,@description,@description_ar,@product_type,@price,@compare_price,@cost_price,@sku,@barcode,@stock_quantity,@low_stock_threshold,@track_inventory,@weight_grams,@images,@tags,@meta_title,@meta_description,@is_active,@is_featured)`).run(p); }
+  ecProductUpdate(id, p) { return this._db.prepare(`UPDATE ec_products SET category_id=@category_id,name=@name,name_ar=@name_ar,slug=@slug,description=@description,description_ar=@description_ar,product_type=@product_type,price=@price,compare_price=@compare_price,cost_price=@cost_price,sku=@sku,barcode=@barcode,stock_quantity=@stock_quantity,low_stock_threshold=@low_stock_threshold,track_inventory=@track_inventory,weight_grams=@weight_grams,images=@images,tags=@tags,meta_title=@meta_title,meta_description=@meta_description,is_active=@is_active,is_featured=@is_featured,updated_at=datetime('now') WHERE id=?`).run({...p, id}); }
+  ecProductDelete(id) { return this._db.prepare(`UPDATE ec_products SET is_active=0, updated_at=datetime('now') WHERE id=?`).run(id); }
+  ecProductAdjustStock(id, delta) { return this._db.prepare(`UPDATE ec_products SET stock_quantity=MAX(0, stock_quantity+?), updated_at=datetime('now') WHERE id=?`).run(delta, id); }
+  ecProductLowStock() { return this._db.prepare('SELECT * FROM ec_products WHERE is_active=1 AND track_inventory=1 AND stock_quantity<=low_stock_threshold ORDER BY stock_quantity ASC').all(); }
+
+  ecVariantCreate(v) { return this._db.prepare(`INSERT INTO ec_product_variants (id,product_id,name,options,price,stock_quantity,sku,image_url) VALUES (@id,@product_id,@name,@options,@price,@stock_quantity,@sku,@image_url)`).run(v); }
+  ecVariantUpdate(id, v) { return this._db.prepare(`UPDATE ec_product_variants SET name=@name,options=@options,price=@price,stock_quantity=@stock_quantity,sku=@sku,image_url=@image_url,is_active=@is_active WHERE id=?`).run({...v, id}); }
+  ecVariantDelete(id) { return this._db.prepare('UPDATE ec_product_variants SET is_active=0 WHERE id=?').run(id); }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // E-COMMERCE: CUSTOMERS
+  // ═══════════════════════════════════════════════════════════════════════════
+  ecCustomerList(opts = {}) {
+    let sql = 'SELECT * FROM ec_customers WHERE 1=1';
+    const params = [];
+    if (opts.search) { sql += ' AND (name LIKE ? OR phone LIKE ? OR email LIKE ?)'; const s = `%${opts.search}%`; params.push(s, s, s); }
+    sql += ' ORDER BY created_at DESC';
+    if (opts.limit) { sql += ' LIMIT ?'; params.push(opts.limit); }
+    return this._db.prepare(sql).all(...params);
+  }
+  ecCustomerGet(id) { return this._db.prepare('SELECT * FROM ec_customers WHERE id=?').get(id); }
+  ecCustomerGetByPhone(phone) { return this._db.prepare('SELECT * FROM ec_customers WHERE phone=?').get(phone); }
+  ecCustomerCreate(c) { return this._db.prepare(`INSERT INTO ec_customers (id,name,email,phone,addresses,notes,tags,source) VALUES (@id,@name,@email,@phone,@addresses,@notes,@tags,@source)`).run(c); }
+  ecCustomerUpdate(id, c) { return this._db.prepare(`UPDATE ec_customers SET name=@name,email=@email,phone=@phone,addresses=@addresses,notes=@notes,tags=@tags,loyalty_points=@loyalty_points,updated_at=datetime('now') WHERE id=?`).run({...c, id}); }
+  ecCustomerIncrStats(id, amount) { return this._db.prepare(`UPDATE ec_customers SET total_orders=total_orders+1, total_spent=total_spent+?, updated_at=datetime('now') WHERE id=?`).run(amount, id); }
+  ecCustomerAddPoints(id, pts) { return this._db.prepare(`UPDATE ec_customers SET loyalty_points=loyalty_points+?, updated_at=datetime('now') WHERE id=?`).run(pts, id); }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // E-COMMERCE: ORDERS
+  // ═══════════════════════════════════════════════════════════════════════════
+  ecOrderList(opts = {}) {
+    let sql = 'SELECT o.*, c.name AS customer_name, c.phone AS customer_phone FROM ec_orders o LEFT JOIN ec_customers c ON c.id=o.customer_id WHERE 1=1';
+    const params = [];
+    if (opts.status)      { sql += ' AND o.status=?'; params.push(opts.status); }
+    if (opts.customer_id) { sql += ' AND o.customer_id=?'; params.push(opts.customer_id); }
+    if (opts.search)      { sql += ' AND (o.order_number LIKE ? OR c.name LIKE ? OR c.phone LIKE ?)'; const s=`%${opts.search}%`; params.push(s,s,s); }
+    if (opts.date_from)   { sql += ' AND o.created_at >= ?'; params.push(opts.date_from); }
+    if (opts.date_to)     { sql += ' AND o.created_at <= ?'; params.push(opts.date_to); }
+    sql += ' ORDER BY o.created_at DESC';
+    if (opts.limit) { sql += ' LIMIT ?'; params.push(opts.limit); }
+    return this._db.prepare(sql).all(...params);
+  }
+  ecOrderGet(id) {
+    const o = this._db.prepare('SELECT o.*, c.name AS customer_name, c.phone AS customer_phone FROM ec_orders o LEFT JOIN ec_customers c ON c.id=o.customer_id WHERE o.id=?').get(id);
+    if (o) o.history = this._db.prepare('SELECT * FROM ec_order_history WHERE order_id=? ORDER BY created_at ASC').all(id);
+    return o;
+  }
+  ecOrderGetByNumber(num) { return this._db.prepare('SELECT * FROM ec_orders WHERE order_number=?').get(num); }
+  ecOrderCreate(o) { return this._db.prepare(`INSERT INTO ec_orders (id,order_number,customer_id,customer_snapshot,status,payment_method,payment_status,items,subtotal,discount_amount,coupon_code,shipping_fee,total_amount,shipping_address,delivery_notes,wa_session_id) VALUES (@id,@order_number,@customer_id,@customer_snapshot,@status,@payment_method,@payment_status,@items,@subtotal,@discount_amount,@coupon_code,@shipping_fee,@total_amount,@shipping_address,@delivery_notes,@wa_session_id)`).run(o); }
+  ecOrderUpdateStatus(id, status, opts = {}) {
+    this._db.prepare(`UPDATE ec_orders SET status=?, updated_at=datetime('now') WHERE id=?`).run(status, id);
+    if (opts.note || opts.created_by) {
+      const { v4: uuidv4 } = require('uuid');
+      this._db.prepare(`INSERT INTO ec_order_history (id,order_id,status,note,created_by) VALUES (?,?,?,?,?)`).run(uuidv4(), id, status, opts.note||null, opts.created_by||'system');
+    }
+  }
+  ecOrderUpdateWaStatus(id, waStatus) { return this._db.prepare(`UPDATE ec_orders SET wa_confirmation_status=?, updated_at=datetime('now') WHERE id=?`).run(waStatus, id); }
+  ecOrderUpdateTracking(id, trackingNumber, shippingProvider) { return this._db.prepare(`UPDATE ec_orders SET tracking_number=?, shipping_provider=?, updated_at=datetime('now') WHERE id=?`).run(trackingNumber, shippingProvider, id); }
+  ecOrderNextNumber() {
+    const n = parseInt(this.settingGet('ec_order_seq') || '0') + 1;
+    this.settingSet('ec_order_seq', String(n));
+    return `ORD-${new Date().getFullYear()}-${String(n).padStart(5, '0')}`;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // E-COMMERCE: CART
+  // ═══════════════════════════════════════════════════════════════════════════
+  ecCartGet(token) { return this._db.prepare('SELECT * FROM ec_carts WHERE session_token=? AND expires_at > datetime(\'now\')').get(token); }
+  ecCartCreate(c) { return this._db.prepare(`INSERT INTO ec_carts (id,session_token,customer_id,items) VALUES (@id,@session_token,@customer_id,@items)`).run(c); }
+  ecCartUpdate(token, items, couponCode, loyaltyPts) { return this._db.prepare(`UPDATE ec_carts SET items=?,coupon_code=?,loyalty_points_used=?,updated_at=datetime('now') WHERE session_token=?`).run(items, couponCode||null, loyaltyPts||0, token); }
+  ecCartDelete(token) { return this._db.prepare('DELETE FROM ec_carts WHERE session_token=?').run(token); }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // E-COMMERCE: COUPONS
+  // ═══════════════════════════════════════════════════════════════════════════
+  ecCouponList() { return this._db.prepare('SELECT * FROM ec_coupons ORDER BY created_at DESC').all(); }
+  ecCouponGet(id) { return this._db.prepare('SELECT * FROM ec_coupons WHERE id=?').get(id); }
+  ecCouponGetByCode(code) { return this._db.prepare('SELECT * FROM ec_coupons WHERE code=? AND is_active=1').get(code); }
+  ecCouponCreate(c) { return this._db.prepare(`INSERT INTO ec_coupons (id,code,type,value,min_order_amount,max_uses,applicable_products,applicable_categories,starts_at,expires_at) VALUES (@id,@code,@type,@value,@min_order_amount,@max_uses,@applicable_products,@applicable_categories,@starts_at,@expires_at)`).run(c); }
+  ecCouponUpdate(id, c) { return this._db.prepare(`UPDATE ec_coupons SET code=@code,type=@type,value=@value,min_order_amount=@min_order_amount,max_uses=@max_uses,starts_at=@starts_at,expires_at=@expires_at,is_active=@is_active WHERE id=?`).run({...c, id}); }
+  ecCouponDelete(id) { return this._db.prepare('DELETE FROM ec_coupons WHERE id=?').run(id); }
+  ecCouponIncrUsed(id) { return this._db.prepare('UPDATE ec_coupons SET used_count=used_count+1 WHERE id=?').run(id); }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // E-COMMERCE: LOYALTY
+  // ═══════════════════════════════════════════════════════════════════════════
+  ecLoyaltyConfig() { return this._db.prepare('SELECT * FROM ec_loyalty_config WHERE id=?').get('singleton'); }
+  ecLoyaltyConfigSave(c) { return this._db.prepare(`UPDATE ec_loyalty_config SET points_per_egp=?,egp_per_point=?,min_redeem_points=?,max_redeem_percent=?,is_active=?,updated_at=datetime('now') WHERE id='singleton'`).run(c.points_per_egp, c.egp_per_point, c.min_redeem_points, c.max_redeem_percent, c.is_active?1:0); }
+  ecLoyaltyTransactionList(customerId, limit = 50) { return this._db.prepare('SELECT * FROM ec_loyalty_transactions WHERE customer_id=? ORDER BY created_at DESC LIMIT ?').all(customerId, limit); }
+  ecLoyaltyTransactionCreate(t) { return this._db.prepare(`INSERT INTO ec_loyalty_transactions (id,customer_id,order_id,type,points,balance_after,description) VALUES (@id,@customer_id,@order_id,@type,@points,@balance_after,@description)`).run(t); }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // E-COMMERCE: SHIPPING ZONES
+  // ═══════════════════════════════════════════════════════════════════════════
+  ecShippingZoneList() { return this._db.prepare('SELECT * FROM ec_shipping_zones WHERE is_active=1 ORDER BY name').all(); }
+  ecShippingZoneCreate(z) { return this._db.prepare(`INSERT INTO ec_shipping_zones (id,name,governorates,base_fee,free_shipping_above,estimated_days_min,estimated_days_max) VALUES (@id,@name,@governorates,@base_fee,@free_shipping_above,@estimated_days_min,@estimated_days_max)`).run(z); }
+  ecShippingZoneUpdate(id, z) { return this._db.prepare(`UPDATE ec_shipping_zones SET name=@name,governorates=@governorates,base_fee=@base_fee,free_shipping_above=@free_shipping_above,estimated_days_min=@estimated_days_min,estimated_days_max=@estimated_days_max,is_active=@is_active WHERE id=?`).run({...z, id}); }
+  ecShippingZoneDelete(id) { return this._db.prepare('UPDATE ec_shipping_zones SET is_active=0 WHERE id=?').run(id); }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // E-COMMERCE: REVIEWS
+  // ═══════════════════════════════════════════════════════════════════════════
+  ecReviewList(productId) { return this._db.prepare('SELECT r.*, c.name AS customer_name FROM ec_reviews r LEFT JOIN ec_customers c ON c.id=r.customer_id WHERE r.product_id=? AND r.is_approved=1 ORDER BY r.created_at DESC').all(productId); }
+  ecReviewCreate(r) { return this._db.prepare(`INSERT INTO ec_reviews (id,product_id,customer_id,order_id,rating,comment) VALUES (@id,@product_id,@customer_id,@order_id,@rating,@comment)`).run(r); }
+  ecReviewApprove(id) { return this._db.prepare('UPDATE ec_reviews SET is_approved=1 WHERE id=?').run(id); }
+  ecReviewAllPending() { return this._db.prepare('SELECT r.*, c.name AS customer_name, p.name AS product_name FROM ec_reviews r LEFT JOIN ec_customers c ON c.id=r.customer_id LEFT JOIN ec_products p ON p.id=r.product_id WHERE r.is_approved=0 ORDER BY r.created_at DESC').all(); }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // E-COMMERCE: ANALYTICS
+  // ═══════════════════════════════════════════════════════════════════════════
+  ecAnalyticsOverview() {
+    const orders  = this._db.prepare(`SELECT COUNT(*) AS total, SUM(total_amount) AS revenue FROM ec_orders WHERE status != 'cancelled'`).get();
+    const today   = this._db.prepare(`SELECT COUNT(*) AS count FROM ec_orders WHERE date(created_at)=date('now') AND status != 'cancelled'`).get();
+    const customers = this._db.prepare(`SELECT COUNT(*) AS total FROM ec_customers`).get();
+    const avgOrder  = this._db.prepare(`SELECT AVG(total_amount) AS avg FROM ec_orders WHERE status != 'cancelled'`).get();
+    const pending   = this._db.prepare(`SELECT COUNT(*) AS count FROM ec_orders WHERE status='pending'`).get();
+    return { total_orders: orders.total, total_revenue: orders.revenue||0, today_orders: today.count, total_customers: customers.total, avg_order_value: avgOrder.avg||0, pending_orders: pending.count };
+  }
+  ecAnalyticsSalesByDay(days = 30) {
+    return this._db.prepare(`SELECT date(created_at) AS day, COUNT(*) AS orders, SUM(total_amount) AS revenue FROM ec_orders WHERE created_at >= datetime('now', '-${days} days') AND status != 'cancelled' GROUP BY day ORDER BY day`).all();
+  }
+  ecAnalyticsTopProducts(limit = 10) {
+    return this._db.prepare(`
+      SELECT p.id, p.name, p.price,
+        COUNT(DISTINCT o.id) AS order_count,
+        SUM(json_extract(value, '$.quantity')) AS units_sold,
+        SUM(json_extract(value, '$.total')) AS revenue
+      FROM ec_orders o
+      JOIN json_each(o.items) ON 1=1
+      LEFT JOIN ec_products p ON p.id = json_extract(value, '$.product_id')
+      WHERE o.status != 'cancelled'
+      GROUP BY json_extract(value, '$.product_id')
+      ORDER BY units_sold DESC LIMIT ?
+    `).all(limit);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // WA ORDER CONFIRMATION BOT
+  // ═══════════════════════════════════════════════════════════════════════════
+  waBotConfirmationCreate(c) { return this._db.prepare(`INSERT INTO wa_order_confirmations (id,session_id,ec_order_id,customer_phone,customer_name,status,expires_at) VALUES (@id,@session_id,@ec_order_id,@customer_phone,@customer_name,@status,@expires_at)`).run(c); }
+  waBotConfirmationGetActive(phone) { return this._db.prepare(`SELECT * FROM wa_order_confirmations WHERE customer_phone=? AND is_active=1 ORDER BY created_at DESC LIMIT 1`).get(phone); }
+  waBotConfirmationGetByOrderId(orderId) { return this._db.prepare(`SELECT * FROM wa_order_confirmations WHERE ec_order_id=?`).get(orderId); }
+  waBotConfirmationUpdate(id, fields) {
+    const sets = Object.keys(fields).filter(k => k !== 'id').map(k => `${k}=@${k}`).join(', ');
+    return this._db.prepare(`UPDATE wa_order_confirmations SET ${sets}, updated_at=datetime('now') WHERE id=@id`).run({ ...fields, id });
+  }
+  waBotConfirmationList(limit = 50) {
+    return this._db.prepare(`SELECT c.*, o.order_number FROM wa_order_confirmations c LEFT JOIN ec_orders o ON o.id=c.ec_order_id ORDER BY c.created_at DESC LIMIT ?`).all(limit);
+  }
+  waBotConfirmationExpireOld() {
+    return this._db.prepare(`UPDATE wa_order_confirmations SET is_active=0, status='expired', updated_at=datetime('now') WHERE is_active=1 AND expires_at < datetime('now')`).run();
   }
 }
 

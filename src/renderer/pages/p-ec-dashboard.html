@@ -1,0 +1,158 @@
+<!-- E-Commerce Dashboard -->
+<div class="page-hd">
+  <div>
+    <h1 class="page-tt">📊 لوحة المبيعات</h1>
+    <p class="page-st" id="ec-dash-subtitle">تحميل البيانات...</p>
+  </div>
+  <button class="btn bp" onclick="ecDashLoad()">🔄 تحديث</button>
+</div>
+
+<!-- KPI Cards -->
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px">
+  <div class="card" style="text-align:center">
+    <div class="f11 ts mb4">إجمالي الإيرادات</div>
+    <div class="f24 fw7 fc-g" id="ec-kpi-revenue">—</div>
+    <div class="f11 ts mt4">ج.م</div>
+  </div>
+  <div class="card" style="text-align:center">
+    <div class="f11 ts mb4">إجمالي الطلبات</div>
+    <div class="f24 fw7" style="color:var(--acc)" id="ec-kpi-orders">—</div>
+  </div>
+  <div class="card" style="text-align:center">
+    <div class="f11 ts mb4">طلبات اليوم</div>
+    <div class="f24 fw7 fc-b" id="ec-kpi-today">—</div>
+  </div>
+  <div class="card" style="text-align:center">
+    <div class="f11 ts mb4">إجمالي العملاء</div>
+    <div class="f24 fw7" style="color:#8b5cf6" id="ec-kpi-customers">—</div>
+  </div>
+  <div class="card" style="text-align:center">
+    <div class="f11 ts mb4">متوسط قيمة الطلب</div>
+    <div class="f24 fw7 fc-y" id="ec-kpi-avg">—</div>
+    <div class="f11 ts mt4">ج.م</div>
+  </div>
+  <div class="card" style="text-align:center">
+    <div class="f11 ts mb4">طلبات معلقة</div>
+    <div class="f24 fw7 fc-r" id="ec-kpi-pending">—</div>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+  <!-- Sales Chart (30 days) -->
+  <div class="card">
+    <div class="fw7 mb12">📈 المبيعات (آخر 30 يوم)</div>
+    <canvas id="ec-sales-chart" height="200"></canvas>
+  </div>
+
+  <!-- Top Products -->
+  <div class="card">
+    <div class="fw7 mb12">🏆 أفضل المنتجات مبيعاً</div>
+    <div id="ec-top-products">
+      <div class="ta ts f12" style="padding:20px">جارٍ التحميل...</div>
+    </div>
+  </div>
+</div>
+
+<!-- Low Stock Alert -->
+<div class="card mt16">
+  <div class="fw7 mb12">⚠️ تنبيه المخزون المنخفض</div>
+  <div id="ec-low-stock">
+    <div class="ta ts f12" style="padding:20px">جارٍ التحميل...</div>
+  </div>
+</div>
+
+<!-- Recent Orders -->
+<div class="card mt16">
+  <div class="flex jb ic mb12">
+    <div class="fw7">📦 أحدث الطلبات</div>
+    <button class="btn bo bsm" onclick="nav('ec-orders')">عرض الكل</button>
+  </div>
+  <div id="ec-recent-orders">
+    <div class="ta ts f12" style="padding:20px">جارٍ التحميل...</div>
+  </div>
+</div>
+
+<script>
+const EC_STATUS_LABELS = { pending:'معلق', confirmed:'مؤكد', processing:'قيد التجهيز', shipped:'تم الشحن', delivered:'تم التسليم', cancelled:'ملغي', refunded:'مسترجع' };
+const EC_STATUS_COLORS = { pending:'#f59e0b', confirmed:'#6366f1', processing:'#3b82f6', shipped:'#8b5cf6', delivered:'#10b981', cancelled:'#ef4444', refunded:'#6b7280' };
+
+async function ecDashLoad() {
+  if (!IS_ELECTRON) return;
+  try {
+    const [ov, sales, top, ls, recentR] = await Promise.all([
+      BE.ec.analytics.overview(),
+      BE.ec.analytics.salesByDay(30),
+      BE.ec.analytics.topProducts(5),
+      BE.ec.products.lowStock(),
+      BE.ec.orders.list({ limit: 10 }),
+    ]);
+
+    // KPIs
+    if (ov.ok) {
+      const d = ov.data;
+      document.getElementById('ec-kpi-revenue').textContent   = (d.total_revenue||0).toLocaleString('ar-EG');
+      document.getElementById('ec-kpi-orders').textContent    = d.total_orders||0;
+      document.getElementById('ec-kpi-today').textContent     = d.today_orders||0;
+      document.getElementById('ec-kpi-customers').textContent = d.total_customers||0;
+      document.getElementById('ec-kpi-avg').textContent       = (d.avg_order_value||0).toFixed(0);
+      document.getElementById('ec-kpi-pending').textContent   = d.pending_orders||0;
+      document.getElementById('ec-dash-subtitle').textContent = `آخر تحديث: ${new Date().toLocaleTimeString('ar')}`;
+    }
+
+    // Sales chart (simple bar using canvas)
+    if (sales.ok) {
+      renderEcSalesChart(sales.data || []);
+    }
+
+    // Top products
+    if (top.ok) {
+      const rows = (top.data||[]).map((p,i) => `<div class="flex jb ic py6 border-b"><div class="flex ic gap8"><span class="fw7 f11" style="color:var(--acc);min-width:20px">#${i+1}</span><span>${p.name||'—'}</span></div><div class="ta"><div class="fw7">${(p.revenue||0).toFixed(0)} ج.م</div><div class="f11 ts">${p.units_sold||0} وحدة</div></div></div>`).join('');
+      document.getElementById('ec-top-products').innerHTML = rows || '<div class="ta ts f12" style="padding:20px">لا توجد مبيعات بعد</div>';
+    }
+
+    // Low stock
+    const lsData = ls.data || ls || [];
+    if (lsData.length) {
+      document.getElementById('ec-low-stock').innerHTML = `<table class="tbl"><thead><tr><th>المنتج</th><th>الكمية</th><th>الحد الأدنى</th><th></th></tr></thead><tbody>${lsData.map(p=>`<tr><td>${p.name}</td><td class="fc-r fw7">${p.stock_quantity}</td><td>${p.low_stock_threshold}</td><td><button class="btn bo bsm" onclick="nav('ec-products')">إدارة</button></td></tr>`).join('')}</tbody></table>`;
+    } else {
+      document.getElementById('ec-low-stock').innerHTML = '<div class="ta ts f12 py12">✅ المخزون في حالة جيدة</div>';
+    }
+
+    // Recent orders
+    const ro = recentR.data || [];
+    if (ro.length) {
+      document.getElementById('ec-recent-orders').innerHTML = `<table class="tbl"><thead><tr><th>رقم الطلب</th><th>العميل</th><th>المبلغ</th><th>الحالة</th><th>التاريخ</th><th></th></tr></thead><tbody>${ro.map(o=>`<tr><td class="fw7 fm">${o.order_number}</td><td>${o.customer_name||'—'}</td><td>${(o.total_amount||0).toFixed(0)} ج.م</td><td><span class="bge f11" style="background:${EC_STATUS_COLORS[o.status]||'#6b7280'}20;color:${EC_STATUS_COLORS[o.status]||'#6b7280'}">${EC_STATUS_LABELS[o.status]||o.status}</span></td><td class="f11 ts">${new Date(o.created_at).toLocaleDateString('ar')}</td><td><button class="btn bo bsm" onclick="ecViewOrder('${o.id}')">عرض</button></td></tr>`).join('')}</tbody></table>`;
+    } else {
+      document.getElementById('ec-recent-orders').innerHTML = '<div class="ta ts f12 py12">لا توجد طلبات بعد</div>';
+    }
+  } catch(e) { console.error('[EC-Dash]', e.message); }
+}
+
+function renderEcSalesChart(data) {
+  const canvas = document.getElementById('ec-sales-chart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width = canvas.parentElement.clientWidth - 32;
+  const H = canvas.height = 180;
+  ctx.clearRect(0, 0, W, H);
+  if (!data.length) { ctx.fillStyle='rgba(255,255,255,.2)'; ctx.font='12px sans-serif'; ctx.fillText('لا توجد بيانات', W/2-30, H/2); return; }
+  const maxRev = Math.max(...data.map(d => d.revenue||0), 1);
+  const bw = Math.max(4, (W - 20) / data.length - 2);
+  data.forEach((d, i) => {
+    const h = Math.max(2, ((d.revenue||0) / maxRev) * (H - 30));
+    const x = 10 + i * ((W - 20) / data.length);
+    const y = H - 20 - h;
+    ctx.fillStyle = 'rgba(99,102,241,.7)';
+    ctx.fillRect(x, y, bw, h);
+  });
+}
+
+async function ecViewOrder(id) {
+  // Store ID then navigate to orders page
+  window._ecViewOrderId = id;
+  await nav('ec-orders');
+  if (window.ecOrdersOpenDetail) ecOrdersOpenDetail(id);
+}
+
+window.addEventListener('page:ec-dashboard', () => ecDashLoad());
+</script>

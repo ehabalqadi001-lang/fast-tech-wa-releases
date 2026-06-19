@@ -1,0 +1,80 @@
+<!-- E-Commerce Customers -->
+<div class="page-hd">
+  <div>
+    <h1 class="page-tt">👤 العملاء</h1>
+    <p class="page-st" id="ec-cust-count">—</p>
+  </div>
+  <input id="ec-cust-search" class="inp" placeholder="بحث بالاسم أو الهاتف..." style="width:240px" oninput="ecCustLoad()">
+</div>
+
+<div class="card">
+  <div id="ec-cust-table"><div class="ta ts f12 py20">جارٍ التحميل...</div></div>
+</div>
+
+<!-- Customer Detail Modal -->
+<div class="modal" id="m-ec-cust" style="display:none">
+  <div class="modal-box" style="max-width:580px">
+    <div class="modal-hd"><span id="ec-cust-detail-name">تفاصيل العميل</span><button class="btn-x" onclick="closeM('m-ec-cust')">×</button></div>
+    <div id="ec-cust-detail-body" class="modal-body"></div>
+    <div class="modal-ft flex gap8 jb">
+      <div class="flex gap8 ic">
+        <label class="f12 ts">نقاط الولاء:</label>
+        <input id="ec-cust-points-val" class="inp" type="number" placeholder="0" style="width:100px">
+        <button class="btn bp bsm" onclick="ecCustAddPoints()">إضافة نقاط</button>
+      </div>
+      <button class="btn bo bsm" onclick="closeM('m-ec-cust')">إغلاق</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let _ecCustCurrent = null;
+
+async function ecCustLoad() {
+  if (!IS_ELECTRON) return;
+  const search = document.getElementById('ec-cust-search').value.trim();
+  try {
+    const r = await BE.ec.customers.list({ search: search||undefined });
+    const custs = r.data || [];
+    document.getElementById('ec-cust-count').textContent = `${custs.length} عميل`;
+    if (!custs.length) { document.getElementById('ec-cust-table').innerHTML = '<div class="ta ts f12 py20">لا يوجد عملاء</div>'; return; }
+    document.getElementById('ec-cust-table').innerHTML = `<table class="tbl"><thead><tr><th>الاسم</th><th>الهاتف</th><th>الطلبات</th><th>إجمالي الإنفاق</th><th>نقاط الولاء</th><th>منذ</th><th></th></tr></thead><tbody>${custs.map(c=>`<tr><td class="fw7">${c.name||'—'}</td><td class="fm f12">${c.phone}</td><td class="ta">${c.total_orders||0}</td><td class="ta fw7">${(c.total_spent||0).toFixed(2)} ج.م</td><td class="ta" style="color:#8b5cf6;font-weight:700">${c.loyalty_points||0}</td><td class="f11 ts">${new Date(c.created_at).toLocaleDateString('ar')}</td><td><button class="btn bo bsm" onclick="ecCustOpen('${c.id}')">عرض</button></td></tr>`).join('')}</tbody></table>`;
+  } catch(e) { console.error('[EC-Customers]', e); }
+}
+
+async function ecCustOpen(id) {
+  if (!IS_ELECTRON) return;
+  const r = await BE.ec.customers.get(id);
+  if (!r.ok) { beErr(r.error); return; }
+  const c = r.data;
+  _ecCustCurrent = c;
+  document.getElementById('ec-cust-detail-name').textContent = c.name || c.phone;
+  document.getElementById('ec-cust-points-val').value = '';
+  document.getElementById('ec-cust-detail-body').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+      <div><div class="f11 ts mb4">الهاتف</div><div class="fw7 fm">${c.phone}</div></div>
+      <div><div class="f11 ts mb4">البريد الإلكتروني</div><div>${c.email||'—'}</div></div>
+      <div><div class="f11 ts mb4">إجمالي الطلبات</div><div class="fw7">${c.total_orders||0}</div></div>
+      <div><div class="f11 ts mb4">إجمالي الإنفاق</div><div class="fw7 fc-g">${(c.total_spent||0).toFixed(2)} ج.م</div></div>
+      <div><div class="f11 ts mb4">نقاط الولاء</div><div class="fw7 f18" style="color:#8b5cf6">${c.loyalty_points||0}</div></div>
+      <div><div class="f11 ts mb4">مستوى الولاء</div><div>${c.loyalty_tier||'عادي'}</div></div>
+      <div><div class="f11 ts mb4">عميل منذ</div><div>${new Date(c.created_at).toLocaleDateString('ar')}</div></div>
+      ${c.last_order_at ? `<div><div class="f11 ts mb4">آخر طلب</div><div>${new Date(c.last_order_at).toLocaleDateString('ar')}</div></div>` : ''}
+    </div>
+    ${c.address ? `<div><div class="f11 ts mb4">العنوان</div><div>${c.address}</div></div>` : ''}
+    ${c.notes ? `<div class="mt8"><div class="f11 ts mb4">ملاحظات</div><div>${c.notes}</div></div>` : ''}
+  `;
+  openM('m-ec-cust');
+}
+
+async function ecCustAddPoints() {
+  if (!_ecCustCurrent) return;
+  const pts = parseInt(document.getElementById('ec-cust-points-val').value) || 0;
+  if (!pts) { beErr('أدخل عدد النقاط'); return; }
+  const r = await BE.ec.loyalty.addTransaction({ customer_id: _ecCustCurrent.id, points: pts, type: 'manual', description: 'نقاط يدوية من الإدارة' });
+  if (r.ok) { beOk(`تم إضافة ${pts} نقطة للعميل`); closeM('m-ec-cust'); ecCustLoad(); }
+  else beErr(r.error);
+}
+
+window.addEventListener('page:ec-customers', () => ecCustLoad());
+</script>

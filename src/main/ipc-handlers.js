@@ -21,6 +21,7 @@ const antibanH   = require('./handlers/antiban');
 const teamH      = require('./handlers/team');
 const resellerH  = require('./handlers/reseller');
 const analyticsH = require('./handlers/analytics');
+const ecH        = require('./handlers/ecommerce');
 
 function register(ipcMain, deps) {
   const { db, engine, waSvc, antiBanSvc } = deps;
@@ -102,6 +103,7 @@ function register(ipcMain, deps) {
   teamH.register(ctx);
   resellerH.register(ctx);
   analyticsH.register(ctx);
+  ecH.register(ctx);
 }
 
 module.exports = { register };

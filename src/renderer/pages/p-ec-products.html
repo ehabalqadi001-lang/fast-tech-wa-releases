@@ -1,0 +1,135 @@
+<!-- E-Commerce Products -->
+<div class="page-hd">
+  <div>
+    <h1 class="page-tt">🛍️ المنتجات</h1>
+    <p class="page-st" id="ec-prod-count">—</p>
+  </div>
+  <div class="flex gap8">
+    <input id="ec-prod-search" class="inp" placeholder="بحث..." style="width:200px" oninput="ecProdLoad()">
+    <select id="ec-prod-cat" class="inp" style="width:160px" onchange="ecProdLoad()">
+      <option value="">جميع الفئات</option>
+    </select>
+    <button class="btn bp" onclick="ecProdOpenForm()">+ منتج جديد</button>
+  </div>
+</div>
+
+<div class="card">
+  <div id="ec-prod-table"><div class="ta ts f12 py20">جارٍ التحميل...</div></div>
+</div>
+
+<!-- Product Form Modal -->
+<div class="modal" id="m-ec-prod" style="display:none">
+  <div class="modal-box" style="max-width:680px">
+    <div class="modal-hd"><span id="ec-prod-form-title">منتج جديد</span><button class="btn-x" onclick="closeM('m-ec-prod')">×</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="ec-prod-id">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="span2"><label class="lbl">اسم المنتج *</label><input id="ec-prod-name" class="inp w100" placeholder="اسم المنتج"></div>
+        <div><label class="lbl">السعر *</label><input id="ec-prod-price" class="inp w100" type="number" placeholder="0.00"></div>
+        <div><label class="lbl">سعر المقارنة</label><input id="ec-prod-compare" class="inp w100" type="number" placeholder="0.00"></div>
+        <div><label class="lbl">الكمية</label><input id="ec-prod-stock" class="inp w100" type="number" placeholder="0"></div>
+        <div><label class="lbl">حد المخزون المنخفض</label><input id="ec-prod-threshold" class="inp w100" type="number" placeholder="5"></div>
+        <div><label class="lbl">الفئة</label>
+          <select id="ec-prod-cat-sel" class="inp w100"><option value="">بدون فئة</option></select>
+        </div>
+        <div><label class="lbl">الحالة</label>
+          <select id="ec-prod-status" class="inp w100">
+            <option value="active">نشط</option>
+            <option value="inactive">غير نشط</option>
+          </select>
+        </div>
+        <div class="span2"><label class="lbl">الوصف</label><textarea id="ec-prod-desc" class="inp w100" rows="3" placeholder="وصف المنتج..."></textarea></div>
+        <div class="span2"><label class="lbl">رابط الصورة</label><input id="ec-prod-img" class="inp w100" placeholder="https://..."></div>
+        <div class="span2"><label class="lbl">الكلمات المفتاحية (مفصولة بفواصل)</label><input id="ec-prod-tags" class="inp w100" placeholder="قميص, ملابس, رجالي"></div>
+      </div>
+    </div>
+    <div class="modal-ft flex gap8 jb">
+      <button class="btn bo" onclick="closeM('m-ec-prod')">إلغاء</button>
+      <button class="btn bp" onclick="ecProdSave()">حفظ المنتج</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let _ecProdCats = [];
+
+async function ecProdLoadCats() {
+  const r = await BE.ec.categories.list();
+  _ecProdCats = r.data || [];
+  const opts = '<option value="">بدون فئة</option>' + _ecProdCats.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+  const filterOpts = '<option value="">جميع الفئات</option>' + _ecProdCats.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+  document.getElementById('ec-prod-cat-sel').innerHTML = opts;
+  document.getElementById('ec-prod-cat').innerHTML = filterOpts;
+}
+
+async function ecProdLoad() {
+  if (!IS_ELECTRON) return;
+  const search = document.getElementById('ec-prod-search').value.trim();
+  const catId  = document.getElementById('ec-prod-cat').value;
+  try {
+    const r = await BE.ec.products.list({ search: search||undefined, category_id: catId||undefined });
+    const prods = r.data || [];
+    document.getElementById('ec-prod-count').textContent = `${prods.length} منتج`;
+    if (!prods.length) { document.getElementById('ec-prod-table').innerHTML = '<div class="ta ts f12 py20">لا توجد منتجات</div>'; return; }
+    document.getElementById('ec-prod-table').innerHTML = `<table class="tbl"><thead><tr><th>المنتج</th><th>الفئة</th><th>السعر</th><th>المخزون</th><th>الحالة</th><th></th></tr></thead><tbody>${prods.map(p=>`<tr><td><div class="fw7">${p.name}</div>${p.sku?`<div class="f11 ts fm">${p.sku}</div>`:''}</td><td class="f12 ts">${p.category_name||'—'}</td><td class="fw7">${(p.price||0).toFixed(2)} ج.م</td><td class="${p.stock_quantity<=(p.low_stock_threshold||5)?'fc-r fw7':''}">${p.stock_quantity??'—'}</td><td><span class="bge f11" style="background:${p.status==='active'?'#10b98120':'#6b728020'};color:${p.status==='active'?'#10b981':'#6b7280'}">${p.status==='active'?'نشط':'غير نشط'}</span></td><td class="flex gap4"><button class="btn bo bsm" onclick="ecProdOpenForm('${p.id}')">تعديل</button><button class="btn bsm" style="background:#ef444420;color:#ef4444" onclick="ecProdDelete('${p.id}','${p.name.replace(/'/g,'')}')">حذف</button></td></tr>`).join('')}</tbody></table>`;
+  } catch(e) { console.error('[EC-Prods]', e); }
+}
+
+async function ecProdOpenForm(id) {
+  await ecProdLoadCats();
+  if (id) {
+    const r = await BE.ec.products.get(id);
+    if (!r.ok) { beErr(r.error); return; }
+    const p = r.data;
+    document.getElementById('ec-prod-form-title').textContent = 'تعديل المنتج';
+    document.getElementById('ec-prod-id').value       = p.id;
+    document.getElementById('ec-prod-name').value     = p.name||'';
+    document.getElementById('ec-prod-price').value    = p.price||0;
+    document.getElementById('ec-prod-compare').value  = p.compare_at_price||'';
+    document.getElementById('ec-prod-stock').value    = p.stock_quantity||0;
+    document.getElementById('ec-prod-threshold').value= p.low_stock_threshold||5;
+    document.getElementById('ec-prod-cat-sel').value  = p.category_id||'';
+    document.getElementById('ec-prod-status').value   = p.status||'active';
+    document.getElementById('ec-prod-desc').value     = p.description||'';
+    document.getElementById('ec-prod-img').value      = p.image_url||'';
+    document.getElementById('ec-prod-tags').value     = (JSON.parse(p.tags||'[]')).join(', ');
+  } else {
+    document.getElementById('ec-prod-form-title').textContent = 'منتج جديد';
+    ['ec-prod-id','ec-prod-name','ec-prod-price','ec-prod-compare','ec-prod-stock','ec-prod-desc','ec-prod-img','ec-prod-tags'].forEach(id=>{ document.getElementById(id).value=''; });
+    document.getElementById('ec-prod-threshold').value = 5;
+    document.getElementById('ec-prod-status').value   = 'active';
+    document.getElementById('ec-prod-cat-sel').value  = '';
+  }
+  openM('m-ec-prod');
+}
+
+async function ecProdSave() {
+  const id = document.getElementById('ec-prod-id').value;
+  const name = document.getElementById('ec-prod-name').value.trim();
+  if (!name) { beErr('أدخل اسم المنتج'); return; }
+  const data = {
+    name,
+    price:             parseFloat(document.getElementById('ec-prod-price').value)||0,
+    compare_at_price:  parseFloat(document.getElementById('ec-prod-compare').value)||null,
+    stock_quantity:    parseInt(document.getElementById('ec-prod-stock').value)||0,
+    low_stock_threshold: parseInt(document.getElementById('ec-prod-threshold').value)||5,
+    category_id:       document.getElementById('ec-prod-cat-sel').value||null,
+    status:            document.getElementById('ec-prod-status').value,
+    description:       document.getElementById('ec-prod-desc').value.trim(),
+    image_url:         document.getElementById('ec-prod-img').value.trim()||null,
+    tags:              document.getElementById('ec-prod-tags').value.split(',').map(t=>t.trim()).filter(Boolean),
+  };
+  const r = id ? await BE.ec.products.update(id, data) : await BE.ec.products.create(data);
+  if (r.ok) { beOk(id ? 'تم تحديث المنتج' : 'تم إضافة المنتج'); closeM('m-ec-prod'); ecProdLoad(); }
+  else beErr(r.error);
+}
+
+async function ecProdDelete(id, name) {
+  if (!confirm(`هل تريد حذف المنتج: ${name}?`)) return;
+  const r = await BE.ec.products.delete(id);
+  if (r.ok) { beOk('تم حذف المنتج'); ecProdLoad(); }
+  else beErr(r.error);
+}
+
+window.addEventListener('page:ec-products', () => { ecProdLoadCats(); ecProdLoad(); });
+</script>

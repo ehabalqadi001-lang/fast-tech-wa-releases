@@ -1,0 +1,93 @@
+<!-- E-Commerce Shipping Zones -->
+<div class="page-hd">
+  <div>
+    <h1 class="page-tt">🚚 مناطق الشحن</h1>
+    <p class="page-st">إدارة تكاليف الشحن لكل منطقة</p>
+  </div>
+  <button class="btn bp" onclick="ecShipOpenForm()">+ منطقة جديدة</button>
+</div>
+
+<div class="card">
+  <div id="ec-ship-table"><div class="ta ts f12 py20">جارٍ التحميل...</div></div>
+</div>
+
+<!-- Shipping Zone Form Modal -->
+<div class="modal" id="m-ec-ship" style="display:none">
+  <div class="modal-box" style="max-width:480px">
+    <div class="modal-hd"><span id="ec-ship-form-title">منطقة شحن جديدة</span><button class="btn-x" onclick="closeM('m-ec-ship')">×</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="ec-ship-id">
+      <div style="display:grid;grid-template-columns:1fr;gap:12px">
+        <div><label class="lbl">اسم المنطقة *</label><input id="ec-ship-name" class="inp w100" placeholder="القاهرة والجيزة"></div>
+        <div><label class="lbl">تكلفة الشحن (ج.م) *</label><input id="ec-ship-cost" class="inp w100" type="number" placeholder="0"></div>
+        <div><label class="lbl">الحد الأدنى للطلب المجاني</label><input id="ec-ship-free" class="inp w100" type="number" placeholder="500 (فارغ = لا يوجد شحن مجاني)"></div>
+        <div><label class="lbl">أيام التسليم المتوقعة</label><input id="ec-ship-days" class="inp w100" placeholder="2-5 أيام"></div>
+        <div><label class="lbl">المناطق المشمولة (مفصولة بفواصل)</label><textarea id="ec-ship-areas" class="inp w100" rows="3" placeholder="القاهرة, الجيزة, 6 أكتوبر"></textarea></div>
+        <div class="flex ic gap8"><input type="checkbox" id="ec-ship-active" checked><label for="ec-ship-active">نشطة</label></div>
+      </div>
+    </div>
+    <div class="modal-ft flex gap8 jb">
+      <button class="btn bo" onclick="closeM('m-ec-ship')">إلغاء</button>
+      <button class="btn bp" onclick="ecShipSave()">حفظ</button>
+    </div>
+  </div>
+</div>
+
+<script>
+async function ecShipLoad() {
+  if (!IS_ELECTRON) return;
+  try {
+    const r = await BE.ec.shipping.list();
+    const zones = r.data || [];
+    if (!zones.length) { document.getElementById('ec-ship-table').innerHTML = '<div class="ta ts f12 py20">لا توجد مناطق شحن — أضف منطقة جديدة</div>'; return; }
+    document.getElementById('ec-ship-table').innerHTML = `<table class="tbl"><thead><tr><th>المنطقة</th><th>التكلفة</th><th>الشحن المجاني عند</th><th>وقت التسليم</th><th>الحالة</th><th></th></tr></thead><tbody>${zones.map(z=>`<tr><td><div class="fw7">${z.name}</div>${z.areas_covered?`<div class="f11 ts">${z.areas_covered}</div>`:''}</td><td class="fw7">${(z.cost||0).toFixed(2)} ج.م</td><td class="ts f12">${z.free_shipping_threshold?`فوق ${z.free_shipping_threshold} ج.م`:'—'}</td><td class="ts f12">${z.estimated_days||'—'}</td><td><span class="bge f11" style="background:${z.is_active?'#10b98120':'#6b728020'};color:${z.is_active?'#10b981':'#6b7280'}">${z.is_active?'نشطة':'موقفة'}</span></td><td class="flex gap4"><button class="btn bo bsm" onclick="ecShipOpenForm('${z.id}')">تعديل</button><button class="btn bsm" style="background:#ef444420;color:#ef4444" onclick="ecShipDelete('${z.id}','${z.name.replace(/'/g,'')}')">حذف</button></td></tr>`).join('')}</tbody></table>`;
+  } catch(e) { console.error('[EC-Shipping]', e); }
+}
+
+async function ecShipOpenForm(id) {
+  if (id) {
+    const r = await BE.ec.shipping.list();
+    const z = (r.data||[]).find(x=>x.id===id);
+    if (!z) return;
+    document.getElementById('ec-ship-form-title').textContent = 'تعديل منطقة الشحن';
+    document.getElementById('ec-ship-id').value     = z.id;
+    document.getElementById('ec-ship-name').value   = z.name||'';
+    document.getElementById('ec-ship-cost').value   = z.cost||0;
+    document.getElementById('ec-ship-free').value   = z.free_shipping_threshold||'';
+    document.getElementById('ec-ship-days').value   = z.estimated_days||'';
+    document.getElementById('ec-ship-areas').value  = z.areas_covered||'';
+    document.getElementById('ec-ship-active').checked = !!z.is_active;
+  } else {
+    document.getElementById('ec-ship-form-title').textContent = 'منطقة شحن جديدة';
+    ['ec-ship-id','ec-ship-name','ec-ship-cost','ec-ship-free','ec-ship-days','ec-ship-areas'].forEach(i=>{ document.getElementById(i).value=''; });
+    document.getElementById('ec-ship-active').checked = true;
+  }
+  openM('m-ec-ship');
+}
+
+async function ecShipSave() {
+  const id = document.getElementById('ec-ship-id').value;
+  const name = document.getElementById('ec-ship-name').value.trim();
+  if (!name) { beErr('أدخل اسم المنطقة'); return; }
+  const data = {
+    name,
+    cost:                     parseFloat(document.getElementById('ec-ship-cost').value)||0,
+    free_shipping_threshold:  parseFloat(document.getElementById('ec-ship-free').value)||null,
+    estimated_days:           document.getElementById('ec-ship-days').value.trim()||null,
+    areas_covered:            document.getElementById('ec-ship-areas').value.trim()||null,
+    is_active:                document.getElementById('ec-ship-active').checked ? 1 : 0,
+  };
+  const r = id ? await BE.ec.shipping.update(id, data) : await BE.ec.shipping.create(data);
+  if (r.ok) { beOk(id ? 'تم تحديث المنطقة' : 'تم إضافة المنطقة'); closeM('m-ec-ship'); ecShipLoad(); }
+  else beErr(r.error);
+}
+
+async function ecShipDelete(id, name) {
+  if (!confirm(`هل تريد حذف منطقة الشحن: ${name}?`)) return;
+  const r = await BE.ec.shipping.delete(id);
+  if (r.ok) { beOk('تم حذف المنطقة'); ecShipLoad(); }
+  else beErr(r.error);
+}
+
+window.addEventListener('page:ec-shipping', () => ecShipLoad());
+</script>

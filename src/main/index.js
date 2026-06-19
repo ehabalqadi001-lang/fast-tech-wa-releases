@@ -19,9 +19,10 @@ const IpcHandlers    = require('./ipc-handlers');
 const LicenseService = require('./license-service');
 const Updater        = require('./updater');
 const { AntiBanService } = require('./anti-ban-service');
-const SequenceService = require('./sequence-service');
-const Container      = require('./container');
-const EventEmitter   = require('events');
+const SequenceService       = require('./sequence-service');
+const Container             = require('./container');
+const OrderConfirmationBot  = require('./order-confirmation-bot');
+const EventEmitter          = require('events');
 
 // Internal bus — used to signal from IPC handlers to window lifecycle code
 const _bus = new EventEmitter();
@@ -277,6 +278,16 @@ app.whenReady().then(async () => {
     // 7. Sequence engine (Phase 7)
     const seqSvc = new SequenceService(db, engine, waSvc);
     seqSvc.start();
+
+    // 7b. WA Order Confirmation Bot (E-Commerce)
+    const orderBot = new OrderConfirmationBot(db, waSvc);
+    orderBot.start();
+    orderBot.on('order:confirmed', (d) => {
+      BrowserWindow.getAllWindows().forEach(w => w.webContents.send('ec:order:confirmed', d));
+    });
+    orderBot.on('order:cancelled', (d) => {
+      BrowserWindow.getAllWindows().forEach(w => w.webContents.send('ec:order:cancelled', d));
+    });
 
     // Wire keyword trigger: check incoming messages for sequence triggers
     if (waSvc) {
