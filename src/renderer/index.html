@@ -194,14 +194,44 @@
 
 <!-- MODAL: Send to Groups via Web -->
 <div class="mo" id="m-send-to-group">
-  <div class="md" style="max-width:560px">
+  <div class="md" style="max-width:580px">
     <div class="md-tt">📤 إرسال مباشر عبر WhatsApp Web</div>
     <div class="md-st" id="stg-target-info">اختر مجموعة أو مجموعات للإرسال إليها</div>
+
     <div class="fg">
       <label class="fl">الجهاز (جلسة Web) <span class="f11 ts">— يجب أن يكون متصلاً</span></label>
       <select id="stg-session" class="fc"><option value="">اختر جهاز...</option></select>
     </div>
-    <div class="fg"><label class="fl">نص الرسالة</label><textarea id="stg-body" class="fc" rows="4" placeholder="أهلاً! لدينا عرض مميز اليوم... 🎉"></textarea></div>
+
+    <!-- Media Attachment -->
+    <div class="fg">
+      <label class="fl">مرفق (صورة / فيديو / مستند) <span class="f11 ts">— اختياري</span></label>
+      <div class="flex gap8 ic">
+        <button class="btn bo bsm" onclick="pickStgMedia('image')" title="صورة">🖼️ صورة</button>
+        <button class="btn bo bsm" onclick="pickStgMedia('video')" title="فيديو">🎬 فيديو</button>
+        <button class="btn bo bsm" onclick="pickStgMedia('document')" title="ملف">📎 ملف</button>
+        <button class="btn bo bsm" id="stg-clear-media" onclick="clearStgMedia()" style="display:none;color:#ef4444" title="حذف المرفق">✕</button>
+      </div>
+      <!-- Preview bar -->
+      <div id="stg-media-preview" style="display:none;margin-top:8px;padding:10px 14px;background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.25);border-radius:8px;font-size:12px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span id="stg-media-icon" style="font-size:20px">📄</span>
+          <div style="flex:1;overflow:hidden">
+            <div id="stg-media-name" style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
+            <div id="stg-media-size" style="opacity:.6;margin-top:2px"></div>
+          </div>
+        </div>
+      </div>
+      <input type="hidden" id="stg-media-path">
+    </div>
+
+    <!-- Message / Caption -->
+    <div class="fg">
+      <label class="fl" id="stg-body-label">نص الرسالة</label>
+      <textarea id="stg-body" class="fc" rows="4" placeholder="أهلاً! لدينا عرض مميز اليوم... 🎉"></textarea>
+    </div>
+
+    <!-- Delay -->
     <div class="fg">
       <label class="fl">التأخير بين المجموعات</label>
       <div class="flex gap8 ic">
@@ -212,6 +242,7 @@
         <span class="f12 ts">ثانية</span>
       </div>
     </div>
+
     <div class="md-cl">
       <button class="btn bo" onclick="closeM('m-send-to-group')">إلغاء</button>
       <button class="btn bp" onclick="sendToGroupConfirm()">🚀 إرسال الآن</button>

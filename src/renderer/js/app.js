@@ -2886,10 +2886,51 @@ async function _populateSendToGroupSessions() {
   }
 }
 
+function _stgResetMedia() {
+  document.getElementById('stg-media-path').value = '';
+  document.getElementById('stg-media-preview').style.display = 'none';
+  document.getElementById('stg-clear-media').style.display  = 'none';
+  document.getElementById('stg-body-label').textContent      = 'نص الرسالة';
+  document.getElementById('stg-body').placeholder            = 'أهلاً! لدينا عرض مميز اليوم... 🎉';
+}
+
+async function pickStgMedia(type) {
+  if (!IS_ELECTRON) { beErr('اختيار الملف متاح فقط في تطبيق Electron'); return; }
+  const filters = {
+    image:    [{ name: 'صور', extensions: ['jpg','jpeg','png','gif','webp'] }],
+    video:    [{ name: 'فيديو', extensions: ['mp4','avi','mov','mkv','3gp'] }],
+    document: [{ name: 'ملفات', extensions: ['pdf','docx','xlsx','pptx','txt','zip','rar'] }],
+  };
+  const icons  = { image: '🖼️', video: '🎬', document: '📎' };
+  try {
+    const result = await window.ftwa.dialog.openFile({ filters: filters[type] || [] });
+    if (!result || result.canceled || !result.filePaths?.length) return;
+    const filePath = result.filePaths[0];
+    const fileName = filePath.split(/[\\/]/).pop();
+    const fileExt  = fileName.split('.').pop().toLowerCase();
+
+    document.getElementById('stg-media-path').value        = filePath;
+    document.getElementById('stg-media-name').textContent  = fileName;
+    document.getElementById('stg-media-size').textContent  = '.' + fileExt.toUpperCase();
+    document.getElementById('stg-media-icon').textContent  = icons[type] || '📄';
+    document.getElementById('stg-media-preview').style.display = 'flex';
+    document.getElementById('stg-clear-media').style.display   = 'inline-flex';
+    document.getElementById('stg-body-label').textContent  = 'التعليق (Caption) — اختياري';
+    document.getElementById('stg-body').placeholder        = 'أضف تعليقاً للمرفق... (اختياري)';
+  } catch (e) {
+    beErr('فشل اختيار الملف: ' + e.message);
+  }
+}
+
+function clearStgMedia() {
+  _stgResetMedia();
+}
+
 async function openSendToGroup(groupId, groupName) {
   _sendToGroupTargets = [groupId];
   document.getElementById('stg-target-info').textContent =
     `المجموعة: ${groupName || groupId}`;
+  _stgResetMedia();
   await _populateSendToGroupSessions();
   openM('m-send-to-group');
 }
@@ -2899,6 +2940,7 @@ async function openSendToGroupBulk() {
   _sendToGroupTargets = Array.from(_groupsSelected);
   document.getElementById('stg-target-info').textContent =
     `${_sendToGroupTargets.length} مجموعة محددة`;
+  _stgResetMedia();
   await _populateSendToGroupSessions();
   openM('m-send-to-group');
 }
@@ -2906,26 +2948,31 @@ async function openSendToGroupBulk() {
 async function sendToGroupConfirm() {
   const sessionId = document.getElementById('stg-session').value;
   const body      = document.getElementById('stg-body').value.trim();
+  const mediaPath = document.getElementById('stg-media-path').value.trim();
   const delayMin  = parseInt(document.getElementById('stg-delay-min').value, 10) * 1000;
   const delayMax  = parseInt(document.getElementById('stg-delay-max').value, 10) * 1000;
 
   if (!sessionId) { beErr('اختر جهاز Web أولاً'); return; }
-  if (!body)      { beErr('أدخل نص الرسالة'); return; }
+  if (!body && !mediaPath) { beErr('أدخل نص الرسالة أو أرفق ملفاً'); return; }
   if (!_sendToGroupTargets.length) { beErr('لا توجد مجموعات محددة'); return; }
 
   closeM('m-send-to-group');
 
-  const r = await BE.wa.send.bulk({
+  const payload = {
     recipients:   _sendToGroupTargets,
     scripts:      [body],
     sessionId,
     delayMin,
     delayMax,
     campaignName: `إرسال للمجموعات — ${new Date().toLocaleDateString('ar')}`,
-  });
+  };
+  if (mediaPath) payload.mediaPath = mediaPath;
+
+  const r = await BE.wa.send.bulk(payload);
 
   if (r.ok) {
-    beOk(`✅ تم إضافة ${_sendToGroupTargets.length} مجموعة للقائمة — الإرسال جارٍ`);
+    const mediaNote = mediaPath ? ' مع مرفق' : '';
+    beOk(`✅ تم إضافة ${_sendToGroupTargets.length} مجموعة للقائمة${mediaNote} — الإرسال جارٍ`);
     nav('engine');
     setTimeout(loadEngineStats, 2000);
   } else {
