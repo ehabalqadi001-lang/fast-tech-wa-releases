@@ -2903,7 +2903,7 @@ async function pickStgMedia(type) {
   };
   const icons  = { image: '🖼️', video: '🎬', document: '📎' };
   try {
-    const result = await window.ftwa.dialog.openFile({ filters: filters[type] || [] });
+    const result = await window.ftwa.openFile({ filters: filters[type] || [] });
     if (!result || result.canceled || !result.filePaths?.length) return;
     const filePath = result.filePaths[0];
     const fileName = filePath.split(/[\\/]/).pop();
