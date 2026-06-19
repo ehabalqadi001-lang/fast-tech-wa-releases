@@ -496,6 +496,24 @@ class Db {
       this.settingSet('db_version', '11');
       v = 11;
     }
+
+    if (v < 12) {
+      // Visual Chatbot Builder — auto-reply flows
+      this._db.exec(`
+        CREATE TABLE IF NOT EXISTS chatbot_flows (
+          id               TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(8)))),
+          name             TEXT NOT NULL,
+          nodes_json       TEXT NOT NULL DEFAULT '[]',
+          active           INTEGER DEFAULT 1,
+          trigger_keywords TEXT DEFAULT '',
+          created_at       TEXT DEFAULT (datetime('now')),
+          updated_at       TEXT DEFAULT (datetime('now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_chatbot_active ON chatbot_flows(active);
+      `);
+      this.settingSet('db_version', '12');
+      v = 12;
+    }
   }
 
   // ─── FTS Search ───────────────────────────────────────────────────────────
@@ -1388,6 +1406,38 @@ class Db {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // CHATBOT FLOWS
+  // ═══════════════════════════════════════════════════════════════════════════
+  chatbotList() {
+    return this._db.prepare('SELECT * FROM chatbot_flows ORDER BY created_at DESC').all();
+  }
+
+  chatbotGet(id) {
+    return this._db.prepare('SELECT * FROM chatbot_flows WHERE id=?').get(id);
+  }
+
+  chatbotSave({ id, name, nodes_json, trigger_keywords, active }) {
+    if (id) {
+      return this._db.prepare(`
+        UPDATE chatbot_flows SET name=?, nodes_json=?, trigger_keywords=?, active=?, updated_at=datetime('now')
+        WHERE id=?
+      `).run(name, nodes_json, trigger_keywords || '', active ?? 1, id);
+    }
+    return this._db.prepare(`
+      INSERT INTO chatbot_flows (name, nodes_json, trigger_keywords, active)
+      VALUES (?, ?, ?, ?)
+    `).run(name, nodes_json, trigger_keywords || '', active ?? 1);
+  }
+
+  chatbotDelete(id) {
+    return this._db.prepare('DELETE FROM chatbot_flows WHERE id=?').run(id);
+  }
+
+  chatbotGetActive() {
+    return this._db.prepare('SELECT * FROM chatbot_flows WHERE active=1').all();
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // AUDIT LOG
   // ═══════════════════════════════════════════════════════════════════════════
   auditLog({ event_type, description, session_id = null, meta = null }) {
@@ -1443,6 +1493,33 @@ class Db {
 
   audienceDelete(id) {
     return this._db.prepare('DELETE FROM audiences WHERE id=?').run(id);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ADVANCED ANALYTICS — funnel
+  // ═══════════════════════════════════════════════════════════════════════════
+  analyticsFunnel(days = 30) {
+    const from = new Date(); from.setDate(from.getDate() - days);
+    const fromStr = from.toISOString().slice(0, 10);
+    const sent      = this._db.prepare(`SELECT COUNT(*) AS n FROM send_queue WHERE status IN ('sent','delivered','read') AND DATE(created_at)>=?`).get(fromStr)?.n || 0;
+    const delivered = this._db.prepare(`SELECT COUNT(*) AS n FROM send_queue WHERE status IN ('delivered','read') AND DATE(created_at)>=?`).get(fromStr)?.n || 0;
+    const read      = this._db.prepare(`SELECT COUNT(*) AS n FROM send_queue WHERE status='read' AND DATE(created_at)>=?`).get(fromStr)?.n || 0;
+    const replied   = this._db.prepare(`SELECT COUNT(*) AS n FROM incoming_messages WHERE DATE(received_at)>=?`).get(fromStr)?.n || 0;
+    return { sent, delivered, read, replied };
+  }
+
+  analyticsHeatmap(days = 30) {
+    const from = new Date(); from.setDate(from.getDate() - days);
+    const fromStr = from.toISOString().slice(0, 10);
+    return this._db.prepare(`
+      SELECT strftime('%w', created_at) AS dow,
+             strftime('%H', created_at) AS hour,
+             COUNT(*) AS count
+      FROM send_queue
+      WHERE status IN ('sent','delivered','read') AND DATE(created_at)>=?
+      GROUP BY dow, hour
+      ORDER BY dow, hour
+    `).all(fromStr);
   }
 
   // ═══════════════════════════════════════════════════════════════════════════

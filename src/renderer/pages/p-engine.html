@@ -92,6 +92,22 @@
           <span class="f12 ts" style="white-space:nowrap">ثانية</span>
         </div>
       </div>
+      <!-- Enhanced Cloud API: Interactive Messages (Phase 5) -->
+      <div style="border-top:1px solid rgba(var(--ar),.1);padding-top:12px;margin-top:4px">
+        <div class="flex ic gap8 mb8">
+          <div class="tg" id="eng-interactive-toggle" onclick="toggleInteractiveMode()"></div>
+          <span class="f12 ts">رسالة تفاعلية (Cloud API) — أزرار سريعة</span>
+        </div>
+        <div id="eng-interactive-panel" style="display:none">
+          <div class="f11 ts mb8">أضف حتى 3 أزرار رد سريع (Cloud API فقط)</div>
+          <div class="flex gap8" style="flex-direction:column">
+            <input class="fc bsm" id="eng-btn-1" placeholder="زر 1: مثال — نعم، أنا مهتم">
+            <input class="fc bsm" id="eng-btn-2" placeholder="زر 2: مثال — أرسل لي المزيد">
+            <input class="fc bsm" id="eng-btn-3" placeholder="زر 3: مثال — شكراً، لا أريد">
+          </div>
+        </div>
+      </div>
+
       <button class="btn bp wf" style="margin-top:8px" onclick="startBulkSend()">🚀 بدء الإرسال المضاد للحظر</button>
     </div>
   </div>

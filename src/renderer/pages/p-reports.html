@@ -10,6 +10,7 @@
         <option value="replied">✅ تم الرد</option>
       </select>
       <button class="btn bp bsm" onclick="exportReportExcel()">📊 تصدير Excel</button>
+      <button class="btn bo bsm" onclick="exportReportPDF()">📄 تصدير PDF</button>
     </div>
   </div>
   <div class="sg mb18">
@@ -46,6 +47,18 @@
         <tr><td colspan="5" class="ta f12 ts" style="padding:24px">لا توجد ردود حتى الآن</td></tr>
       </tbody>
     </table>
+  </div>
+
+  <!-- Advanced Analytics: Funnel -->
+  <div class="g2 mb18">
+    <div class="card">
+      <div class="ct">🔽 مسار التحويل (Funnel) — آخر 30 يوم</div>
+      <div id="funnel-chart" style="display:flex;flex-direction:column;gap:8px;padding:8px 0"></div>
+    </div>
+    <div class="card">
+      <div class="ct">🗓️ خريطة حرارة الإرسال (Hour × Day)</div>
+      <div id="heatmap-chart" style="overflow-x:auto"></div>
+    </div>
   </div>
 
   <!-- Usage Chart (7-day trend) -->

@@ -87,6 +87,32 @@
         </div>
       </div>
 
+      <!-- Developer API Mode (Phase 5) -->
+      <div class="card mb18">
+        <div class="ct">🔧 وضع المطوّر — REST API المحلي</div>
+        <div class="f12 ts mb10">أتمتة إرسال الرسائل وإدارة جهات الاتصال عبر REST API محلي. يُضاف كـ Route على منفذ الـ Webhook.</div>
+        <div class="fg">
+          <label class="fl">مفتاح API (Bearer Token)</label>
+          <div class="flex gap8">
+            <input class="fc fi" id="dev-api-key" type="password" placeholder="أدخل مفتاحاً سرياً أو اضغط إنشاء">
+            <button class="btn bo bsm" onclick="generateApiKey()">🔑 إنشاء</button>
+          </div>
+        </div>
+        <div class="f11 ts mb10" id="dev-api-docs-url"></div>
+        <div class="flex gap8">
+          <button class="btn bp bsm" onclick="saveApiKey()">💾 حفظ المفتاح</button>
+          <button class="btn bo bsm" onclick="copyApiKey()">📋 نسخ</button>
+        </div>
+        <div class="f11 mt10 ts">Endpoints: <code>POST /api/send</code> · <code>GET /api/contacts</code> · <code>GET /api/stats</code></div>
+      </div>
+
+      <!-- Chatbot Builder shortcut -->
+      <div class="card mb18">
+        <div class="ct">🤖 منشئ Chatbot التلقائي</div>
+        <div class="f12 ts mb10">أنشئ تدفقات ردود تلقائية تستجيب للكلمات المفتاحية</div>
+        <button class="btn bp wf" onclick="nav('chatbot')">🔀 فتح منشئ Chatbot</button>
+      </div>
+
       <!-- System Info -->
       <div class="card">
         <div class="ct">ℹ️ معلومات النظام</div>

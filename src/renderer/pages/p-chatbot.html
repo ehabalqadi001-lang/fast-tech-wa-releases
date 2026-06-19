@@ -1,0 +1,43 @@
+<div id="p-chatbot" class="page">
+  <div class="ph">
+    <div class="ph-l"><div class="ph-ic">🤖</div><div><h1>CHATBOT BUILDER</h1><p>منشئ الردود التلقائية — Auto-Reply Flows</p></div></div>
+    <div class="flex gap8">
+      <button class="btn bo bsm" onclick="loadChatbotFlows()">🔄 تحديث</button>
+      <button class="btn bp" onclick="newChatbotFlow()">➕ تدفق جديد</button>
+    </div>
+  </div>
+
+  <!-- Flow list -->
+  <div class="card mb18">
+    <div class="ct flex ic jb">
+      <span>🔀 تدفقات الردود التلقائية</span>
+      <span class="f11 ts" id="chatbot-count"></span>
+    </div>
+    <div id="chatbot-flows-list">
+      <div class="f12 ts" style="padding:32px;text-align:center">لا توجد تدفقات — أنشئ تدفقاً جديداً</div>
+    </div>
+  </div>
+
+  <!-- Flow Editor -->
+  <div class="card" id="chatbot-editor" style="display:none">
+    <div class="ct flex ic jb">
+      <span>✏️ محرر التدفق</span>
+      <div class="flex gap8">
+        <button class="btn bo bsm" onclick="addChatbotNode()">➕ إضافة خطوة</button>
+        <button class="btn bp bsm" onclick="saveChatbotFlow()">💾 حفظ</button>
+        <button class="btn bo bsm" onclick="closeChatbotEditor()">✕ إغلاق</button>
+      </div>
+    </div>
+    <div class="g2 mb14">
+      <div class="fg">
+        <label class="fl">اسم التدفق</label>
+        <input class="fc" id="chatbot-flow-name" placeholder="مثال: رد على الاستفسارات">
+      </div>
+      <div class="fg">
+        <label class="fl">كلمات مفتاحية تُطلق التدفق (مفصولة بفواصل)</label>
+        <input class="fc" id="chatbot-flow-keywords" placeholder="مرحبا, مساء, أهلا, السلام">
+      </div>
+    </div>
+    <div id="chatbot-nodes-container" style="display:flex;flex-direction:column;gap:12px"></div>
+  </div>
+</div>
