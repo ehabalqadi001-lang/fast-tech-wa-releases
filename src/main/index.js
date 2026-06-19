@@ -20,6 +20,7 @@ const LicenseService = require('./license-service');
 const Updater        = require('./updater');
 const { AntiBanService } = require('./anti-ban-service');
 const SequenceService = require('./sequence-service');
+const Container      = require('./container');
 const EventEmitter   = require('events');
 
 // Internal bus — used to signal from IPC handlers to window lifecycle code
@@ -284,11 +285,24 @@ app.whenReady().then(async () => {
       });
     }
 
-    // 8. IPC handlers (all services registered)
-    IpcHandlers.register(ipcMain, {
-      db, waApi, waSvc, engine, scraper, scheduler,
-      aiSvc, excel, adapter, webhookSrv, antiBanSvc, seqSvc,
-    });
+    // 8. Service container (DI) + IPC handlers
+    const container = new Container();
+    container
+      .register('db',         db)
+      .register('waApi',      waApi)
+      .register('waSvc',      waSvc)
+      .register('engine',     engine)
+      .register('scraper',    scraper)
+      .register('scheduler',  scheduler)
+      .register('aiSvc',      aiSvc)
+      .register('excel',      excel)
+      .register('adapter',    adapter)
+      .register('webhookSrv', webhookSrv)
+      .register('antiBanSvc', antiBanSvc)
+      .register('seqSvc',     seqSvc)
+      .register('ipcMain',    ipcMain);
+
+    IpcHandlers.register(ipcMain, container.toDeps());
 
     // 6. Window + tray
     setAppMenu();

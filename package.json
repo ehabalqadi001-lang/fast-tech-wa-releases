@@ -1,6 +1,6 @@
 {
   "name": "fast-tech-whatsapp-manager",
-  "version": "6.1.0",
+  "version": "6.2.0",
   "description": "Fast Tech WhatsApp Business Manager - Professional WhatsApp Business Management System",
   "main": "src/main/index.js",
   "author": "Fast Tech",
@@ -9,9 +9,11 @@
   "scripts": {
     "start": "set ELECTRON_RUN_AS_NODE=&& electron .",
     "dev": "set ELECTRON_RUN_AS_NODE=&& electron . --dev",
-    "build": "npm run obfuscate && electron-builder --win",
-    "build:portable": "npm run obfuscate && electron-builder --win portable",
+    "build": "npm run tsc && npm run obfuscate && electron-builder --win",
+    "build:portable": "npm run tsc && npm run obfuscate && electron-builder --win portable",
     "build:dev": "electron-builder --win",
+    "tsc": "tsc",
+    "typecheck": "tsc --noEmit",
     "install-deps": "npm install",
     "generate-icon": "node scripts/generate-icon.js",
     "postinstall": "electron-builder install-app-deps",
@@ -35,11 +37,13 @@
   },
   "devDependencies": {
     "@electron/asar": "^3.4.1",
+    "@types/node": "^26.0.0",
     "electron": "^29.4.6",
     "electron-builder": "^26.15.3",
     "javascript-obfuscator": "^5.4.3",
     "jimp": "^1.6.1",
-    "to-ico": "^1.1.5"
+    "to-ico": "^1.1.5",
+    "typescript": "^6.0.3"
   },
   "build": {
     "appId": "com.fasttech.whatsapp-cyber-nexus",
@@ -100,11 +104,11 @@
     ],
     "publish": [
       {
-        "provider":     "github",
-        "owner":        "ehabalqadi001-lang",
-        "repo":         "fast-tech-wa-releases",
-        "private":      true,
-        "releaseType":  "release"
+        "provider": "github",
+        "owner": "ehabalqadi001-lang",
+        "repo": "fast-tech-wa-releases",
+        "private": true,
+        "releaseType": "release"
       }
     ]
   }
