@@ -23,6 +23,9 @@ async function nav(page) {
   const main = document.getElementById('main');
   main.innerHTML = window._pgCache[page];
 
+  // Show the injected page (CSS default is display:none, .on = display:block)
+  document.getElementById('p-' + page)?.classList.add('on');
+
   // Re-bind modal backdrop listeners
   main.querySelectorAll('.mo').forEach(m => {
     m.addEventListener('click', e => { if(e.target === m) m.classList.remove('open'); });
