@@ -9,18 +9,23 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const Anthropic = require('@anthropic-ai/sdk');
 
 class AiService {
-  constructor(db) {
-    this._db = db;
+  constructor(db, secStore = null) {
+    this._db       = db;
+    this._secStore = secStore; // injected after ipc-handlers creates it
   }
 
   // ─── Key management ───────────────────────────────────────────────────────
   _getKeys() {
+    const get = (key) => this._secStore ? this._secStore.get(key) : (this._db.settingGet(key) || '');
     return {
-      gemini:  this._db.settingGet('ai_gemini_key')  || '',
-      claude:  this._db.settingGet('ai_claude_key')  || '',
-      provider: this._db.settingGet('ai_provider')   || 'gemini',
+      gemini:   get('ai_gemini_key'),
+      claude:   get('ai_claude_key'),
+      provider: this._db.settingGet('ai_provider') || 'gemini',
     };
   }
+
+  // Called by ipc-handlers after saving new keys to refresh in-memory state
+  reloadKeys() { /* keys are read fresh on each call via _getKeys() */ }
 
   saveKeys({ geminiKey, claudeKey, provider, geminiModel }) {
     if (geminiKey   !== undefined) this._db.settingSet('ai_gemini_key',   geminiKey);

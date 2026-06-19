@@ -9,11 +9,18 @@
 const { v4: uuidv4 }  = require('uuid');
 const path = require('path');
 const fs   = require('fs');
+const V           = require('./validate');
+const SecureStore = require('./secure-store');
 
 function ok(data)  { return { ok: true,  data }; }
 function err(e)    { return { ok: false, error: String(e?.message || e) }; }
 
 function register(ipcMain, { db, waApi, waSvc, engine, scraper, scheduler, aiSvc, excel, adapter, webhookSrv, antiBanSvc, seqSvc }) {
+
+  // ── Secure storage for sensitive keys ──────────────────────────────────────
+  const secStore = new SecureStore(db);
+  try { secStore.migrateExisting(); } catch (e) { console.warn('[SecureStore] migrate failed:', e.message); }
+  if (aiSvc && typeof aiSvc._secStore !== 'undefined') aiSvc._secStore = secStore;
 
   // ── Wake lock (prevent sleep during active campaigns) ─────────────────────
   const { powerSaveBlocker, BrowserWindow } = require('electron');
@@ -70,6 +77,8 @@ function register(ipcMain, { db, waApi, waSvc, engine, scraper, scheduler, aiSvc
   // ══════════════════════════════════════════════════════════════════════════
   handle('accounts:list',    ()   => db.accountList());
   handle('accounts:save',    (a)  => {
+    const v = V.all(V.str(a?.name, 200, 'اسم الحساب'), V.str(a?.token || a?.api_key || 'x', 2000, 'رمز الوصول'));
+    if (!v.ok) return v;
     if (!a.id) a.id = uuidv4();
     db.accountUpsert(a);
     return db.accountGet(a.id);
@@ -83,6 +92,10 @@ function register(ipcMain, { db, waApi, waSvc, engine, scraper, scheduler, aiSvc
   // ══════════════════════════════════════════════════════════════════════════
   handle('contacts:list',  (f)  => db.contactList(f));
   handle('contacts:save',  (c)  => {
+    const v = V.phone(c?.phone);
+    if (!v.ok) return { ok: false, error: v.error };
+    const vn = V.optStr(c?.name, 200, 'الاسم');
+    if (!vn.ok) return { ok: false, error: vn.error };
     if (!c.id) c.id = uuidv4();
     db.contactUpsert(c);
     return db.contactGet(c.id);
@@ -170,6 +183,11 @@ function register(ipcMain, { db, waApi, waSvc, engine, scraper, scheduler, aiSvc
   // MESSAGES
   // ══════════════════════════════════════════════════════════════════════════
   handle('messages:sendSingle', async ({ accountId, to, body, mediaPath, mediaType, sessionId, engine: engineOpt }) => {
+    const vPhone = V.phone(to);
+    if (!vPhone.ok) return { ok: false, error: vPhone.error };
+    const vBody  = mediaPath ? V.optStr(body, 4096, 'النص') : V.str(body, 4096, 'نص الرسالة');
+    if (!vBody.ok) return { ok: false, error: vBody.error };
+
     const msgId = uuidv4();
     let res, status = 'sent', errMsg = null, waId = null;
 
@@ -334,15 +352,20 @@ function register(ipcMain, { db, waApi, waSvc, engine, scraper, scheduler, aiSvc
   // ══════════════════════════════════════════════════════════════════════════
   handle('ai:chat',          (data) => aiSvc.chat(data));
   handle('ai:generateScript',(data) => aiSvc.generateScript(data));
-  handle('ai:getKeys',       ()     => {
-    const s = db.settingsGetAll();
-    return {
-      geminiKey: s.ai_gemini_key ? '****' + s.ai_gemini_key.slice(-4) : '',
-      claudeKey: s.ai_claude_key ? '****' + s.ai_claude_key.slice(-4) : '',
-      provider:  s.ai_provider || 'gemini',
-    };
+  handle('ai:getKeys', () => ({
+    geminiKey: secStore.mask('ai_gemini_key'),
+    claudeKey: secStore.mask('ai_claude_key'),
+    provider:  db.settingGet('ai_provider') || 'gemini',
+  }));
+  handle('ai:saveKeys', (keys) => {
+    const { geminiKey, claudeKey, provider, geminiModel } = keys || {};
+    if (geminiKey  !== undefined) { const v = V.optStr(geminiKey, 500, 'مفتاح Gemini'); if (!v.ok) return v; secStore.set('ai_gemini_key', geminiKey); }
+    if (claudeKey  !== undefined) { const v = V.optStr(claudeKey, 500, 'مفتاح Claude'); if (!v.ok) return v; secStore.set('ai_claude_key', claudeKey); }
+    if (provider   !== undefined) db.settingSet('ai_provider',     provider);
+    if (geminiModel!== undefined) db.settingSet('ai_gemini_model', geminiModel);
+    aiSvc.reloadKeys();
+    return { ok: true };
   });
-  handle('ai:saveKeys', (keys) => aiSvc.saveKeys(keys));
 
   // ══════════════════════════════════════════════════════════════════════════
   // ══════════════════════════════════════════════════════════════════════════
@@ -352,15 +375,15 @@ function register(ipcMain, { db, waApi, waSvc, engine, scraper, scheduler, aiSvc
   handle('crm:getConfig', () => {
     const s = db.settingsGetAll();
     return {
-      hubspot_key:        s.crm_hubspot_key        || '',
+      hubspot_key:        secStore.mask('crm_hubspot_key'),
       hubspot_portal_id:  s.crm_hubspot_portal_id  || '',
       hubspot_sync_freq:  s.crm_hubspot_sync_freq  || '0',
-      pipedrive_key:      s.crm_pipedrive_key       || '',
-      airtable_key:       s.crm_airtable_key        || '',
+      pipedrive_key:      secStore.mask('crm_pipedrive_key'),
+      airtable_key:       secStore.mask('crm_airtable_key'),
       airtable_base:      s.crm_airtable_base       || '',
       airtable_table:     s.crm_airtable_table      || '',
       webhook_url:        s.crm_webhook_url          || '',
-      webhook_secret:     s.crm_webhook_secret       || '',
+      webhook_secret:     secStore.mask('crm_webhook_secret'),
       webhook_on_send:    s.crm_webhook_on_send     || '1',
       webhook_on_reply:   s.crm_webhook_on_reply    || '1',
       gsheets_url:        s.crm_gsheets_url          || '',
@@ -370,23 +393,29 @@ function register(ipcMain, { db, waApi, waSvc, engine, scraper, scheduler, aiSvc
   });
 
   handle('crm:saveConfig', (data) => {
-    const map = {
-      hubspot_key:        'crm_hubspot_key',
-      hubspot_portal_id:  'crm_hubspot_portal_id',
-      hubspot_sync_freq:  'crm_hubspot_sync_freq',
-      pipedrive_key:      'crm_pipedrive_key',
-      airtable_key:       'crm_airtable_key',
-      airtable_base:      'crm_airtable_base',
-      airtable_table:     'crm_airtable_table',
-      webhook_url:        'crm_webhook_url',
-      webhook_secret:     'crm_webhook_secret',
-      webhook_on_send:    'crm_webhook_on_send',
-      webhook_on_reply:   'crm_webhook_on_reply',
-      gsheets_url:        'crm_gsheets_url',
-      gsheets_phone_col:  'crm_gsheets_phone_col',
-      gsheets_name_col:   'crm_gsheets_name_col',
+    // Sensitive keys use SecureStore; plain settings use db directly
+    const secureMap = {
+      hubspot_key:    'crm_hubspot_key',
+      pipedrive_key:  'crm_pipedrive_key',
+      airtable_key:   'crm_airtable_key',
+      webhook_secret: 'crm_webhook_secret',
     };
-    for (const [k, dbKey] of Object.entries(map)) {
+    const plainMap = {
+      hubspot_portal_id: 'crm_hubspot_portal_id',
+      hubspot_sync_freq: 'crm_hubspot_sync_freq',
+      airtable_base:     'crm_airtable_base',
+      airtable_table:    'crm_airtable_table',
+      webhook_url:       'crm_webhook_url',
+      webhook_on_send:   'crm_webhook_on_send',
+      webhook_on_reply:  'crm_webhook_on_reply',
+      gsheets_url:       'crm_gsheets_url',
+      gsheets_phone_col: 'crm_gsheets_phone_col',
+      gsheets_name_col:  'crm_gsheets_name_col',
+    };
+    for (const [k, dbKey] of Object.entries(secureMap)) {
+      if (data[k] !== undefined) secStore.set(dbKey, data[k]);
+    }
+    for (const [k, dbKey] of Object.entries(plainMap)) {
       if (data[k] !== undefined) db.settingSet(dbKey, data[k]);
     }
     return { ok: true };
@@ -1125,9 +1154,11 @@ function register(ipcMain, { db, waApi, waSvc, engine, scraper, scheduler, aiSvc
   });
 
   handle('webhook:saveConfig', async ({ port, verifyToken }) => {
+    if (port) { const v = V.port(port, 'منفذ Webhook'); if (!v.ok) return v; }
+    if (verifyToken) { const v = V.str(verifyToken, 200, 'رمز التحقق'); if (!v.ok) return v; }
     const oldPort = db.settingGet('webhook_port') || '3001';
     if (port)        db.settingSet('webhook_port',         String(port));
-    if (verifyToken) db.settingSet('webhook_verify_token', verifyToken);
+    if (verifyToken) secStore.set('webhook_verify_token', verifyToken);
 
     // Auto-restart if port changed and server is currently running
     if (port && String(port) !== String(oldPort) && webhookSrv?.isRunning()) {
@@ -1240,9 +1271,14 @@ function register(ipcMain, { db, waApi, waSvc, engine, scraper, scheduler, aiSvc
   handle('analytics:heatmap',  ({ days } = {}) => ({ ok: true, data: db.analyticsHeatmap(days || 30) }));
 
   // ── Phase 5: API Developer Mode ────────────────────────────────────────────
-  handle('api:getKey',  ()      => ({ ok: true, data: db.settingGet('dev_api_key') || '' }));
-  handle('api:setKey',  ({ key }) => { db.settingSet('dev_api_key', key); return { ok: true }; });
-  handle('api:getStatus', ()    => ({ ok: true, data: { enabled: !!db.settingGet('dev_api_key') } }));
+  handle('api:getKey',    ()          => ({ ok: true, data: secStore.mask('dev_api_key') }));
+  handle('api:setKey',    ({ key })   => {
+    const v = V.optStr(key, 500, 'مفتاح API');
+    if (!v.ok) return v;
+    secStore.set('dev_api_key', key || '');
+    return { ok: true };
+  });
+  handle('api:getStatus', ()          => ({ ok: true, data: { enabled: !!secStore.get('dev_api_key') } }));
 
   // ── AI Phase 4 — Intelligence features ───────────────────────────────────
   handle('ai:classify',        ({ text })       => aiSvc.classifyReply(text));
