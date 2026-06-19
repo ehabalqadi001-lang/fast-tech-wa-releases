@@ -593,33 +593,55 @@ class WhatsAppWebService extends EventEmitter {
       throw new Error(lookup?.__error || 'فشل جلب أعضاء المجموعة');
     }
 
-    // Build phone → original-id map
-    const memberMap = new Map();
+    // Build multi-key phone → id map for flexible matching
+    // Handles: exact, leading-zero strip, suffix (last 9 digits for country-code mismatches)
+    const memberMap = new Map(); // normalized phone → id
+    const suffixMap = new Map(); // last-9-digits → {phone, id}
     for (const m of lookup) {
       const phone = String(m.phone || '').replace(/\D/g, '');
-      if (phone) memberMap.set(phone, m.id);
+      if (!phone || phone.length < 6) continue;
+      memberMap.set(phone, m.id);
+      if (phone.startsWith('0')) memberMap.set(phone.slice(1), m.id);
+      const suf = phone.slice(-9);
+      if (suf.length >= 8 && !suffixMap.has(suf)) suffixMap.set(suf, { phone, id: m.id });
     }
 
     const found    = [];
     const notFound = [];
     for (const raw of phones) {
       const clean = String(raw).replace(/\D/g, '');
+      if (!clean) continue;
       if (memberMap.has(clean)) {
         found.push({ phone: clean, id: memberMap.get(clean) });
       } else {
-        notFound.push(clean);
+        const suf   = clean.slice(-9);
+        const match = suf.length >= 8 ? suffixMap.get(suf) : null;
+        if (match) found.push({ phone: match.phone, id: match.id });
+        else        notFound.push(clean);
       }
     }
 
+    // Compute sample phones (real phone numbers only, no LIDs) for user hint
+    const samplePhones = lookup
+      .map(m => m.phone).filter(p => p && /^\d{7,}$/.test(p) && p.length <= 15)
+      .slice(0, 3).join(', ');
+
     if (dryRun) {
-      return { dryRun: true, found: found.map(f => f.phone), notFound, removed: 0 };
+      return {
+        dryRun:       true,
+        found:        found.map(f => f.phone),
+        notFound,
+        removed:      0,
+        memberCount:  lookup.length,
+        sampleFormat: samplePhones,
+      };
     }
 
     if (!found.length) {
       return {
         removed: 0, found: [], notFound,
-        warning: 'لم يُعثر على أي من الأرقام المدخلة ضمن أعضاء المجموعة',
-        debug: `أعضاء الجروب المكتشفون (${lookup.length}): ${lookup.slice(0,10).map(m=>`${m.phone}(${m.id})`).join(', ')}`,
+        warning: `لم يُعثر على الأرقام المدخلة في المجموعة (${lookup.length} عضو)`,
+        hint:    samplePhones ? `أمثلة من أرقام المجموعة: ${samplePhones}` : 'تأكد من إدخال الأرقام بالتنسيق الدولي (بدون +)',
       };
     }
 
@@ -640,6 +662,32 @@ class WhatsAppWebService extends EventEmitter {
       if (i + BATCH < found.length) await new Promise(r => setTimeout(r, 1500));
     }
     return { removed, found: found.map(f => f.phone), notFound };
+  }
+
+  // Remove members by their raw participant IDs (@lid or @s.whatsapp.net) — bypasses phone matching entirely
+  async removeMembersByIds(sessionId, groupId, memberIds) {
+    const client = this._readyClient(sessionId);
+    const BATCH  = 5;
+    let removed  = 0;
+    const errors = [];
+
+    for (let i = 0; i < memberIds.length; i += BATCH) {
+      const batchIds = memberIds.slice(i, i + BATCH);
+      try {
+        await client.pupPage.evaluate(async (chatId, ids) => {
+          const chatModel = await window.WWebJS.getChat(chatId, { getAsModel: false });
+          const toRemove  = ids.map(id => chatModel.groupMetadata.participants.get(id)).filter(Boolean);
+          if (!toRemove.length) throw new Error('الأعضاء غير موجودين في الـ store');
+          await window.require('WAWebModifyParticipantsGroupAction').removeParticipants(chatModel, toRemove);
+        }, groupId, batchIds);
+        removed += batchIds.length;
+      } catch (e) {
+        errors.push(e.message);
+      }
+      if (i + BATCH < memberIds.length) await new Promise(r => setTimeout(r, 1500));
+    }
+
+    return { removed, errors };
   }
 
   async getPhoneContacts(sessionId) {

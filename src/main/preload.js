@@ -215,6 +215,7 @@ contextBridge.exposeInMainWorld('ftwa', {
     groups: {
       addMembers:          (data)     => ipcRenderer.invoke('wa:groups:addMembers',          data),
       removeMembers:       (data)     => ipcRenderer.invoke('wa:groups:removeMembers',       data),
+      removeMembersByIds:  (data)     => ipcRenderer.invoke('wa:groups:removeMembersByIds',  data),
       readPhonesFromExcel: (filePath) => ipcRenderer.invoke('wa:groups:readPhonesFromExcel', filePath),
       exportList:          (groups)   => ipcRenderer.invoke('wa:groups:exportList',          groups),
     },

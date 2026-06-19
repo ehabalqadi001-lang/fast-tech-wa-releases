@@ -933,6 +933,11 @@ function register(ipcMain, { db, waApi, waSvc, engine, scraper, scheduler, aiSvc
     return waSvc.removeGroupMembers(sessionId, groupId, phones, !!dryRun);
   });
 
+  handle('wa:groups:removeMembersByIds', async ({ sessionId, groupId, memberIds }) => {
+    if (!waSvc) throw new Error('Web service not available');
+    return waSvc.removeMembersByIds(sessionId, groupId, memberIds);
+  });
+
   handle('wa:groups:readPhonesFromExcel', (filePath) => {
     const XLSX = require('xlsx');
     const wb   = XLSX.readFile(filePath);

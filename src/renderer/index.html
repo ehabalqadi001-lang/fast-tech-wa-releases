@@ -263,65 +263,120 @@
   </div>
 </div>
 
-<!-- MODAL: Group member management -->
+<!-- MODAL: Group member management v2 -->
 <div class="mo" id="m-group-members">
-  <div class="md" style="max-width:580px">
-    <div class="md-tt">👥 إدارة أعضاء المجموعات</div>
-    <div class="md-st">المجموعة المستهدفة: <span id="mm-target" style="color:var(--acc)"></span></div>
+  <div class="md" style="max-width:740px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden">
 
-    <div class="fg">
-      <label class="fl">العملية</label>
-      <div class="flex gap8">
-        <button id="mm-btn-add" class="btn bp bsm" onclick="setMembersAction('add')">➕ إضافة أعضاء</button>
-        <button id="mm-btn-remove" class="btn bo bsm" onclick="setMembersAction('remove')">➖ حذف أعضاء</button>
+    <!-- Header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid rgba(var(--ar),.1)">
+      <div>
+        <div class="f15 fw7">⚙️ إدارة أعضاء المجموعة</div>
+        <div class="f12 ts mt4">المجموعة: <span id="mm-target" style="color:var(--acc)"></span></div>
+      </div>
+      <button class="btn bo bsm" onclick="closeM('m-group-members')" style="padding:4px 12px">✕</button>
+    </div>
+
+    <!-- Session + Tab bar -->
+    <div style="display:grid;grid-template-columns:1fr auto;gap:10px;align-items:flex-end;margin-bottom:14px">
+      <div>
+        <label class="fl" style="margin-bottom:4px">الجلسة (يجب أن تكون أدمن في المجموعة)</label>
+        <select id="mm-session-sel" class="fc" style="height:34px"></select>
+      </div>
+      <div class="flex gap6">
+        <button id="mm-tab-view"   class="btn bp bsm" onclick="mmSetTab('view')">👥 الأعضاء</button>
+        <button id="mm-tab-add"    class="btn bo bsm" onclick="mmSetTab('add')">➕ إضافة</button>
+        <button id="mm-tab-remove" class="btn bo bsm" onclick="mmSetTab('remove')">➖ حذف</button>
       </div>
     </div>
 
-    <div class="fg">
-      <label class="fl">الجلسة (يجب أن تكون أدمن في المجموعة)</label>
-      <select id="mm-session-sel" class="fc"><option value="">اختر جلسة...</option></select>
-    </div>
-
-    <div class="fg">
-      <label class="fl">طريقة الإدخال</label>
-      <div class="flex gap8">
-        <button id="mm-method-manual" class="btn bp bsm" onclick="setMembersMethod('manual')">✏️ يدوي</button>
-        <button id="mm-method-excel" class="btn bo bsm" onclick="setMembersMethod('excel')">📂 Excel</button>
+    <!-- ── TAB: View Members ── -->
+    <div id="mm-tab-view-content" style="flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0">
+      <!-- Load + Search -->
+      <div class="flex ic gap8 mb10">
+        <button class="btn bp bsm" id="mm-load-btn" onclick="mmLoadMembers()">📥 تحميل الأعضاء</button>
+        <input id="mm-member-search" class="fc fi" placeholder="🔍 بحث بالرقم أو المعرف..." oninput="mmFilterMembers(this.value)" style="height:32px">
+        <span id="mm-member-count" class="bge bg-b f11" style="white-space:nowrap">—</span>
+      </div>
+      <!-- Quick select actions (hidden until list loaded) -->
+      <div id="mm-bulk-actions" class="flex ic gap6 mb10 flex-wrap" style="display:none">
+        <button class="btn bo bsm" onclick="mmSelectAll()">☑️ الكل</button>
+        <button class="btn bo bsm" onclick="mmSelectNone()">✕ إلغاء</button>
+        <button class="btn bo bsm" onclick="mmSelectNonAdmins()">👤 الأعضاء فقط</button>
+        <span class="fi"></span>
+        <span id="mm-sel-count" class="f12 fw7 ta">0 محدد</span>
+        <button class="btn bsm" style="background:rgba(239,68,68,.1);color:#ef4444;border:1px solid rgba(239,68,68,.3)" onclick="mmRemoveSelected()">🗑️ حذف المحددين</button>
+      </div>
+      <!-- Member list -->
+      <div id="mm-members-list" style="flex:1;overflow-y:auto;max-height:300px;background:rgba(var(--ar),.03);border:1px solid rgba(var(--ar),.08);border-radius:8px">
+        <div class="f12 ts" style="padding:30px;text-align:center;opacity:.5">اضغط "تحميل الأعضاء" لعرض القائمة الكاملة</div>
       </div>
     </div>
 
-    <div id="mm-manual-sec">
-      <div class="fg">
-        <label class="fl">أرقام الهواتف — رقم لكل سطر (مع كود الدولة، بدون +)</label>
-        <textarea id="mm-phones" class="fc" rows="5" placeholder="966501234567&#10;971501234567&#10;201234567890"></textarea>
+    <!-- ── TAB: Add Members ── -->
+    <div id="mm-tab-add-content" style="display:none">
+      <div class="flex gap8 mb10">
+        <button id="mm-method-add-manual" class="btn bp bsm" onclick="setMembersMethodFor('add','manual')">✏️ يدوي</button>
+        <button id="mm-method-add-excel"  class="btn bo bsm" onclick="setMembersMethodFor('add','excel')">📂 Excel</button>
       </div>
-    </div>
-
-    <div id="mm-excel-sec" style="display:none">
-      <div class="fg">
-        <label class="fl">ملف Excel — العمود الأول يحتوي أرقام الهواتف</label>
-        <div class="flex ic gap10">
-          <button class="btn bo bsm" onclick="pickMembersExcel()">📂 اختر ملف</button>
-          <span id="mm-excel-info" class="f11 ts"></span>
+      <div id="mm-add-manual-sec">
+        <div class="fg">
+          <label class="fl">أرقام الهواتف — رقم لكل سطر (بالتنسيق الدولي بدون +)</label>
+          <textarea id="mm-add-phones" class="fc" rows="6" placeholder="201234567890&#10;966501234567&#10;971501234567"></textarea>
         </div>
       </div>
+      <div id="mm-add-excel-sec" style="display:none">
+        <div class="fg">
+          <label class="fl">ملف Excel / CSV — العمود الأول يحتوي أرقام الهواتف</label>
+          <div class="flex ic gap10">
+            <button class="btn bo bsm" onclick="pickMembersExcelFor('add')">📂 اختر ملف</button>
+            <span id="mm-add-excel-info" class="f11 ts fi"></span>
+          </div>
+        </div>
+      </div>
+      <div class="flex gap8 mt12">
+        <button id="mm-add-test-btn" class="btn bsm" style="background:rgba(139,92,246,.1);color:#8b5cf6;border:1px solid rgba(139,92,246,.3)" onclick="submitMembersAdd(true)">🔍 اختبار</button>
+        <button id="mm-add-btn" class="btn bp fi" onclick="submitMembersAdd(false)">➕ تنفيذ الإضافة</button>
+      </div>
     </div>
 
+    <!-- ── TAB: Remove by phones ── -->
+    <div id="mm-tab-remove-content" style="display:none">
+      <div class="f11 ts mb10" style="padding:8px 12px;background:rgba(var(--ar),.04);border-radius:6px;border:1px solid rgba(var(--ar),.1)">
+        💡 النظام يدعم التطابق المرن: يبحث بالرقم الكامل، بدون كود الدولة، وبالـ 9 أرقام الأخيرة. استخدم تبويب "الأعضاء" للحذف المباشر من القائمة.
+      </div>
+      <div class="flex gap8 mb10">
+        <button id="mm-method-rem-manual" class="btn bp bsm" onclick="setMembersMethodFor('remove','manual')">✏️ يدوي</button>
+        <button id="mm-method-rem-excel"  class="btn bo bsm" onclick="setMembersMethodFor('remove','excel')">📂 Excel</button>
+      </div>
+      <div id="mm-rem-manual-sec">
+        <div class="fg">
+          <label class="fl">أرقام الهواتف — رقم لكل سطر</label>
+          <textarea id="mm-rem-phones" class="fc" rows="5" placeholder="201234567890&#10;966501234567&#10;971501234567"></textarea>
+        </div>
+      </div>
+      <div id="mm-rem-excel-sec" style="display:none">
+        <div class="fg">
+          <label class="fl">ملف Excel / CSV — العمود الأول يحتوي أرقام الهواتف</label>
+          <div class="flex ic gap10">
+            <button class="btn bo bsm" onclick="pickMembersExcelFor('remove')">📂 اختر ملف</button>
+            <span id="mm-rem-excel-info" class="f11 ts fi"></span>
+          </div>
+        </div>
+      </div>
+      <div class="flex gap8 mt12">
+        <button id="mm-rem-test-btn" class="btn bsm" style="background:rgba(139,92,246,.1);color:#8b5cf6;border:1px solid rgba(139,92,246,.3)" onclick="submitMembersRemove(true)">🔍 اختبار</button>
+        <button id="mm-rem-btn" class="btn bsm fi" style="background:rgba(239,68,68,.1);color:#ef4444;border:1px solid rgba(239,68,68,.3)" onclick="submitMembersRemove(false)">➖ تنفيذ الحذف</button>
+      </div>
+    </div>
+
+    <!-- Progress + Log (shared across all tabs) -->
     <div id="mm-progress" style="display:none;margin-top:12px">
-      <div class="pb mb8"><div class="pf" id="mm-progress-bar" style="width:0%;transition:width .5s"></div></div>
-      <div id="mm-log" style="max-height:150px;overflow-y:auto;background:rgba(0,0,0,.35);border-radius:8px;padding:10px;font-size:11px;font-family:monospace;line-height:1.8"></div>
+      <div class="pb mb6"><div class="pf" id="mm-progress-bar" style="width:0%;transition:width .5s"></div></div>
+      <div id="mm-log" style="max-height:110px;overflow-y:auto;background:rgba(0,0,0,.35);border-radius:8px;padding:10px;font-size:11px;font-family:monospace;line-height:1.8"></div>
     </div>
 
-    <!-- Debug / error box — shown only when there's a problem -->
-    <div id="mm-debug-box" style="display:none;margin-top:10px;background:rgba(255,80,80,.1);border:1px solid rgba(255,80,80,.35);border-radius:8px;padding:10px">
-      <div style="font-size:11px;font-weight:700;color:#ff6060;margin-bottom:6px">⚠️ تفاصيل المشكلة</div>
-      <div id="mm-debug-msg" style="font-size:11px;font-family:monospace;color:#ffaaaa;white-space:pre-wrap;word-break:break-all;max-height:100px;overflow-y:auto"></div>
-    </div>
-
-    <div class="md-cl">
+    <div class="md-cl" style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(var(--ar),.08)">
       <button class="btn bo" onclick="closeM('m-group-members')">إغلاق</button>
-      <button id="mm-test-btn" class="btn" style="background:var(--acc2,#6c4ecb);color:#fff" onclick="submitMembersMgr(true)">🔍 اختبار</button>
-      <button id="mm-submit-btn" class="btn bp" onclick="submitMembersMgr(false)">🚀 تنفيذ</button>
     </div>
   </div>
 </div>

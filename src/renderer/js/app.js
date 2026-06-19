@@ -362,14 +362,10 @@ let _grpMethod = 'web';
 
 function switchGroupMethod(method) {
   _grpMethod = method;
-  ['web','manual','excel'].forEach(m => {
+  // New design: inline sections, toggle visibility
+  ['manual','excel'].forEach(m => {
     const sec = document.getElementById(`groups-${m}-section`);
-    const btn = document.getElementById(`grp-method-${m}`);
     if (sec) sec.style.display = m === method ? '' : 'none';
-    if (btn) {
-      btn.style.borderColor = m === method ? 'var(--hp)' : '';
-      btn.style.color       = m === method ? 'var(--hp)' : '';
-    }
   });
 }
 
@@ -2640,9 +2636,20 @@ async function loadGroupsPage() {
 
 function renderGroupsTable(groups) {
   const tbody = document.getElementById('groups-tbody');
-  document.getElementById('groups-count').textContent = groups.length;
+  const total = groups.length;
+  document.getElementById('groups-count').textContent = total;
   document.getElementById('groups-subtitle').textContent =
-    groups.length ? `${groups.length} مجموعة` : 'سحب بيانات المجموعات من WhatsApp';
+    total ? `${total} مجموعة` : 'سحب بيانات المجموعات من WhatsApp';
+
+  // Update quick stats
+  const _si = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  const synced  = groups.filter(g => g.synced_at).length;
+  const members = groups.reduce((s, g) => s + (g.member_count || 0), 0);
+  const links   = groups.filter(g => g.invite_link).length;
+  _si('grp-stat-total',   total.toLocaleString());
+  _si('grp-stat-members', members.toLocaleString());
+  _si('grp-stat-synced',  synced.toLocaleString());
+  _si('grp-stat-links',   links.toLocaleString());
 
   if (!groups.length) {
     tbody.innerHTML = '<tr><td colspan="7" class="ta f12 ts" style="padding:32px">لا توجد مجموعات — اختر جلسة واضغط "سحب المجموعات"</td></tr>';
@@ -3155,17 +3162,22 @@ async function loadGroupMembersToEngine() {
   beOk(`✅ ${allPhones.size} عضو فريد من ${groupIds.length} مجموعة — جاهز للإرسال`);
 }
 
-// ── MEMBER MANAGEMENT MODAL ───────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════
+// MEMBER MANAGEMENT MODAL v2
+// ══════════════════════════════════════════════════════════════════════════
 
-let _mmGroups = [];
-let _mmAction = 'add';
-let _mmMethod = 'manual';
-let _mmExcelPhones = null;
+let _mmGroups          = [];      // [{id, name}] target groups
+let _mmLoadedMembers   = [];      // [{phone, id, isAdmin, isSuperAdmin}]
+let _mmFiltered        = [];      // filtered view of _mmLoadedMembers
+let _mmSelected        = new Set(); // member IDs selected for removal
+let _mmExcelAdd        = null;    // phones from excel (add tab)
+let _mmExcelRem        = null;    // phones from excel (remove tab)
+let _mmMethodAdd       = 'manual';
+let _mmMethodRem       = 'manual';
 
 function openMembersMgr(groupId, groupName) {
   _mmGroups = [{ id: groupId, name: groupName }];
-  _mmAction = 'add';
-  _initMembersModal();
+  _mmInitModal('view');
   openM('m-group-members');
 }
 
@@ -3176,172 +3188,308 @@ function openMembersMgrBulk(action) {
     return { id, name: g?.name || id };
   });
   if (!_mmGroups.length) { beErr('حدد مجموعات أولاً'); return; }
-  _mmAction = action;
-  _initMembersModal();
+  _mmInitModal(action === 'add' ? 'add' : 'remove');
   openM('m-group-members');
 }
 
-function _initMembersModal() {
-  // Reset UI
-  document.getElementById('mm-log').innerHTML = '';
-  document.getElementById('mm-progress').style.display = 'none';
-  document.getElementById('mm-phones').value = '';
-  document.getElementById('mm-excel-info').textContent = '';
-  document.getElementById('mm-submit-btn').disabled = false;
-  document.getElementById('mm-debug-box').style.display = 'none';
-  document.getElementById('mm-debug-msg').textContent = '';
-  _mmExcelPhones = null;
+function _mmInitModal(tab) {
+  _mmLoadedMembers = [];
+  _mmFiltered      = [];
+  _mmSelected      = new Set();
+  _mmExcelAdd      = null;
+  _mmExcelRem      = null;
+  _mmMethodAdd     = 'manual';
+  _mmMethodRem     = 'manual';
 
-  // Show target groups
-  const target = _mmGroups.length === 1
-    ? escH(_mmGroups[0].name)
-    : `${_mmGroups.length} مجموعات محددة`;
-  document.getElementById('mm-target').textContent = target;
+  // Set target display
+  const tgt = document.getElementById('mm-target');
+  if (tgt) tgt.textContent = _mmGroups.length === 1 ? _mmGroups[0].name : `${_mmGroups.length} مجموعة`;
 
   // Sync session dropdown from groups page
-  const src  = document.getElementById('groups-session-sel');
-  const dest = document.getElementById('mm-session-sel');
-  dest.innerHTML = src.innerHTML;
+  const grpSes = document.getElementById('groups-session-sel')?.value;
+  _fillSessionSelect('mm-session-sel', _devicesCache || []);
+  if (grpSes) { const s = document.getElementById('mm-session-sel'); if (s) s.value = grpSes; }
 
-  setMembersAction(_mmAction);
-  setMembersMethod(_mmMethod);
+  // Reset member list
+  const listEl = document.getElementById('mm-members-list');
+  if (listEl) listEl.innerHTML = '<div class="f12 ts" style="padding:30px;text-align:center;opacity:.5">اضغط "تحميل الأعضاء" لعرض القائمة الكاملة</div>';
+
+  const cntEl = document.getElementById('mm-member-count');
+  if (cntEl) cntEl.textContent = '—';
+
+  const bulkBar = document.getElementById('mm-bulk-actions');
+  if (bulkBar) bulkBar.style.display = 'none';
+
+  // Reset progress/log
+  const prog = document.getElementById('mm-progress');
+  if (prog) prog.style.display = 'none';
+  const log = document.getElementById('mm-log');
+  if (log) log.innerHTML = '';
+  const bar = document.getElementById('mm-progress-bar');
+  if (bar) bar.style.width = '0%';
+
+  const loadBtn = document.getElementById('mm-load-btn');
+  if (loadBtn) { loadBtn.disabled = false; loadBtn.textContent = '📥 تحميل الأعضاء'; }
+
+  mmSetTab(tab);
 }
 
-function setMembersAction(action) {
-  _mmAction = action;
-  const btnAdd  = document.getElementById('mm-btn-add');
-  const btnRem  = document.getElementById('mm-btn-remove');
-  const testBtn = document.getElementById('mm-test-btn');
-  btnAdd.className = `btn bsm ${action === 'add'    ? 'bp' : 'bo'}`;
-  btnRem.className = `btn bsm ${action === 'remove' ? 'bd' : 'bo'}`;
-  if (testBtn) testBtn.style.display = action === 'remove' ? '' : 'none';
+function mmSetTab(tab) {
+  ['view', 'add', 'remove'].forEach(t => {
+    const btn  = document.getElementById('mm-tab-' + t);
+    const cont = document.getElementById('mm-tab-' + t + '-content');
+    if (btn)  btn.className  = `btn bsm ${t === tab ? 'bp' : 'bo'}`;
+    if (cont) cont.style.display = t === tab ? '' : 'none';
+  });
 }
 
-function setMembersMethod(method) {
-  _mmMethod = method;
-  document.getElementById('mm-manual-sec').style.display = method === 'manual' ? '' : 'none';
-  document.getElementById('mm-excel-sec').style.display  = method === 'excel'  ? '' : 'none';
-  document.getElementById('mm-method-manual').className = `btn bsm ${method === 'manual' ? 'bp' : 'bo'}`;
-  document.getElementById('mm-method-excel').className  = `btn bsm ${method === 'excel'  ? 'bp' : 'bo'}`;
+// ── Member list loader ────────────────────────────────────────────────────
+
+async function mmLoadMembers() {
+  const sessionId = document.getElementById('mm-session-sel').value;
+  if (!sessionId) { beErr('اختر جلسة أولاً'); return; }
+  if (!_mmGroups.length) return;
+
+  const btn = document.getElementById('mm-load-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ جارٍ التحميل...'; }
+
+  try {
+    const r = await BE.wa.scraper.getParticipants({ sessionId, groupId: _mmGroups[0].id });
+    if (!r.ok) throw new Error(r.error);
+
+    _mmLoadedMembers = r.data || [];
+    _mmFiltered      = [..._mmLoadedMembers];
+    _mmSelected      = new Set();
+
+    const cntEl = document.getElementById('mm-member-count');
+    if (cntEl) cntEl.textContent = `${_mmLoadedMembers.length} عضو`;
+
+    const bulkBar = document.getElementById('mm-bulk-actions');
+    if (bulkBar) bulkBar.style.display = 'flex';
+
+    _mmRenderList(_mmFiltered);
+  } catch (e) {
+    beErr('فشل تحميل الأعضاء: ' + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🔄 تحديث'; }
+  }
 }
 
-async function pickMembersExcel() {
+function _mmRenderList(members) {
+  const listEl = document.getElementById('mm-members-list');
+  if (!listEl) return;
+
+  if (!members.length) {
+    listEl.innerHTML = '<div class="f12 ts" style="padding:24px;text-align:center;opacity:.5">لا توجد نتائج</div>';
+    _mmUpdateSelCount();
+    return;
+  }
+
+  listEl.innerHTML = members.map(m => {
+    const key   = m.id || m.phone || '';
+    const phone = m.phone || key.split('@')[0] || '—';
+    const chk   = _mmSelected.has(key) ? 'checked' : '';
+    const isAdm = m.isAdmin || m.isSuperAdmin;
+    const badge = isAdm
+      ? `<span class="bge bg-y f10" style="padding:1px 6px">${m.isSuperAdmin ? 'سوبر أدمن' : 'أدمن'}</span>`
+      : '';
+    const lidMark = key.includes('@lid') ? ' <span class="f10 ts">🔐</span>' : '';
+    return `<div class="flex ic gap10" style="padding:7px 12px;border-bottom:1px solid rgba(var(--ar),.06);cursor:pointer"
+              onclick="mmToggle(${JSON.stringify(key)},this)">
+      <input type="checkbox" ${chk} onclick="event.stopPropagation();mmToggle(${JSON.stringify(key)},this.parentElement)"
+             style="flex-shrink:0;cursor:pointer;width:15px;height:15px">
+      <div class="fi">
+        <span class="f12 fw6" style="direction:ltr;font-family:monospace">${escH(phone)}</span>
+        ${badge}${lidMark}
+      </div>
+    </div>`;
+  }).join('');
+
+  _mmUpdateSelCount();
+}
+
+function mmToggle(key, rowEl) {
+  if (_mmSelected.has(key)) _mmSelected.delete(key); else _mmSelected.add(key);
+  const cb = rowEl.querySelector('input[type="checkbox"]');
+  if (cb) cb.checked = _mmSelected.has(key);
+  _mmUpdateSelCount();
+}
+
+function _mmUpdateSelCount() {
+  const el = document.getElementById('mm-sel-count');
+  if (el) el.textContent = `${_mmSelected.size} محدد`;
+}
+
+function mmSelectAll()       { _mmFiltered.forEach(m => _mmSelected.add(m.id||m.phone||'')); _mmRenderList(_mmFiltered); }
+function mmSelectNone()      { _mmSelected.clear(); _mmRenderList(_mmFiltered); }
+function mmSelectNonAdmins() {
+  _mmSelected.clear();
+  _mmFiltered.filter(m => !m.isAdmin && !m.isSuperAdmin).forEach(m => _mmSelected.add(m.id||m.phone||''));
+  _mmRenderList(_mmFiltered);
+}
+
+function mmFilterMembers(q) {
+  const t = (q || '').trim().toLowerCase();
+  _mmFiltered = t ? _mmLoadedMembers.filter(m => (m.phone||'').includes(t)||(m.id||'').includes(t)) : [..._mmLoadedMembers];
+  _mmRenderList(_mmFiltered);
+}
+
+async function mmRemoveSelected() {
+  if (!_mmSelected.size) { beErr('حدد أعضاء للحذف أولاً'); return; }
+  const sessionId = document.getElementById('mm-session-sel').value;
+  if (!sessionId) { beErr('اختر جلسة أولاً'); return; }
+  if (!_mmGroups.length) return;
+
+  if (!confirm(`هل تريد حذف ${_mmSelected.size} عضو من "${_mmGroups[0].name}"؟`)) return;
+
+  const memberIds = [..._mmSelected];
+  const logEl     = document.getElementById('mm-log');
+  const prog      = document.getElementById('mm-progress');
+  if (prog)  prog.style.display = 'block';
+  if (logEl) logEl.innerHTML = `<div>⏳ جارٍ حذف ${memberIds.length} عضو...</div>`;
+
+  try {
+    const r = await BE.wa.groups.removeMembersByIds({ sessionId, groupId: _mmGroups[0].id, memberIds });
+    if (r.ok) {
+      const d = r.data || {};
+      logEl.innerHTML += `<div style="color:var(--acc)">✅ تم حذف ${d.removed || 0} عضو بنجاح</div>`;
+      if (d.errors?.length) logEl.innerHTML += `<div style="color:#f93">⚠️ أخطاء: ${escH(d.errors.join(', '))}</div>`;
+      _mmSelected.clear();
+      await mmLoadMembers();
+    } else {
+      logEl.innerHTML += `<div style="color:#ef4444">❌ ${escH(r.error)}</div>`;
+    }
+  } catch (e) {
+    logEl.innerHTML += `<div style="color:#ef4444">❌ ${escH(e.message)}</div>`;
+  }
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+// ── Add / Remove by phones ────────────────────────────────────────────────
+
+function setMembersMethodFor(tab, method) {
+  if (tab === 'add') {
+    _mmMethodAdd = method;
+    document.getElementById('mm-add-manual-sec').style.display = method === 'manual' ? '' : 'none';
+    document.getElementById('mm-add-excel-sec').style.display  = method === 'excel'  ? '' : 'none';
+    document.getElementById('mm-method-add-manual').className  = `btn bsm ${method === 'manual' ? 'bp' : 'bo'}`;
+    document.getElementById('mm-method-add-excel').className   = `btn bsm ${method === 'excel'  ? 'bp' : 'bo'}`;
+  } else {
+    _mmMethodRem = method;
+    document.getElementById('mm-rem-manual-sec').style.display = method === 'manual' ? '' : 'none';
+    document.getElementById('mm-rem-excel-sec').style.display  = method === 'excel'  ? '' : 'none';
+    document.getElementById('mm-method-rem-manual').className  = `btn bsm ${method === 'manual' ? 'bp' : 'bo'}`;
+    document.getElementById('mm-method-rem-excel').className   = `btn bsm ${method === 'excel'  ? 'bp' : 'bo'}`;
+  }
+}
+
+async function pickMembersExcelFor(tab) {
   if (!IS_ELECTRON) return;
   const fp = await BE.openFile({ filters: [{ name: 'Excel', extensions: ['xlsx','xls','csv'] }] });
   if (!fp) return;
   const r = await BE.wa.groups.readPhonesFromExcel(fp);
   if (!r.ok) { beErr(r.error); return; }
-  _mmExcelPhones = r.data;
-  document.getElementById('mm-excel-info').textContent = `✅ ${r.data.length} رقم هاتف من الملف`;
+  if (tab === 'add') {
+    _mmExcelAdd = r.data;
+    document.getElementById('mm-add-excel-info').textContent = `✅ ${r.data.length} رقم`;
+  } else {
+    _mmExcelRem = r.data;
+    document.getElementById('mm-rem-excel-info').textContent = `✅ ${r.data.length} رقم`;
+  }
 }
 
-async function submitMembersMgr(dryRun = false) {
-  if (!IS_ELECTRON) { beOk('تم التنفيذ (وضع العرض)'); return; }
+function _mmGetPhones(tab) {
+  if (tab === 'add') {
+    if (_mmMethodAdd === 'excel') return _mmExcelAdd || [];
+    const raw = document.getElementById('mm-add-phones')?.value || '';
+    return raw.split(/[\n,;]+/).map(p => p.trim().replace(/[\s\-\+\(\)]/g,'')).filter(p => /^\d{7,15}$/.test(p));
+  } else {
+    if (_mmMethodRem === 'excel') return _mmExcelRem || [];
+    const raw = document.getElementById('mm-rem-phones')?.value || '';
+    return raw.split(/[\n,;]+/).map(p => p.trim().replace(/[\s\-\+\(\)]/g,'')).filter(p => /^\d{7,15}$/.test(p));
+  }
+}
+
+async function submitMembersAdd(dryRun = false) {
   const sessionId = document.getElementById('mm-session-sel').value;
   if (!sessionId) { beErr('اختر جلسة أولاً'); return; }
+  const phones = _mmGetPhones('add');
+  if (!phones.length) { beErr('لم يتم إدخال أرقام صالحة'); return; }
 
-  let phones = [];
-  if (_mmMethod === 'manual') {
-    const raw = document.getElementById('mm-phones').value;
-    phones = raw.split(/[\n,;]+/)
-      .map(p => p.trim().replace(/[\s\-\+\(\)]/g, ''))
-      .filter(p => /^\d{7,15}$/.test(p));
-  } else {
-    if (!_mmExcelPhones?.length) { beErr('لم يتم تحميل ملف Excel'); return; }
-    phones = _mmExcelPhones;
-  }
-  if (!phones.length) { beErr('لم يتم إدخال أي أرقام هاتف صالحة'); return; }
+  const btn   = document.getElementById(dryRun ? 'mm-add-test-btn' : 'mm-add-btn');
+  const logEl = document.getElementById('mm-log');
+  const prog  = document.getElementById('mm-progress');
+  const bar   = document.getElementById('mm-progress-bar');
+  if (btn)  btn.disabled = true;
+  if (prog) prog.style.display = 'block';
+  if (logEl) logEl.innerHTML = '';
+  if (bar)  bar.style.width = '0%';
 
-  const btn     = document.getElementById('mm-submit-btn');
-  const testBtn = document.getElementById('mm-test-btn');
-  const logEl   = document.getElementById('mm-log');
-  const prog    = document.getElementById('mm-progress');
-  const bar     = document.getElementById('mm-progress-bar');
-
-  const debugBox = document.getElementById('mm-debug-box');
-  const debugMsg = document.getElementById('mm-debug-msg');
-
-  btn.disabled = true;
-  if (testBtn) testBtn.disabled = true;
-  prog.style.display = 'block';
-  debugBox.style.display = 'none';
-  debugMsg.textContent = '';
-  logEl.innerHTML = '';
-  bar.style.width = '0%';
-
-  const ipcFn = _mmAction === 'add' ? 'addMembers' : 'removeMembers';
-  const verb   = _mmAction === 'add' ? 'إضافة' : 'حذف';
-  const modeLabel = dryRun ? '🔍 اختبار' : '🚀 تنفيذ';
-  const debugLines = [];
-  let done = 0;
-  GP.show(`${modeLabel} — ${verb} أعضاء...`, 0, `0/${_mmGroups.length}`);
-
-  for (const group of _mmGroups) {
-    const pct = Math.round((done / _mmGroups.length) * 100);
-    bar.style.width = pct + '%';
-    GP.step(`${verb} في: ${group.name}`, done, _mmGroups.length, `${done+1}/${_mmGroups.length}`);
-    logEl.innerHTML += `<div>⏳ ${escH(group.name)} — ${modeLabel}: ${phones.length} رقم...</div>`;
+  for (const [i, group] of _mmGroups.entries()) {
+    if (bar) bar.style.width = Math.round(i / _mmGroups.length * 100) + '%';
+    if (dryRun) {
+      logEl.innerHTML += `<div style="color:#8b5cf6">🔍 اختبار: ${phones.length} رقم ← "${escH(group.name)}"</div>`;
+    } else {
+      logEl.innerHTML += `<div>⏳ إضافة ${phones.length} رقم إلى "${escH(group.name)}"...</div>`;
+      try {
+        const r = await BE.wa.groups.addMembers({ sessionId, groupId: group.id, phones });
+        if (r.ok) logEl.innerHTML += `<div style="color:var(--acc)">✅ ${escH(group.name)}: تم إضافة ${r.data?.added ?? phones.length} عضو</div>`;
+        else      logEl.innerHTML += `<div style="color:#ef4444">❌ ${escH(group.name)}: ${escH(r.error)}</div>`;
+      } catch (e) {
+        logEl.innerHTML += `<div style="color:#ef4444">❌ ${escH(group.name)}: ${escH(e.message)}</div>`;
+      }
+    }
     logEl.scrollTop = logEl.scrollHeight;
+  }
+  if (bar) bar.style.width = '100%';
+  if (btn) btn.disabled = false;
+}
+
+async function submitMembersRemove(dryRun = false) {
+  const sessionId = document.getElementById('mm-session-sel').value;
+  if (!sessionId) { beErr('اختر جلسة أولاً'); return; }
+  const phones = _mmGetPhones('remove');
+  if (!phones.length) { beErr('لم يتم إدخال أرقام صالحة'); return; }
+
+  const btn   = document.getElementById(dryRun ? 'mm-rem-test-btn' : 'mm-rem-btn');
+  const logEl = document.getElementById('mm-log');
+  const prog  = document.getElementById('mm-progress');
+  const bar   = document.getElementById('mm-progress-bar');
+  if (btn)  btn.disabled = true;
+  if (prog) prog.style.display = 'block';
+  if (logEl) logEl.innerHTML = '';
+  if (bar)  bar.style.width = '0%';
+
+  for (const [i, group] of _mmGroups.entries()) {
+    if (bar) bar.style.width = Math.round(i / _mmGroups.length * 100) + '%';
+    logEl.innerHTML += `<div>⏳ ${dryRun ? '🔍 اختبار' : 'حذف'} في "${escH(group.name)}" (${phones.length} رقم)...</div>`;
     try {
       const payload = { sessionId, groupId: group.id, phones };
-      if (_mmAction === 'remove') payload.dryRun = dryRun;
-      const r = await BE.wa.groups[ipcFn](payload);
+      if (dryRun) payload.dryRun = true;
+      const r = await BE.wa.groups.removeMembers(payload);
       if (r.ok) {
         const d = r.data || {};
-
-        if (dryRun && _mmAction === 'remove') {
-          const foundList    = (d.found    || []).join(', ') || '—';
-          const notFoundList = (d.notFound || []).join(', ') || '—';
-          logEl.innerHTML +=
-            `<div style="color:var(--acc)">🔍 ${escH(group.name)}: موجود في الجروب (${(d.found||[]).length}): <span style="color:#8ff">${escH(foundList)}</span></div>`;
+        if (dryRun) {
+          const fmt = d.sampleFormat ? ` ← مثال من المجموعة: ${d.sampleFormat}` : '';
+          logEl.innerHTML += `<div style="color:#8b5cf6">🔍 موجود (${(d.found||[]).length}): ${escH((d.found||[]).join(', ')||'—')}</div>`;
           if (d.notFound?.length) {
-            logEl.innerHTML += `<div style="color:#f93">⚠️ غير موجود (${d.notFound.length}): <span style="color:#fbb">${escH(notFoundList)}</span></div>`;
-            if (d.debug) debugLines.push(`[${group.name}] ${d.debug}`);
+            logEl.innerHTML += `<div style="color:#f93">⚠️ غير موجود (${d.notFound.length}): ${escH(d.notFound.slice(0,5).join(', '))}${escH(fmt)}</div>`;
           }
-
-        } else if (_mmAction === 'remove') {
-          const cnt      = d.removed ?? 0;
-          const notFound = d.notFound || [];
-          logEl.innerHTML += `<div style="color:var(--acc)">✅ ${escH(group.name)}: تم حذف ${cnt} عضو</div>`;
-          if (d.warning) {
-            logEl.innerHTML += `<div style="color:#f93">⚠️ ${escH(d.warning)}</div>`;
-          }
-          if (notFound.length) {
-            logEl.innerHTML += `<div style="color:#f93">⚠️ لم يُعثر عليهم (${notFound.length}): <span style="color:#fbb">${escH(notFound.join(', '))}</span></div>`;
-          }
-          if (d.debug) debugLines.push(`[${group.name}] ${d.debug}`);
-
         } else {
-          logEl.innerHTML += `<div style="color:var(--acc)">✅ ${escH(group.name)}: نجح (${d.added ?? phones.length} أرقام)</div>`;
+          logEl.innerHTML += `<div style="color:var(--acc)">✅ ${escH(group.name)}: تم حذف ${d.removed ?? 0} عضو</div>`;
+          if (d.hint)              logEl.innerHTML += `<div style="color:#94a3b8">💡 ${escH(d.hint)}</div>`;
+          if (d.notFound?.length)  logEl.innerHTML += `<div style="color:#f93">⚠️ لم يُعثر على ${d.notFound.length}: ${escH(d.notFound.slice(0,5).join(', '))}</div>`;
         }
       } else {
         logEl.innerHTML += `<div style="color:#ef4444">❌ ${escH(group.name)}: ${escH(r.error)}</div>`;
-        debugLines.push(`[${group.name}] خطأ: ${r.error}`);
       }
     } catch (e) {
       logEl.innerHTML += `<div style="color:#ef4444">❌ ${escH(group.name)}: ${escH(e.message)}</div>`;
-      debugLines.push(`[${group.name}] استثناء: ${e.message}`);
     }
-    done++;
     logEl.scrollTop = logEl.scrollHeight;
   }
-
-  bar.style.width = '100%';
-  const summary = dryRun
-    ? `اكتمل الاختبار — ${done}/${_mmGroups.length} مجموعة`
-    : `اكتملت العملية — ${done}/${_mmGroups.length} مجموعة`;
-  logEl.innerHTML += `<div style="color:var(--acc);margin-top:6px;font-weight:700">✅ ${summary}</div>`;
-  logEl.scrollTop = logEl.scrollHeight;
-  GP.done(summary);
-
-  // Show debug box if there's diagnostic info
-  if (debugLines.length) {
-    debugMsg.textContent = debugLines.join('\n');
-    debugBox.style.display = 'block';
-  }
-
-  btn.disabled = false;
-  if (testBtn) testBtn.disabled = false;
+  if (bar) bar.style.width = '100%';
+  if (btn) btn.disabled = false;
 }
 
 // ══════════════════════════════════════════════════════════════════════════
