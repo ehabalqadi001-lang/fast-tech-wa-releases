@@ -3206,9 +3206,9 @@ function _mmInitModal(tab) {
   if (tgt) tgt.textContent = _mmGroups.length === 1 ? _mmGroups[0].name : `${_mmGroups.length} مجموعة`;
 
   // Sync session dropdown from groups page
-  const grpSes = document.getElementById('groups-session-sel')?.value;
-  _fillSessionSelect('mm-session-sel', _devicesCache || []);
-  if (grpSes) { const s = document.getElementById('mm-session-sel'); if (s) s.value = grpSes; }
+  const src  = document.getElementById('groups-session-sel');
+  const dest = document.getElementById('mm-session-sel');
+  if (src && dest) { dest.innerHTML = src.innerHTML; if (src.value) dest.value = src.value; }
 
   // Reset member list
   const listEl = document.getElementById('mm-members-list');
