@@ -2781,6 +2781,18 @@ async function scrapeGroups() {
   const sessionId = document.getElementById('groups-session-sel').value;
   if (!sessionId) { beErr('اختر جلسة أولاً'); return; }
 
+  // Pre-check: verify the session is connected before starting
+  try {
+    const sessR = await BE.wa.sessions.list();
+    if (sessR.ok) {
+      const sess = (sessR.data || []).find(s => s.id === sessionId);
+      if (sess && sess.status !== 'ready') {
+        beErr('الجلسة غير متصلة — اذهب إلى صفحة الأجهزة (Web QR) وابدأ الجلسة أولاً');
+        return;
+      }
+    }
+  } catch (_) { /* proceed — let the main call surface any error */ }
+
   const btn = document.getElementById('btn-scrape-groups');
   const prog = document.getElementById('groups-progress');
   const progBar = document.getElementById('groups-progress-bar');
@@ -2814,8 +2826,12 @@ async function scrapeGroups() {
     }
   } catch (e) {
     GP.hide();
-    beErr('فشل سحب المجموعات: ' + e.message);
-    progTxt.textContent = '❌ ' + e.message;
+    let errMsg = e.message;
+    if (/Session not active|Session not ready/i.test(errMsg)) {
+      errMsg = 'الجلسة غير متصلة — اذهب إلى صفحة الأجهزة (Web QR) وتأكد من اتصال الجلسة أولاً';
+    }
+    beErr('فشل سحب المجموعات: ' + errMsg);
+    progTxt.textContent = '❌ ' + errMsg;
   } finally {
     btn.disabled = false;
     btn.textContent = '🔍 سحب المجموعات';
@@ -3121,33 +3137,60 @@ async function sendToGroupConfirm() {
 
   closeM('m-send-to-group');
 
-  const payload = {
-    recipients:   _sendToGroupTargets,
-    body:         body || null,
-    scripts:      body ? [body] : [],
-    sessionId,
-    delayMin,
-    delayMax,
-    campaignName: `إرسال للمجموعات — ${new Date().toLocaleDateString('ar')}`,
-  };
-  if (mediaPath) payload.mediaPath = mediaPath;
+  const targets = [..._sendToGroupTargets];
+  const total   = targets.length;
+  let sent = 0, failed = 0;
 
-  try {
-    const r = await BE.wa.send.bulk(payload);
-    const mediaNote = mediaPath ? ' مع مرفق' : '';
-    beOk(`✅ تم إضافة ${_sendToGroupTargets.length} مجموعة للقائمة${mediaNote} — الإرسال يعمل في الخلفية`);
-    // Clear group selection if still on groups page
-    _groupsSelected.clear();
-    document.querySelectorAll('.grp-chk').forEach(cb => cb.checked = false);
-    const chkAll = document.getElementById('grp-chk-all');
-    if (chkAll) chkAll.checked = false;
-    const bulkBar = document.getElementById('grp-bulk-bar');
-    if (bulkBar) bulkBar.style.display = 'none';
-    const selCount = document.getElementById('grp-sel-count');
-    if (selCount) selCount.textContent = '0';
-  } catch (e) {
-    beErr('فشل الإرسال: ' + (e.message || 'خطأ غير معروف'));
+  GP.show(`جارٍ الإرسال إلى ${total} مجموعة...`, 0, `0/${total}`);
+
+  for (let i = 0; i < targets.length; i++) {
+    const groupId   = targets[i];
+    const groupName = _groupsData.find(g => g.id === groupId)?.name || groupId;
+
+    GP.update(`إرسال إلى: ${groupName}`, Math.round(((i) / total) * 100), `${i + 1}/${total}`);
+
+    try {
+      let r;
+      if (mediaPath) {
+        r = await BE.wa.send.media({ sessionId, to: groupId, filePath: mediaPath, caption: body || '' });
+      } else {
+        r = await BE.wa.send.text({ sessionId, to: groupId, body });
+      }
+      if (!r.ok) throw new Error(r.error || 'فشل الإرسال');
+      sent++;
+    } catch (e) {
+      failed++;
+      console.warn(`[Groups] Failed → ${groupId}: ${e.message}`);
+    }
+
+    // Inter-group delay (skip after last)
+    if (i < targets.length - 1) {
+      const wait = Math.floor(Math.random() * (delayMax - delayMin + 1)) + delayMin;
+      await new Promise(res => setTimeout(res, wait));
+    }
   }
+
+  // Final status
+  if (failed === 0) {
+    GP.done(`✅ تم الإرسال إلى ${sent} مجموعة`);
+    beOk(`✅ تم الإرسال بنجاح إلى ${sent} مجموعة${mediaPath ? ' مع مرفق' : ''}`);
+  } else if (sent === 0) {
+    GP.hide();
+    beErr(`❌ فشل الإرسال إلى جميع المجموعات (${failed})`);
+  } else {
+    GP.done(`اكتمل: ${sent} نجح، ${failed} فشل`);
+    showN('اكتمل الإرسال', `${sent} نجح — ${failed} فشل`, '⚠️');
+  }
+
+  // Clear group selection
+  _groupsSelected.clear();
+  document.querySelectorAll('.grp-row-chk').forEach(cb => cb.checked = false);
+  const chkAll   = document.getElementById('grp-chk-all');
+  if (chkAll) chkAll.checked = false;
+  const bulkBar  = document.getElementById('grp-bulk-bar');
+  if (bulkBar) bulkBar.style.display = 'none';
+  const selCount = document.getElementById('grp-sel-count');
+  if (selCount) selCount.textContent = '0';
 }
 
 // Load a single group's members into the send engine
