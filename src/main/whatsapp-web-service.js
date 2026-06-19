@@ -22,11 +22,76 @@ class WhatsAppWebService extends EventEmitter {
    */
   constructor(db, dataDir) {
     super();
-    this._db      = db;
-    this._dataDir = dataDir;
-    this._clients = new Map();   // sessionId → Client instance
-    this._states  = new Map();   // sessionId → state string
-    this._win     = null;        // BrowserWindow — set after window creation
+    this._db            = db;
+    this._dataDir       = dataDir;
+    this._clients       = new Map();   // sessionId → Client instance
+    this._states        = new Map();   // sessionId → state string
+    this._win           = null;        // BrowserWindow — set after window creation
+    this._qrTimers      = new Map();   // sessionId → QR expiry timeout handle
+    this._keepAlive     = new Map();   // sessionId → keep-alive interval handle
+    this._reconnecting  = new Set();   // sessions currently reconnecting
+  }
+
+  // ── QR timeout helpers ────────────────────────────────────────────────────
+  _startQrTimer(sessionId) {
+    this._clearQrTimer(sessionId);
+    const t = setTimeout(async () => {
+      if (this._states.get(sessionId) !== 'qr') return;
+      console.warn(`[WA-WEB] QR expired for ${sessionId}`);
+      this._setState(sessionId, 'qr_expired');
+      this._db.sessionUpdateField(sessionId, 'status',  'qr_expired');
+      this._db.sessionUpdateField(sessionId, 'qr_code', null);
+      this._push('wa:qrExpired', { sessionId });
+      const c = this._clients.get(sessionId);
+      if (c) { await c.destroy().catch(() => {}); this._clients.delete(sessionId); }
+      this._qrTimers.delete(sessionId);
+    }, 90_000); // 90 seconds — give user time to open phone
+    this._qrTimers.set(sessionId, t);
+  }
+
+  _clearQrTimer(sessionId) {
+    const t = this._qrTimers.get(sessionId);
+    if (t) { clearTimeout(t); this._qrTimers.delete(sessionId); }
+  }
+
+  // ── Keep-alive helpers ────────────────────────────────────────────────────
+  _startKeepAlive(sessionId) {
+    this._stopKeepAlive(sessionId);
+    const interval = setInterval(async () => {
+      const client = this._clients.get(sessionId);
+      if (!client) { this._stopKeepAlive(sessionId); return; }
+      try {
+        const state = await client.getState();
+        if (state !== 'CONNECTED') {
+          console.warn(`[WA-WEB] Keep-alive: ${sessionId} not connected (${state}) — triggering reconnect`);
+          this._stopKeepAlive(sessionId);
+          this._handleSilentDisconnect(sessionId, client, state || 'TIMEOUT');
+        }
+      } catch (err) {
+        console.warn(`[WA-WEB] Keep-alive check failed for ${sessionId}:`, err.message);
+        this._stopKeepAlive(sessionId);
+        this._handleSilentDisconnect(sessionId, client, 'KEEP_ALIVE_ERROR');
+      }
+    }, 30_000); // check every 30 seconds
+    this._keepAlive.set(sessionId, interval);
+  }
+
+  _stopKeepAlive(sessionId) {
+    const iv = this._keepAlive.get(sessionId);
+    if (iv) { clearInterval(iv); this._keepAlive.delete(sessionId); }
+  }
+
+  async _handleSilentDisconnect(sessionId, client, reason) {
+    if (this._reconnecting.has(sessionId)) return;
+    this._reconnecting.add(sessionId);
+    this._setState(sessionId, 'disconnected');
+    this._db.sessionUpdateField(sessionId, 'status', 'disconnected');
+    this._push('wa:disconnected', { sessionId, reason });
+    try { await client.destroy().catch(() => {}); } catch (_) {}
+    this._clients.delete(sessionId);
+    this._states.delete(sessionId);
+    this._reconnecting.delete(sessionId);
+    console.log(`[WA-WEB] Silent disconnect handled for ${sessionId}`);
   }
 
   /** Must be called after createWindow() so IPC events reach the renderer */
@@ -90,6 +155,7 @@ class WhatsAppWebService extends EventEmitter {
         this._db.sessionUpdateField(sessionId, 'qr_code', dataUrl);
         this._db.sessionUpdateField(sessionId, 'status',  'qr');
         this._push('wa:qr', { sessionId, qr: dataUrl });
+        this._startQrTimer(sessionId); // ← auto-expire if not scanned in 90s
       } catch (err) {
         console.error('[WA-WEB] QR error:', err.message);
       }
@@ -97,6 +163,7 @@ class WhatsAppWebService extends EventEmitter {
 
     // ── Authenticated (session keys saved, not yet ready) ───────────────────
     client.on('authenticated', () => {
+      this._clearQrTimer(sessionId); // ← QR was scanned successfully
       this._setState(sessionId, 'authenticated');
       this._db.sessionUpdateField(sessionId, 'status', 'authenticated');
       this._push('wa:authenticated', { sessionId });
@@ -104,30 +171,36 @@ class WhatsAppWebService extends EventEmitter {
 
     // ── Client fully ready to send/receive ──────────────────────────────────
     client.on('ready', () => {
+      this._clearQrTimer(sessionId);
       const info  = client.info;
       const phone = info?.wid?.user || '';
       this._setState(sessionId, 'ready');
       this._db.sessionSetReady(sessionId, phone);
       this._push('wa:ready', { sessionId, phone, pushname: info?.pushname || record.name });
+      this._startKeepAlive(sessionId); // ← heartbeat: detect silent disconnects
       console.log(`[WA-WEB] Ready: ${sessionId} (${phone})`);
     });
 
     // ── Auth failure (bad session / banned) ─────────────────────────────────
     client.on('auth_failure', (msg) => {
+      this._clearQrTimer(sessionId);
+      this._stopKeepAlive(sessionId);
       this._setState(sessionId, 'auth_failed');
       this._db.sessionUpdateField(sessionId, 'status', 'auth_failed');
-      this._db.sessionUpdateField(sessionId, 'qr_code', null);  // clear stale QR
+      this._db.sessionUpdateField(sessionId, 'qr_code', null);
       this._clients.delete(sessionId);
       this._push('wa:authFailed', { sessionId, message: msg });
-      this.emit('auth_failure_internal', sessionId);  // picked up by AntiBanService via IPC hooks
+      this.emit('auth_failure_internal', sessionId);
       console.warn(`[WA-WEB] Auth failure: ${sessionId}`);
     });
 
     // ── Disconnected (network / logged out from phone) ──────────────────────
     client.on('disconnected', (reason) => {
+      this._clearQrTimer(sessionId);
+      this._stopKeepAlive(sessionId);
       this._setState(sessionId, 'disconnected');
       this._db.sessionUpdateField(sessionId, 'status', 'disconnected');
-      this._db.sessionUpdateField(sessionId, 'qr_code', null);  // clear stale QR
+      this._db.sessionUpdateField(sessionId, 'qr_code', null);
       this._clients.delete(sessionId);
       this._states.delete(sessionId);
       this._push('wa:disconnected', { sessionId, reason });
@@ -205,6 +278,8 @@ class WhatsAppWebService extends EventEmitter {
    * Auth data remains on disk — next startSession() will resume without QR.
    */
   async stopSession(sessionId) {
+    this._clearQrTimer(sessionId);
+    this._stopKeepAlive(sessionId);
     const client = this._clients.get(sessionId);
     if (client) {
       await client.destroy().catch(() => {});
@@ -216,11 +291,9 @@ class WhatsAppWebService extends EventEmitter {
     return { stopped: true };
   }
 
-  /**
-   * Log out from WhatsApp and delete local auth data.
-   * User must re-scan QR code next time.
-   */
   async logoutSession(sessionId) {
+    this._clearQrTimer(sessionId);
+    this._stopKeepAlive(sessionId);
     const client = this._clients.get(sessionId);
     if (client) {
       await client.logout().catch(() => {});

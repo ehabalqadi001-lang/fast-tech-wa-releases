@@ -287,19 +287,34 @@ class AntiBanService extends EventEmitter {
   }
 
   _advanceWarmupDay(session) {
-    const today = new Date().toISOString().slice(0, 10);
+    const today    = new Date().toISOString().slice(0, 10);
     const resetDay = session.daily_reset_at ? session.daily_reset_at.slice(0, 10) : null;
-    if (resetDay && resetDay !== today) {
-      // New day — advance warmup_day counter
-      const newDay = (session.warmup_day || 1) + 1;
+    if (!resetDay || resetDay === today) return; // same day — nothing to advance
+
+    // Wrap in a transaction so concurrent sends can't double-advance the day counter
+    const advance = this._db._db.transaction(() => {
+      // Re-read inside transaction to get the freshest state
+      const fresh = this._db.sessionGetAntiBan(session.id);
+      if (!fresh || !fresh.warmup_mode) return null;
+      const freshResetDay = fresh.daily_reset_at ? fresh.daily_reset_at.slice(0, 10) : null;
+      if (freshResetDay === today) return null; // already advanced by another concurrent call
+
+      const newDay = (fresh.warmup_day || 1) + 1;
       if (newDay >= WARMUP_GRADUATED) {
-        this._db.sessionSetWarmup(session.id, false, newDay, 0);
-        this._db.antiBanEventLog({ session_id: session.id, event_type: 'warmup_complete', detail: `Day ${newDay}` });
-        this.emit('warmup:complete', { sessionId: session.id });
-      } else {
-        const newLimit = this._getWarmupLimit(newDay);
-        this._db.sessionSetWarmup(session.id, true, newDay, newLimit);
+        this._db.sessionSetWarmup(fresh.id, false, newDay, 0);
+        return { complete: true, sessionId: fresh.id, newDay };
       }
+      const newLimit = this._getWarmupLimit(newDay);
+      this._db.sessionSetWarmup(fresh.id, true, newDay, newLimit);
+      return { complete: false, sessionId: fresh.id, newDay };
+    });
+
+    const result = advance();
+    if (!result) return;
+
+    if (result.complete) {
+      this._db.antiBanEventLog({ session_id: result.sessionId, event_type: 'warmup_complete', detail: `Day ${result.newDay}` });
+      this.emit('warmup:complete', { sessionId: result.sessionId });
     }
   }
 

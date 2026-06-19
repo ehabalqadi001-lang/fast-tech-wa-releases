@@ -1123,10 +1123,20 @@ function register(ipcMain, { db, waApi, waSvc, engine, scraper, scheduler, aiSvc
     return { running: false };
   });
 
-  handle('webhook:saveConfig', ({ port, verifyToken }) => {
+  handle('webhook:saveConfig', async ({ port, verifyToken }) => {
+    const oldPort = db.settingGet('webhook_port') || '3001';
     if (port)        db.settingSet('webhook_port',         String(port));
     if (verifyToken) db.settingSet('webhook_verify_token', verifyToken);
-    return { ok: true };
+
+    // Auto-restart if port changed and server is currently running
+    if (port && String(port) !== String(oldPort) && webhookSrv?.isRunning()) {
+      webhookSrv.stop();
+      await new Promise(r => setTimeout(r, 500));
+      const newPort = await webhookSrv.start(parseInt(port, 10));
+      console.log(`[Webhook] Restarted on new port ${newPort}`);
+      return { ok: true, restarted: true, port: newPort };
+    }
+    return { ok: true, restarted: false };
   });
 
   handle('webhook:getConfig', () => ({

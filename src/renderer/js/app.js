@@ -1685,20 +1685,47 @@ async function loadDevices() {
   const stateBadge = { ready:'bg-g', qr:'bg-y', initializing:'bg-y', authenticated:'bg-y',
     disconnected:'bg-r', stopped:'', logged_out:'', auth_failed:'bg-r', error:'bg-r' };
 
+  // Fetch health scores in one call for all cards
+  let _healthMap = {};
+  if (IS_ELECTRON) {
+    try {
+      const hr = await BE.antiBan.getSessions();
+      const hs = Array.isArray(hr) ? hr : (hr?.data || []);
+      hs.forEach(h => { _healthMap[h.id] = h; });
+    } catch (_) {}
+  }
+
   const cards = sessions.map(s => {
-    const st    = s.state || s.status || 'disconnected';
-    const lbl   = stateLabel[st] || st;
-    const badge = stateBadge[st] || '';
+    const st      = s.state || s.status || 'disconnected';
+    const lbl     = stateLabel[st] || st;
+    const badge   = stateBadge[st] || '';
     const isReady = st === 'ready';
+    const hd      = _healthMap[s.id];
+    const health  = hd?.healthScore ?? null;
+    const hColor  = health === null ? 'var(--ts)' : health >= 70 ? '#22c55e' : health >= 40 ? '#f59e0b' : '#ef4444';
+    const hLabel  = health === null ? '' : health >= 70 ? '✅' : health >= 40 ? '⚠️' : '🚫';
+    const isBanned = hd?.banDetected;
+    const inCooldown = hd?.suspended && !isBanned;
     return `
-      <div class="ac" style="flex-direction:column;align-items:flex-start;gap:8px;min-height:150px">
+      <div class="ac" style="flex-direction:column;align-items:flex-start;gap:8px;min-height:160px">
         <div class="flex ic jb wf">
           <div style="font-size:28px">📱</div>
-          <span class="bge ${badge} f11">${lbl}</span>
+          <div class="flex gap4 ic">
+            ${isBanned   ? `<span class="bge bg-r f10">🚫 محظور</span>` : ''}
+            ${inCooldown ? `<span class="bge bg-y f10">⏸️ موقوف</span>` : ''}
+            <span class="bge ${badge} f11">${lbl}</span>
+          </div>
         </div>
         <div class="fw7 f13">${esc(s.name)}</div>
         <div class="f11 ts">${s.phone ? '📞 +'+s.phone : '—'}</div>
         <div class="f11 ts">✉️ ${(s.msg_count||0).toLocaleString()} رسالة</div>
+        ${health !== null ? `
+        <div style="width:100%">
+          <div class="f10 ts mb2">صحة الجلسة ${hLabel} <span style="color:${hColor}">${health}%</span></div>
+          <div style="height:4px;background:rgba(var(--ar),.1);border-radius:2px">
+            <div style="height:100%;width:${health}%;background:${hColor};border-radius:2px;transition:width .4s"></div>
+          </div>
+        </div>` : ''}
         <div class="flex gap6 mt4 wf" style="flex-wrap:wrap">
           ${isReady ? '' : `<button class="btn bp bsm fi" onclick="startDevice('${s.id}')">▶ تشغيل</button>`}
           ${s.active ? `<button class="btn bo bsm fi" onclick="stopDevice('${s.id}')">⏹️ إيقاف</button>` : ''}
@@ -1790,6 +1817,14 @@ if (IS_ELECTRON) {
 
   BE.on('wa:authFailed', ({ sessionId, message }) => {
     showN('فشل المصادقة', message || 'تحقق من الجلسة', '⚠️');
+    loadDevices();
+  });
+
+  BE.on('wa:qrExpired', ({ sessionId }) => {
+    if (document.getElementById('m-qr')?.classList.contains('open') && sessionId === _currentQrSession) {
+      closeM('m-qr');
+      beErr('⏰ انتهت صلاحية رمز QR — اضغط "تشغيل" مرة أخرى لتوليد رمز جديد');
+    }
     loadDevices();
   });
 

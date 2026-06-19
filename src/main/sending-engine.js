@@ -1,39 +1,34 @@
 'use strict';
 
-/**
- * FAST TECH WhatsApp Cyber Nexus — Anti-Ban Sending Engine
- *
- * Processes the send_queue table one item at a time with:
- *   • Randomized delays between messages (profile-driven)
- *   • Account/session rotation (health-score aware + least-recently-used)
- *   • Script/message variation (random pick from variants array — A/B testing)
- *   • Automatic retry on transient errors (up to max_attempts, default 3)
- *   • Full attachment support via MessageMedia.fromFilePath
- *   • AntiBanService integration (optional — falls back gracefully if absent)
- */
-
 const { v4: uuidv4 }   = require('uuid');
 const EventEmitter     = require('events');
 
-const DELAY_MIN_DEFAULT = 15_000;  // 15 seconds
-const DELAY_MAX_DEFAULT = 45_000;  // 45 seconds
-const POLL_MS           =  2_500;  // queue polling interval
+const DELAY_MIN_DEFAULT  = 15_000;
+const DELAY_MAX_DEFAULT  = 45_000;
+const POLL_MS            =  2_500;
+const CB_THRESHOLD       = 5;          // auth failures before circuit opens
+const CB_COOLDOWN_MS     = 15 * 60_000; // 15-minute cooldown per session
+
+// ── Basic phone number validation ────────────────────────────────────────────
+function _isValidPhone(raw) {
+  if (!raw) return false;
+  if (String(raw).includes('@')) return true; // JID — pass through
+  const digits = String(raw).replace(/\D/g, '');
+  return digits.length >= 6 && digits.length <= 15;
+}
 
 class SendingEngine extends EventEmitter {
-  /**
-   * @param {import('./database')} db
-   * @param {import('./whatsapp-web-service')} waSvc
-   * @param {import('./anti-ban-service').AntiBanService|null} antiBanSvc  optional
-   */
   constructor(db, waSvc, antiBanSvc = null) {
     super();
-    this._db          = db;
-    this._wa          = waSvc;
-    this._ab          = antiBanSvc;  // AntiBanService — may be null
-    this._active      = false;
-    this._paused      = false;
-    this._timer       = null;
-    this._processing  = false;  // re-entrancy guard
+    this._db            = db;
+    this._wa            = waSvc;
+    this._ab            = antiBanSvc;
+    this._active        = false;
+    this._paused        = false;
+    this._timer         = null;
+    this._processing    = false;
+    this._cbFailCount   = new Map(); // sessionId → consecutive auth_failure count
+    this._cbCooldown    = new Map(); // sessionId → timestamp when cooldown expires
   }
 
   start() {
@@ -75,14 +70,21 @@ class SendingEngine extends EventEmitter {
    * }>} items
    */
   enqueue(items) {
+    let queued = 0;
+    const rejected = [];
+
     for (const item of items) {
+      if (!_isValidPhone(item.recipient)) {
+        rejected.push(String(item.recipient));
+        continue;
+      }
       this._db.queueEnqueue({
         id:           uuidv4(),
         session_id:   item.sessionId   ?? null,
         campaign_id:  item.campaignId  ?? null,
         recipient:    String(item.recipient).includes('@')
-                        ? String(item.recipient)            // group/contact JID — keep as-is
-                        : String(item.recipient).replace(/\D/g, ''), // phone — strip to digits
+                        ? String(item.recipient)
+                        : String(item.recipient).replace(/\D/g, ''),
         body:         item.body        ?? null,
         scripts:      item.scripts?.length ? JSON.stringify(item.scripts) : null,
         media_path:   item.mediaPath   ?? null,
@@ -92,8 +94,13 @@ class SendingEngine extends EventEmitter {
         max_attempts: item.maxAttempts ?? 3,
         scheduled_at: item.scheduledAt ?? new Date().toISOString(),
       });
+      queued++;
     }
-    return { queued: items.length };
+
+    if (rejected.length) {
+      console.warn(`[Engine] Rejected ${rejected.length} invalid phone(s):`, rejected.slice(0, 5).join(', '));
+    }
+    return { queued, rejected: rejected.length, invalidPhones: rejected };
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -189,12 +196,31 @@ class SendingEngine extends EventEmitter {
 
     } catch (err) {
       const attempts = (item.attempts || 0) + 1;
+      const lm = err.message?.toLowerCase() || '';
+
+      // ── Circuit Breaker: track auth failures per session ──────────────────
+      const isAuthErr = lm.includes('auth') || lm.includes('unauthorized') || lm.includes('session');
+      if (isAuthErr) {
+        const fails = (this._cbFailCount.get(sessionId) || 0) + 1;
+        this._cbFailCount.set(sessionId, fails);
+        if (fails >= CB_THRESHOLD) {
+          const cooldownUntil = Date.now() + CB_COOLDOWN_MS;
+          this._cbCooldown.set(sessionId, cooldownUntil);
+          this._cbFailCount.set(sessionId, 0);
+          console.warn(`[Engine] Circuit OPEN for ${sessionId} — ${CB_THRESHOLD} auth failures. Cooldown 15 min.`);
+          this.emit('circuit:open', { sessionId, cooldownUntil });
+        }
+      } else {
+        // Non-auth error: reset consecutive counter
+        this._cbFailCount.set(sessionId, 0);
+      }
 
       // Tell AntiBanService about the error
       if (this._ab) {
-        const lm = err.message?.toLowerCase() || '';
         if (lm.includes('ban') || lm.includes('blocked') || lm.includes('unauthorized')) {
           this._ab.recordBan(sessionId);
+        } else if (isAuthErr) {
+          this._ab.recordError(sessionId, 'auth_failure');
         } else {
           this._ab.recordError(sessionId, 'send_error');
         }
@@ -249,23 +275,29 @@ class SendingEngine extends EventEmitter {
    * Among healthy sessions picks the least-used one.
    */
   _rotateSession() {
+    const now   = Date.now();
     const ready = this._wa
       .getActiveSessions()
       .filter(s => this._wa.isReady(s.id));
     if (!ready.length) return null;
 
-    // Filter out sessions blocked by AntiBanService
-    const eligible = this._ab
-      ? ready.filter(s => {
-          const abData = this._db.sessionGetAntiBan(s.id);
-          if (!abData) return true;
-          if (abData.ban_detected_at)               return false;
-          if ((abData.health_score ?? 80) < 30)     return false;
-          return true;
-        })
-      : ready;
+    const eligible = ready.filter(s => {
+      // Circuit Breaker cooldown
+      const cooldown = this._cbCooldown.get(s.id);
+      if (cooldown && now < cooldown) return false;
+      else if (cooldown) this._cbCooldown.delete(s.id); // expired — reopen
 
-    const pool = eligible.length ? eligible : ready; // fallback to all ready if all blocked
+      // AntiBanService gates
+      if (this._ab) {
+        const abData = this._db.sessionGetAntiBan(s.id);
+        if (!abData) return true;
+        if (abData.ban_detected_at)           return false;
+        if ((abData.health_score ?? 80) < 30) return false;
+      }
+      return true;
+    });
+
+    const pool = eligible.length ? eligible : ready;
     pool.sort((a, b) => (a.msg_count || 0) - (b.msg_count || 0));
     return pool[0].id;
   }

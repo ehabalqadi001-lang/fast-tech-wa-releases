@@ -351,6 +351,7 @@ contextBridge.exposeInMainWorld('ftwa', {
       'wa:authenticated',
       'wa:ready',
       'wa:authFailed',
+      'wa:qrExpired',
       'wa:disconnected',
       'wa:stateChange',
       'wa:message',
