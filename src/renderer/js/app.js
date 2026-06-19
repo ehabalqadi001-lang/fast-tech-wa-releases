@@ -45,20 +45,44 @@ async function sendAI() {
     return;
   }
   _aiMsgs.push({ role:'user', content:text });
-  try {
-    const r = await BE.ai.chat({ messages: _aiMsgs });
+
+  // Use streaming for Claude, regular invoke for Gemini
+  const pref = document.getElementById('ai-model-pref')?.value || 'gemini';
+  if (pref === 'claude') {
+    // Streaming path
     const bub = document.getElementById(typId)?.querySelector('.ai-bub');
-    if (r.ok) {
-      _aiMsgs.push({ role:'assistant', content:r.data.content });
-      if (bub) bub.innerHTML = r.data.content.replace(/</g,'&lt;').replace(/\n/g,'<br>');
-    } else {
-      _aiMsgs.pop(); // remove failed user msg so next send doesn't cause user→user
-      if (bub) bub.textContent = '⚠️ ' + (r.error||'خطأ');
+    let streamed = '';
+    BE.on('ai:stream:event', function handler(ev) {
+      if (ev.type === 'chunk') {
+        streamed += ev.text;
+        if (bub) bub.innerHTML = streamed.replace(/</g,'&lt;').replace(/\n/g,'<br>');
+        chat.scrollTop = chat.scrollHeight;
+      } else if (ev.type === 'done') {
+        BE.off('ai:stream:event', handler);
+        _aiMsgs.push({ role:'assistant', content: streamed });
+      } else if (ev.type === 'error') {
+        BE.off('ai:stream:event', handler);
+        _aiMsgs.pop();
+        if (bub) bub.textContent = '⚠️ ' + ev.text;
+      }
+    });
+    BE.ai.streamChat({ messages: _aiMsgs });
+  } else {
+    try {
+      const r = await BE.ai.chat({ messages: _aiMsgs });
+      const bub = document.getElementById(typId)?.querySelector('.ai-bub');
+      if (r.ok) {
+        _aiMsgs.push({ role:'assistant', content:r.data.content });
+        if (bub) bub.innerHTML = r.data.content.replace(/</g,'&lt;').replace(/\n/g,'<br>');
+      } else {
+        _aiMsgs.pop();
+        if (bub) bub.textContent = '⚠️ ' + (r.error||'خطأ');
+      }
+    } catch(e) {
+      _aiMsgs.pop();
+      const bub = document.getElementById(typId)?.querySelector('.ai-bub');
+      if (bub) bub.textContent = '⚠️ ' + e.message;
     }
-  } catch(e) {
-    _aiMsgs.pop(); // remove failed user msg so next send doesn't cause user→user
-    const bub = document.getElementById(typId)?.querySelector('.ai-bub');
-    if (bub) bub.textContent = '⚠️ ' + e.message;
   }
   chat.scrollTop = chat.scrollHeight;
 }
@@ -2426,7 +2450,7 @@ window._pg_accounts  = () => {
   loadAccounts();
   document.querySelector('.md-cl .btn.bp')?.addEventListener('click', saveAccount);
 };
-window._pg_contacts  = () => { loadContacts(); };
+window._pg_contacts  = () => { loadContacts(); renderAudienceConditions(); };
 window._pg_groups    = () => { loadGroupsPage(); };
 window._pg_campaigns = () => { loadCampaigns(); };
 window._pg_scheduler = () => { loadScheduler(); };
@@ -2436,7 +2460,7 @@ window._pg_ai        = () => {
   document.getElementById('ai-input')?.addEventListener('keypress', e => { if(e.key==='Enter') sendAI(); });
 };
 window._pg_crm       = () => { loadCRM(); };
-window._pg_reports   = () => { loadReportStats(); loadReports(); };
+window._pg_reports   = () => { loadReportStats(); loadReports(); loadAuditLog(); loadUsageChart(); calcCost(); };
 window._pg_settings  = () => { loadSettings(); };
 window._pg_devices   = () => { loadDevices(); };
 window._pg_engine    = () => { loadDevices(); loadEngineStats(); _ensureAbInit(); };
@@ -3728,8 +3752,309 @@ function stopDashAutoRefresh() {
   if (_dashRefreshTimer) { clearInterval(_dashRefreshTimer); _dashRefreshTimer = null; }
 }
 
-// ── Boot ──────────────────────────────────────────────────────────────────
-// ── SPARKLINES ────────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════
+// PHASE 4 — AI INTELLIGENCE FEATURES
+// ══════════════════════════════════════════════════════════════════════════
+
+// Smart Reply Suggestions
+async function loadSmartReplies(phone, contactName) {
+  if (!IS_ELECTRON) return;
+  const panel    = document.getElementById('ai-smart-panel');
+  const repliesEl= document.getElementById('ai-smart-replies');
+  const summaryEl= document.getElementById('ai-conv-summary');
+  if (!panel) return;
+  panel.style.display = '';
+  if (repliesEl) repliesEl.innerHTML = '<span class="f11 ts">جارٍ إنشاء الردود...</span>';
+  if (summaryEl) summaryEl.textContent = '';
+
+  const convR = await BE.wa.inbox.conversation
+    ? BE.wa.inbox.conversation(phone, 10)
+    : { ok: false };
+
+  const [repliesR, summaryR] = await Promise.all([
+    BE.ai.smartReplies({ conversation: convR.ok ? convR.data : [], contactName, businessContext: '' }),
+    convR.ok && convR.data?.length > 2
+      ? BE.ai.summarize({ messages: convR.data, contactName })
+      : Promise.resolve(null),
+  ]);
+
+  if (repliesEl) {
+    const sugs = repliesR?.suggestions || [];
+    repliesEl.innerHTML = sugs.length
+      ? sugs.map(s => `<button class="btn bo bsm" onclick="document.getElementById('reply-body-input').value='${esc(s)}';openReplyModal('','${esc(phone)}','','');document.getElementById('ai-smart-panel').style.display='none'">${esc(s)}</button>`).join('')
+      : '<span class="f11 ts">لا توجد اقتراحات</span>';
+  }
+  if (summaryEl && summaryR?.content) {
+    summaryEl.textContent = '📋 ملخص: ' + summaryR.content;
+  }
+}
+
+// AI Campaign Optimizer
+async function runAICampaignOptimizer() {
+  if (!IS_ELECTRON) return;
+  const el = document.getElementById('ai-campaign-analysis');
+  if (el) { el.style.display = ''; el.innerHTML = '<span class="f12 ts">جارٍ التحليل...</span>'; }
+
+  const r = await BE.messages.getStats();
+  if (!r.ok) { if(el) el.innerHTML = '<span class="f12 ts">تعذر تحميل إحصائيات الحملة</span>'; return; }
+
+  const res = await BE.ai.optimizeCampaign({ ...r.data });
+  if (!res || el === null) return;
+  if (el) el.innerHTML = `
+    <div class="f12 mb8">${esc(res.analysis||'')}</div>
+    <ul style="margin:0;padding-right:16px">
+      ${(res.suggestions||[]).map(s=>`<li class="f12 mb4">${esc(s)}</li>`).join('')}
+    </ul>`;
+  BE.audit.log({ event_type: 'ai_campaign_optimizer', description: 'تشغيل محسّن الحملة AI' });
+}
+
+async function showAICampaignOptimizer() {
+  const panel = document.getElementById('ai-optimizer-panel');
+  if (!panel) return;
+  if (panel.style.display !== 'none') { panel.style.display = 'none'; return; }
+  panel.style.display = '';
+  const content = document.getElementById('ai-optimizer-content');
+  if (content) content.textContent = 'جارٍ التحليل...';
+  if (!IS_ELECTRON) { if(content) content.textContent = 'AI غير متاح في وضع العرض'; return; }
+  const r = await BE.messages.getStats();
+  if (r.ok) {
+    const res = await BE.ai.optimizeCampaign({ ...r.data });
+    if (content) content.innerHTML = `<b>${esc(res.analysis||'')}</b><ul style="margin:6px 0 0;padding-right:16px">${(res.suggestions||[]).map(s=>`<li>${esc(s)}</li>`).join('')}</ul>`;
+  }
+}
+
+// Reply Classification (runs after inbox load, classifies top unreplied)
+async function classifyInboxMessages(msgs) {
+  if (!IS_ELECTRON || !msgs?.length) return;
+  const unreplied = msgs.filter(m => !m.replied && m.body).slice(0, 5);
+  for (const m of unreplied) {
+    const result = await BE.ai.classify(m.body || '');
+    if (!result) continue;
+    const intentColors = {
+      interested:     '#22c55e',
+      not_interested: '#ef4444',
+      question:       '#3b82f6',
+      complaint:      '#f59e0b',
+      request:        '#8b5cf6',
+    };
+    const badgeEl = document.querySelector(`[data-intent-msg="${m.id}"]`);
+    if (badgeEl) {
+      badgeEl.textContent = result.intent;
+      badgeEl.style.background = intentColors[result.intent] || '#64748b';
+    }
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// PHASE 3 — AUDIENCE BUILDER
+// ══════════════════════════════════════════════════════════════════════════
+let _audienceConditions = [];
+const AUD_FIELDS = [
+  {v:'name',l:'الاسم'},{v:'phone',l:'الهاتف'},{v:'country',l:'الدولة'},
+  {v:'group_tag',l:'المجموعة'},{v:'label',l:'التصنيف'},{v:'opt_in',l:'موافقة التسويق'},
+];
+const AUD_OPS = [
+  {v:'contains',l:'يحتوي'},{v:'eq',l:'يساوي'},{v:'starts',l:'يبدأ بـ'},
+  {v:'neq',l:'لا يساوي'},{v:'empty',l:'فارغ'},
+];
+
+function addAudienceCondition() {
+  _audienceConditions.push({ field: 'name', op: 'contains', value: '' });
+  renderAudienceConditions();
+}
+
+function removeAudienceCondition(i) {
+  _audienceConditions.splice(i, 1);
+  renderAudienceConditions();
+}
+
+function renderAudienceConditions() {
+  const el = document.getElementById('audience-conditions');
+  if (!el) return;
+  el.innerHTML = _audienceConditions.map((c, i) => `
+    <div class="flex ic gap8" style="background:rgba(var(--ar),.04);padding:8px;border-radius:8px">
+      <select class="fc bsm" style="width:130px" onchange="_audienceConditions[${i}].field=this.value">
+        ${AUD_FIELDS.map(f=>`<option value="${f.v}"${c.field===f.v?' selected':''}>${f.l}</option>`).join('')}
+      </select>
+      <select class="fc bsm" style="width:110px" onchange="_audienceConditions[${i}].op=this.value">
+        ${AUD_OPS.map(o=>`<option value="${o.v}"${c.op===o.v?' selected':''}>${o.l}</option>`).join('')}
+      </select>
+      <input class="fc fi bsm" type="text" placeholder="القيمة..." value="${esc(c.value)}" oninput="_audienceConditions[${i}].value=this.value">
+      <button class="btn bd bsm" onclick="removeAudienceCondition(${i})">✕</button>
+    </div>`).join('');
+  if (!_audienceConditions.length) el.innerHTML = '<div class="f11 ts" style="padding:6px">لا توجد شروط — اضغط ➕ شرط لإضافة فلتر</div>';
+}
+
+async function applyAudienceFilter() {
+  if (!IS_ELECTRON) return;
+  const r = await BE.audience.filter(_audienceConditions);
+  if (!r.ok) { beErr('خطأ في الفلترة'); return; }
+  _allContacts = r.data;
+  renderContactsTable(_allContacts);
+  const el = document.getElementById('audience-result-count');
+  if (el) el.textContent = `✅ ${r.data.length.toLocaleString()} جهة اتصال مطابقة`;
+  BE.audit.log({ event_type: 'audience_filter', description: `فلترة الجمهور: ${r.data.length} نتيجة` });
+}
+
+async function saveAudience() {
+  if (!IS_ELECTRON || !_audienceConditions.length) { beErr('أضف شروطاً أولاً'); return; }
+  const name = prompt('اسم الجمهور:');
+  if (!name) return;
+  const r = await BE.audience.save({ name, conditions: _audienceConditions, count: _allContacts.length });
+  if (r.ok) beOk('تم حفظ الجمهور');
+}
+
+async function loadSavedAudiences() {
+  if (!IS_ELECTRON) return;
+  const r = await BE.audience.list();
+  if (!r.ok) return;
+  const list = r.data;
+  if (!list.length) { beErr('لا توجد جماهير محفوظة'); return; }
+  const opts = list.map((a,i)=>`${i+1}. ${a.name} (${a.count})`).join('\n');
+  const idx = prompt('اختر رقم الجمهور:\n'+opts);
+  if (!idx) return;
+  const aud = list[parseInt(idx,10)-1];
+  if (!aud) return;
+  try { _audienceConditions = JSON.parse(aud.conditions); renderAudienceConditions(); applyAudienceFilter(); }
+  catch(_) { beErr('خطأ في تحميل الجمهور'); }
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// PHASE 3 — CONVERSATION SEARCH (FTS5)
+// ══════════════════════════════════════════════════════════════════════════
+let _searchDebounce = null;
+async function searchConversations(query) {
+  clearTimeout(_searchDebounce);
+  const resEl   = document.getElementById('inbox-search-results');
+  const cntEl   = document.getElementById('inbox-search-count');
+  const tableEl = document.querySelector('#p-inbox .card:last-of-type');
+  if (!query || query.length < 2) {
+    if (resEl) resEl.style.display = 'none';
+    if (cntEl) cntEl.textContent = '';
+    return;
+  }
+  _searchDebounce = setTimeout(async () => {
+    if (!IS_ELECTRON) return;
+    const r = await BE.messages.search(query, 30);
+    if (!r.ok || !resEl) return;
+    const hits = r.data || [];
+    if (cntEl) cntEl.textContent = `${hits.length} نتيجة`;
+    resEl.style.display = hits.length ? '' : 'none';
+    resEl.innerHTML = hits.length
+      ? `<table class="dt"><thead><tr><th>المستلم</th><th>النص</th><th>الاتجاه</th><th>التاريخ</th></tr></thead><tbody>${
+          hits.map(h=>`<tr>
+            <td class="f11 fm">${esc(h.recipient||'')}</td>
+            <td class="f12" style="max-width:300px">${(h.highlight||esc(h.body||'')).replace(/<mark>/g,'<mark style="background:rgba(var(--ar),.25);border-radius:2px">') }</td>
+            <td>${h.direction==='out'?'📤 صادر':'📥 وارد'}</td>
+            <td class="f11 ts">${(h.sent_at||'').slice(0,16)}</td>
+          </tr>`).join('')
+        }</tbody></table>`
+      : '<div class="f12 ts" style="padding:10px">لا توجد نتائج</div>';
+  }, 350);
+}
+
+function clearConversationSearch() {
+  const inp = document.getElementById('inbox-search-input');
+  if (inp) inp.value = '';
+  const resEl = document.getElementById('inbox-search-results');
+  const cntEl = document.getElementById('inbox-search-count');
+  if (resEl) resEl.style.display = 'none';
+  if (cntEl) cntEl.textContent = '';
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// PHASE 3 — AUDIT LOG
+// ══════════════════════════════════════════════════════════════════════════
+async function loadAuditLog() {
+  if (!IS_ELECTRON) return;
+  const r = await BE.audit.list(200);
+  const tbody = document.getElementById('audit-tbody');
+  if (!tbody) return;
+  if (!r.ok) { tbody.innerHTML = '<tr><td colspan="4" class="ta f12 ts" style="padding:18px">تعذر تحميل السجل</td></tr>'; return; }
+  const rows = r.data;
+  tbody.innerHTML = rows.length
+    ? rows.map(a=>`<tr>
+        <td class="f11 ts" style="white-space:nowrap">${(a.created_at||'').slice(0,16)}</td>
+        <td><span class="bge bg-b f11">${esc(a.event_type)}</span></td>
+        <td class="f12">${esc(a.description)}</td>
+        <td class="f11 ts">${esc(a.session_id||'—')}</td>
+      </tr>`).join('')
+    : '<tr><td colspan="4" class="ta f12 ts" style="padding:24px">لا توجد سجلات تدقيق حتى الآن</td></tr>';
+}
+
+async function exportAuditLog() {
+  if (!IS_ELECTRON) return;
+  const r = await BE.audit.export();
+  if (!r.ok) { beErr('تعذر تصدير السجل'); return; }
+  const rows = r.data;
+  const header = 'created_at,event_type,description,session_id,meta\n';
+  const csv = header + rows.map(a =>
+    [a.created_at, a.event_type, `"${(a.description||'').replace(/"/g,'""')}"`, a.session_id||'', a.meta||''].join(',')
+  ).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = `audit-log-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click(); URL.revokeObjectURL(url);
+  beOk('تم تصدير سجل التدقيق');
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// PHASE 3 — USAGE ALERTS + CHART
+// ══════════════════════════════════════════════════════════════════════════
+async function loadUsageChart() {
+  if (!IS_ELECTRON) return;
+  const r = await BE.stats.dailySent(7);
+  if (!r.ok) return;
+  const data = r.data;
+  const barsEl   = document.getElementById('usage-bars');
+  const labelsEl = document.getElementById('usage-labels');
+  if (!barsEl) return;
+  const maxVal = Math.max(...data.map(d=>d.count), 1);
+  const limit  = parseInt(localStorage.getItem('usage_daily_limit') || '0', 10);
+  barsEl.innerHTML = data.map(d => {
+    const pct    = Math.round(d.count / maxVal * 100);
+    const isHigh = limit && d.count >= limit * 0.9;
+    const isMed  = limit && d.count >= limit * 0.7;
+    const color  = isHigh ? '#ef4444' : isMed ? '#f59e0b' : 'var(--acc)';
+    return `<div title="${d.date}: ${d.count} رسالة" style="flex:1;height:${pct||2}%;background:${color};border-radius:4px 4px 0 0;min-height:3px;transition:height .3s"></div>`;
+  }).join('');
+  if (labelsEl) labelsEl.innerHTML = data.map(d => `<span>${d.date.slice(5)}</span>`).join('');
+  if (limit) {
+    const todayData = data[data.length-1];
+    const todayPct  = todayData ? Math.round(todayData.count / limit * 100) : 0;
+    const pctEl = document.getElementById('usage-pct-label');
+    if (pctEl) { pctEl.textContent = `${todayPct}% من الحد اليومي`; pctEl.style.color = todayPct>=90?'#ef4444':todayPct>=70?'#f59e0b':'var(--ts)'; }
+    if (todayPct >= 90) showN('⚠️ تحذير الاستخدام', `وصلت إلى ${todayPct}% من الحد اليومي (${todayData.count}/${limit})`, '⚠️');
+    else if (todayPct >= 70) showN('💡 إشعار الاستخدام', `استخدمت ${todayPct}% من الحد اليومي`, '💡');
+  }
+  const limitEl = document.getElementById('usage-daily-limit-label');
+  if (limitEl) limitEl.textContent = limit ? `الحد: ${limit.toLocaleString()} رسالة/يوم` : '';
+  const limitInput = document.getElementById('usage-limit-input');
+  if (limitInput && limit) limitInput.value = limit;
+}
+
+function saveUsageLimit(val) {
+  const n = parseInt(val, 10);
+  if (n > 0) localStorage.setItem('usage_daily_limit', n);
+  else localStorage.removeItem('usage_daily_limit');
+  loadUsageChart();
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// PHASE 3 — COST ESTIMATOR
+// ══════════════════════════════════════════════════════════════════════════
+const COST_PER_MSG = { utility: 0.005, marketing: 0.02, service: 0.001 };
+function calcCost() {
+  const msgs    = parseInt(document.getElementById('cost-msgs')?.value || '0', 10);
+  const type    = document.getElementById('cost-type')?.value || 'marketing';
+  const cost    = (msgs * (COST_PER_MSG[type] || 0.02)).toFixed(2);
+  const el      = document.getElementById('cost-result');
+  if (el) el.textContent = `${parseFloat(cost).toLocaleString()} $`;
+}
+
+// ── Boot ─────────────────────────────────────────────────────────────────
+// ── SPARKLINES ───────────────────────────────────────────────────────────
 function drawSparkline(svgId, data, color) {
   const svg = document.getElementById(svgId);
   if (!svg || !data || !data.length) return;

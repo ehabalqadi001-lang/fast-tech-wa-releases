@@ -16,6 +16,32 @@
       <span class="f12 ts" id="inbox-total-count">0 إجمالي</span>
     </div>
   </div>
+  <!-- Conversation Search -->
+  <div class="card mb14" style="padding:10px 14px">
+    <div class="flex ic gap8" style="flex-wrap:wrap">
+      <input class="fc fi" type="search" id="inbox-search-input" placeholder="🔍 البحث في المحادثات..." oninput="if(this.value.length>2||!this.value)searchConversations(this.value)" style="max-width:280px">
+      <span class="f11 ts" id="inbox-search-count"></span>
+      <button class="btn bo bsm" onclick="clearConversationSearch()">✕ إلغاء</button>
+      <button class="btn bo bsm" onclick="showAICampaignOptimizer()">🤖 محسّن AI</button>
+    </div>
+    <div id="inbox-search-results" style="display:none;margin-top:10px"></div>
+    <!-- AI Campaign Optimizer panel -->
+    <div id="ai-optimizer-panel" style="display:none;margin-top:12px;padding:12px;background:rgba(var(--ar),.04);border-radius:8px">
+      <div class="ct mb10">🤖 محسّن الحملة بالذكاء الاصطناعي</div>
+      <div id="ai-optimizer-content" class="f12">جارٍ التحليل...</div>
+    </div>
+  </div>
+
+  <!-- Smart Reply & Summarize panel (shown below conversation row) -->
+  <div id="ai-smart-panel" class="card mb14" style="display:none;padding:14px">
+    <div class="ct flex ic jb">
+      <span>🤖 ردود ذكية بـ AI</span>
+      <button class="btn bo bsm" onclick="document.getElementById('ai-smart-panel').style.display='none'">✕</button>
+    </div>
+    <div id="ai-smart-replies" class="flex gap8 mt8" style="flex-wrap:wrap"></div>
+    <div id="ai-conv-summary" class="f12 ts mt10" style="font-style:italic"></div>
+  </div>
+
   <!-- Tabs: All / Unreplied / Replied -->
   <div class="flex gap0 mb14" style="border-bottom:2px solid rgba(var(--ar),.1)">
     <button id="inbox-tab-all"       class="tab-btn active" onclick="switchInboxTab('all')"       style="padding:9px 20px;background:none;border:none;border-bottom:2px solid var(--hp);color:var(--hp);cursor:pointer;font-size:13px;font-weight:600;margin-bottom:-2px">📨 الكل</button>

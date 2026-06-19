@@ -469,6 +469,33 @@ class Db {
       this.settingSet('db_version', '10');
       v = 10;
     }
+
+    if (v < 11) {
+      // Compliance & Audit Log — tracks key user/system actions
+      this._db.exec(`
+        CREATE TABLE IF NOT EXISTS audit_log (
+          id          TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(8)))),
+          event_type  TEXT NOT NULL,
+          description TEXT NOT NULL,
+          session_id  TEXT,
+          meta        TEXT,
+          created_at  TEXT DEFAULT (datetime('now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_log(created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_audit_type    ON audit_log(event_type, created_at DESC);
+
+        -- Audience segments — saved filter presets
+        CREATE TABLE IF NOT EXISTS audiences (
+          id          TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(8)))),
+          name        TEXT NOT NULL,
+          conditions  TEXT NOT NULL,
+          count       INTEGER DEFAULT 0,
+          created_at  TEXT DEFAULT (datetime('now'))
+        );
+      `);
+      this.settingSet('db_version', '11');
+      v = 11;
+    }
   }
 
   // ─── FTS Search ───────────────────────────────────────────────────────────
@@ -1358,6 +1385,80 @@ class Db {
       todayMsgs:  todayMsgs?.n  || 0,
       unreadInbox: unread?.n || 0,
     };
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // AUDIT LOG
+  // ═══════════════════════════════════════════════════════════════════════════
+  auditLog({ event_type, description, session_id = null, meta = null }) {
+    return this._db.prepare(`
+      INSERT INTO audit_log (event_type, description, session_id, meta)
+      VALUES (?, ?, ?, ?)
+    `).run(event_type, description, session_id, meta ? JSON.stringify(meta) : null);
+  }
+
+  auditList(limit = 200) {
+    return this._db.prepare(`
+      SELECT * FROM audit_log ORDER BY created_at DESC LIMIT ?
+    `).all(limit);
+  }
+
+  auditExport() {
+    return this._db.prepare(`
+      SELECT created_at, event_type, description, session_id, meta
+      FROM audit_log ORDER BY created_at DESC
+    `).all();
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // AUDIENCE BUILDER — multi-condition contact filter
+  // ═══════════════════════════════════════════════════════════════════════════
+  audienceFilter(conditions = []) {
+    // conditions: [{field, op, value}]
+    let where = ['1=1'];
+    const params = [];
+    for (const c of conditions) {
+      const field = ['name','phone','country','group_tag','label','opt_in'].includes(c.field) ? c.field : null;
+      if (!field) continue;
+      if (c.op === 'eq')       { where.push(`LOWER(${field})=LOWER(?)`); params.push(c.value); }
+      else if (c.op === 'contains') { where.push(`LOWER(${field}) LIKE LOWER(?)`); params.push('%' + c.value + '%'); }
+      else if (c.op === 'starts')   { where.push(`LOWER(${field}) LIKE LOWER(?)`); params.push(c.value + '%'); }
+      else if (c.op === 'neq')  { where.push(`LOWER(${field})!=LOWER(?)`); params.push(c.value); }
+      else if (c.op === 'empty'){ where.push(`(${field} IS NULL OR ${field}='')`); }
+    }
+    return this._db.prepare(
+      `SELECT * FROM contacts WHERE ${where.join(' AND ')} ORDER BY created_at DESC LIMIT 5000`
+    ).all(...params);
+  }
+
+  audienceSave({ name, conditions, count }) {
+    return this._db.prepare(`
+      INSERT INTO audiences (name, conditions, count) VALUES (?, ?, ?)
+    `).run(name, JSON.stringify(conditions), count || 0);
+  }
+
+  audienceList() {
+    return this._db.prepare('SELECT * FROM audiences ORDER BY created_at DESC').all();
+  }
+
+  audienceDelete(id) {
+    return this._db.prepare('DELETE FROM audiences WHERE id=?').run(id);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // DAILY USAGE STATS — for usage alerts
+  // ═══════════════════════════════════════════════════════════════════════════
+  dailySentCount(days = 7) {
+    const rows = [];
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date(); d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().slice(0, 10);
+      const r = this._db.prepare(
+        `SELECT COUNT(*) AS n FROM messages WHERE DATE(sent_at)=?`
+      ).get(dateStr);
+      rows.push({ date: dateStr, count: r?.n || 0 });
+    }
+    return rows;
   }
 
   // ═══════════════════════════════════════════════════════════════════════════

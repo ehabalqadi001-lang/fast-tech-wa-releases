@@ -16,6 +16,21 @@
       <button class="btn bd bsm" id="contacts-del-btn" onclick="deleteSelectedContacts()">🗑️ حذف المحدد</button>
     </div>
   </div>
+  <!-- Audience Builder -->
+  <div class="card mb18">
+    <div class="ct flex ic jb">
+      <span>🎯 منشئ الجمهور — فلترة متعددة الشروط</span>
+      <div class="flex gap8">
+        <button class="btn bo bsm" onclick="addAudienceCondition()">➕ شرط</button>
+        <button class="btn bp bsm" onclick="applyAudienceFilter()">⚡ تطبيق</button>
+        <button class="btn bo bsm" onclick="saveAudience()">💾 حفظ</button>
+        <button class="btn bo bsm" onclick="loadSavedAudiences()">📂 محفوظ</button>
+      </div>
+    </div>
+    <div id="audience-conditions" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px"></div>
+    <div class="f11 ts" id="audience-result-count"></div>
+  </div>
+
   <div class="flex gap12 mb18 ic">
     <input class="fc fi" type="search" id="contacts-search" placeholder="🔍 البحث..." oninput="filterContacts()">
   </div>

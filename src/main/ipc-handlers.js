@@ -1185,6 +1185,37 @@ function register(ipcMain, { db, waApi, waSvc, engine, scraper, scheduler, aiSvc
     return { ok: true };
   });
 
+  // ── AI Phase 4 — Intelligence features ───────────────────────────────────
+  handle('ai:classify',        ({ text })       => aiSvc.classifyReply(text));
+  handle('ai:smartReplies',    (payload)        => aiSvc.smartReplySuggestions(payload));
+  handle('ai:summarize',       (payload)        => aiSvc.summarizeConversation(payload));
+  handle('ai:optimizeCampaign',(payload)        => aiSvc.optimizeCampaign(payload));
+
+  // ── AI Streaming (uses ipcMain.on for push events) ────────────────────────
+  ipcMain.on('ai:streamChat', async (event, data) => {
+    try {
+      for await (const chunk of aiSvc.streamClaudeChat(data.messages || [], data.system)) {
+        if (!event.sender.isDestroyed()) event.sender.send('ai:stream:event', chunk);
+      }
+    } catch (e) {
+      if (!event.sender.isDestroyed()) event.sender.send('ai:stream:event', { type: 'error', text: e.message });
+    }
+  });
+
+  // ── Audit Log ──────────────────────────────────────────────────────────────
+  handle('audit:list',   ({ limit } = {}) => ({ ok: true, data: db.auditList(limit || 200) }));
+  handle('audit:export', ()               => ({ ok: true, data: db.auditExport() }));
+  handle('audit:log',    (payload)        => { db.auditLog(payload); return { ok: true }; });
+
+  // ── Audience Builder ───────────────────────────────────────────────────────
+  handle('audience:filter', ({ conditions }) => ({ ok: true, data: db.audienceFilter(conditions || []) }));
+  handle('audience:save',   (payload)        => { db.audienceSave(payload); return { ok: true }; });
+  handle('audience:list',   ()               => ({ ok: true, data: db.audienceList() }));
+  handle('audience:delete', ({ id })         => { db.audienceDelete(id); return { ok: true }; });
+
+  // ── Usage Stats ────────────────────────────────────────────────────────────
+  handle('stats:dailySent', ({ days } = {}) => ({ ok: true, data: db.dailySentCount(days || 7) }));
+
 }
 
 module.exports = { register };

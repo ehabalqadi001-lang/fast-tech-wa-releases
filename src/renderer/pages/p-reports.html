@@ -38,12 +38,60 @@
     <div class="sc"><div class="si">🔔</div><div class="sn ta fm" id="rep-rs-unreplied">0</div><div class="sl">لم يُرد عليها</div></div>
     <div class="sc"><div class="si">✅</div><div class="sn" id="rep-rs-replied">0</div><div class="sl">تم الرد عليها</div></div>
   </div>
-  <div class="card">
+  <div class="card mb18">
     <div class="ct flex ic jb"><span>💬 الرسائل الواردة (ردود)</span><button class="btn bo bsm" onclick="exportReportExcel()">📊 تصدير</button></div>
     <table class="dt">
       <thead><tr><th>من / الجروب</th><th>الجلسة</th><th>الرسالة</th><th>الوقت</th><th>الحالة</th></tr></thead>
       <tbody id="rep-replies-tbody">
         <tr><td colspan="5" class="ta f12 ts" style="padding:24px">لا توجد ردود حتى الآن</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Usage Chart (7-day trend) -->
+  <div class="card mb18">
+    <div class="ct flex ic jb">
+      <span>📊 مؤشر الإرسال اليومي (7 أيام)</span>
+      <span class="f11 ts" id="usage-daily-limit-label"></span>
+    </div>
+    <div id="usage-bars" style="display:flex;align-items:flex-end;gap:6px;height:80px;padding:0 4px"></div>
+    <div id="usage-labels" class="flex gap6 f11 ts mt4" style="justify-content:space-around"></div>
+    <div class="flex ic gap8 mt10">
+      <span class="f12 ts">حد يومي:</span>
+      <input id="usage-limit-input" type="number" class="fc" style="width:100px" placeholder="مثال: 1000" oninput="saveUsageLimit(this.value)">
+      <span class="f11 ts" id="usage-pct-label"></span>
+    </div>
+  </div>
+
+  <!-- Cost Estimator -->
+  <div class="card mb18">
+    <div class="ct">💰 تقدير التكلفة — Cloud API</div>
+    <div class="g3">
+      <div class="fg"><label class="fl">عدد الرسائل</label><input type="number" id="cost-msgs" class="fc" value="1000" oninput="calcCost()"></div>
+      <div class="fg"><label class="fl">نوع الرسالة</label>
+        <select id="cost-type" class="fc" onchange="calcCost()">
+          <option value="utility">Utility (0.005$)</option>
+          <option value="marketing" selected>Marketing (0.02$)</option>
+          <option value="service">Service (0.001$)</option>
+        </select>
+      </div>
+      <div class="fg"><label class="fl">التكلفة التقديرية</label><div class="fc" id="cost-result" style="background:rgba(var(--ar),.04);display:flex;align-items:center;font-weight:700;color:var(--acc)">— $</div></div>
+    </div>
+  </div>
+
+  <!-- Audit Log -->
+  <div class="card">
+    <div class="ct flex ic jb">
+      <span>📋 سجل التدقيق (Audit Log)</span>
+      <div class="flex gap8">
+        <button class="btn bo bsm" onclick="loadAuditLog()">🔄 تحديث</button>
+        <button class="btn bo bsm" onclick="exportAuditLog()">📊 تصدير CSV</button>
+      </div>
+    </div>
+    <table class="dt">
+      <thead><tr><th>الوقت</th><th>النوع</th><th>التفاصيل</th><th>الجلسة</th></tr></thead>
+      <tbody id="audit-tbody">
+        <tr><td colspan="4" class="ta f12 ts" style="padding:24px">لا توجد سجلات</td></tr>
       </tbody>
     </table>
   </div>

@@ -101,11 +101,16 @@ contextBridge.exposeInMainWorld('ftwa', {
 
   // ── AI ────────────────────────────────────────────────────────────────────
   ai: {
-    chat:             (data)  => ipcRenderer.invoke('ai:chat',             data),
-    generateScript:   (data)  => ipcRenderer.invoke('ai:generateScript',   data),
-    generateVariants: (data)  => ipcRenderer.invoke('ai:generateVariants', data),
-    getKeys:          ()      => ipcRenderer.invoke('ai:getKeys'),
-    saveKeys:         (keys)  => ipcRenderer.invoke('ai:saveKeys',         keys),
+    chat:             (data)    => ipcRenderer.invoke('ai:chat',              data),
+    generateScript:   (data)    => ipcRenderer.invoke('ai:generateScript',    data),
+    generateVariants: (data)    => ipcRenderer.invoke('ai:generateVariants',  data),
+    getKeys:          ()        => ipcRenderer.invoke('ai:getKeys'),
+    saveKeys:         (keys)    => ipcRenderer.invoke('ai:saveKeys',          keys),
+    classify:         (text)    => ipcRenderer.invoke('ai:classify',         { text }),
+    smartReplies:     (payload) => ipcRenderer.invoke('ai:smartReplies',      payload),
+    summarize:        (payload) => ipcRenderer.invoke('ai:summarize',         payload),
+    optimizeCampaign: (payload) => ipcRenderer.invoke('ai:optimizeCampaign',  payload),
+    streamChat:       (data)    => ipcRenderer.send('ai:streamChat',          data),
   },
 
   // ── CRM ───────────────────────────────────────────────────────────────────
@@ -234,6 +239,26 @@ contextBridge.exposeInMainWorld('ftwa', {
     openExternal:    (url) => ipcRenderer.invoke('license:openExternal', url),
   },
 
+  // ── Audit Log ─────────────────────────────────────────────────────────────
+  audit: {
+    list:   (limit)   => ipcRenderer.invoke('audit:list',   { limit }),
+    export: ()        => ipcRenderer.invoke('audit:export'),
+    log:    (payload) => ipcRenderer.invoke('audit:log',    payload),
+  },
+
+  // ── Audience Builder ──────────────────────────────────────────────────────
+  audience: {
+    filter: (conditions) => ipcRenderer.invoke('audience:filter', { conditions }),
+    save:   (payload)    => ipcRenderer.invoke('audience:save',   payload),
+    list:   ()           => ipcRenderer.invoke('audience:list'),
+    delete: (id)         => ipcRenderer.invoke('audience:delete', { id }),
+  },
+
+  // ── Usage Stats ───────────────────────────────────────────────────────────
+  stats: {
+    dailySent: (days) => ipcRenderer.invoke('stats:dailySent', { days }),
+  },
+
   // ── Auto-update ───────────────────────────────────────────────────────────
   update: {
     download: () => ipcRenderer.invoke('update:download'),
@@ -276,6 +301,8 @@ contextBridge.exposeInMainWorld('ftwa', {
       'antiban:rate-limit',
       // Campaign progress
       'campaign:progress:live',
+      // AI streaming
+      'ai:stream:event',
     ];
     if (allowed.includes(channel)) {
       // Wrap cb so we can remove it by reference via off()
