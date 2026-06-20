@@ -362,8 +362,9 @@ contextBridge.exposeInMainWorld('ftwa', {
     },
     // Variants
     variants: {
-      save:   (data) => ipcRenderer.invoke('ec:variants:save',   data),
-      delete: (id)   => ipcRenderer.invoke('ec:variants:delete', id),
+      list:   (productId) => ipcRenderer.invoke('ec:variants:list',   productId),
+      save:   (data)      => ipcRenderer.invoke('ec:variants:save',   data),
+      delete: (id)        => ipcRenderer.invoke('ec:variants:delete', id),
     },
     // Customers
     customers: {

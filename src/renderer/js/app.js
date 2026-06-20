@@ -5428,6 +5428,12 @@ window['_pg_ec-shop']      = () => {
   if (typeof ecShopLoad     === 'function') ecShopLoad();
   if (typeof ecCartUpdate   === 'function') ecCartUpdate();
 };
+window['_pg_ec-categories']   = () => { if (typeof ecCatLoad  === 'function') ecCatLoad();  };
+window['_pg_ec-reviews']      = () => { if (typeof ecRevLoad  === 'function') ecRevLoad();  };
+window['_pg_chatbot-builder'] = () => {
+  window.dispatchEvent(new CustomEvent('page:chatbot-builder'));
+  if (typeof vbRefreshFlowList === 'function') vbRefreshFlowList();
+};
 
 // ── E-Commerce push notifications ─────────────────────────────────────────
 if (IS_ELECTRON) {

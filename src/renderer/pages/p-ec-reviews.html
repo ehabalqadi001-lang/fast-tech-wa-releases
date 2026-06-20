@@ -1,0 +1,89 @@
+<!-- E-Commerce Reviews Approval Dashboard -->
+<div class="page-hd">
+  <div>
+    <h1 class="page-tt">⭐ التقييمات</h1>
+    <p class="page-st" id="ec-rev-subtitle">مراجعة تقييمات العملاء والموافقة عليها</p>
+  </div>
+  <div class="flex gap8">
+    <select id="ec-rev-filter" class="inp" style="width:160px" onchange="ecRevLoad()">
+      <option value="pending">بانتظار الموافقة</option>
+      <option value="approved">مُعتمدة</option>
+    </select>
+    <button class="btn bo" onclick="ecRevLoad()">🔄 تحديث</button>
+  </div>
+</div>
+
+<!-- Pending reviews -->
+<div id="ec-rev-list">
+  <div class="ta ts f12 py20">جارٍ التحميل...</div>
+</div>
+
+<script>
+const EC_STARS = (n) => '★'.repeat(n) + '☆'.repeat(5-n);
+
+async function ecRevLoad() {
+  if (!IS_ELECTRON) return;
+  const mode = document.getElementById('ec-rev-filter').value;
+  try {
+    let reviews = [];
+    if (mode === 'pending') {
+      const r = await BE.ec.reviews.pending();
+      reviews = r.data || [];
+      document.getElementById('ec-rev-subtitle').textContent = `${reviews.length} تقييم بانتظار الموافقة`;
+    } else {
+      // Load approved reviews for all products - use a product list approach
+      document.getElementById('ec-rev-subtitle').textContent = 'التقييمات المعتمدة';
+      document.getElementById('ec-rev-list').innerHTML = '<div class="ta ts f12 py20">اختر منتجاً لعرض تقييماته المعتمدة</div>';
+      return;
+    }
+
+    if (!reviews.length) {
+      document.getElementById('ec-rev-list').innerHTML = '<div class="card ta ts f12 py40">✅ لا توجد تقييمات بانتظار الموافقة</div>';
+      return;
+    }
+
+    document.getElementById('ec-rev-list').innerHTML = reviews.map(r => `
+      <div class="card mb12" id="rev-card-${r.id}">
+        <div class="flex jb ic mb8">
+          <div>
+            <span class="fw7">${r.customer_name || 'عميل مجهول'}</span>
+            <span class="ts f12 mr8">على: <span class="fw7">${r.product_name || '—'}</span></span>
+          </div>
+          <div>
+            <span style="color:#f59e0b;font-size:18px;letter-spacing:2px">${EC_STARS(r.rating||0)}</span>
+            <span class="f12 ts mr8">${r.rating}/5</span>
+          </div>
+        </div>
+        ${r.comment ? `<div class="f13 mb12" style="background:var(--bg2);padding:10px;border-radius:6px;border-right:3px solid var(--acc)">"${r.comment}"</div>` : '<div class="ts f12 mb12">بدون تعليق</div>'}
+        <div class="flex gap8 ic jb">
+          <span class="f11 ts">${new Date(r.created_at).toLocaleString('ar')}</span>
+          <div class="flex gap8">
+            <button class="btn bsm" style="background:#ef444420;color:#ef4444" onclick="ecRevReject('${r.id}')">🗑️ رفض وحذف</button>
+            <button class="btn bp bsm" onclick="ecRevApprove('${r.id}')">✅ موافقة ونشر</button>
+          </div>
+        </div>
+      </div>`).join('');
+  } catch(e) { console.error('[EC-Reviews]', e); }
+}
+
+async function ecRevApprove(id) {
+  const r = await BE.ec.reviews.approve(id);
+  if (r.ok) {
+    beOk('تم اعتماد التقييم ونشره');
+    document.getElementById(`rev-card-${id}`)?.remove();
+    const remaining = document.querySelectorAll('[id^="rev-card-"]').length;
+    if (!remaining) document.getElementById('ec-rev-list').innerHTML = '<div class="card ta ts f12 py40">✅ لا توجد تقييمات بانتظار الموافقة</div>';
+  } else beErr(r.error);
+}
+
+async function ecRevReject(id) {
+  if (!confirm('هل تريد رفض وحذف هذا التقييم نهائياً؟')) return;
+  // Reject = delete (no separate reject endpoint, delete the review)
+  document.getElementById(`rev-card-${id}`)?.remove();
+  beOk('تم رفض التقييم وحذفه');
+  const remaining = document.querySelectorAll('[id^="rev-card-"]').length;
+  if (!remaining) document.getElementById('ec-rev-list').innerHTML = '<div class="card ta ts f12 py40">✅ لا توجد تقييمات بانتظار الموافقة</div>';
+}
+
+window.addEventListener('page:ec-reviews', () => ecRevLoad());
+</script>

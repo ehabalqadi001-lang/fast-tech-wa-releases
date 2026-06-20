@@ -1,0 +1,585 @@
+<!-- Visual Chatbot Flow Builder -->
+<style>
+#vb-wrap { display:flex; height:calc(100vh - 130px); gap:0; border-radius:12px; overflow:hidden; border:1px solid var(--bdr); }
+/* Left palette */
+#vb-palette { width:200px; background:var(--bg1); border-left:1px solid var(--bdr); padding:12px; overflow-y:auto; flex-shrink:0; }
+#vb-palette .pal-sec { font-size:11px; color:var(--ts); margin:12px 0 6px; text-transform:uppercase; font-weight:600; }
+.pal-node { padding:8px 10px; border-radius:8px; margin-bottom:6px; cursor:pointer; font-size:12px; font-weight:600; display:flex; align-items:center; gap:8px; border:1px solid transparent; transition:.15s; user-select:none; }
+.pal-node:hover { transform:translateX(-2px); filter:brightness(1.15); }
+/* Canvas */
+#vb-canvas-wrap { flex:1; position:relative; background:var(--bg2); overflow:auto; }
+#vb-canvas { position:relative; min-width:1800px; min-height:1200px; }
+#vb-svg { position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; overflow:visible; }
+/* Nodes */
+.vb-node { position:absolute; width:210px; background:var(--bg1); border-radius:10px; border:2px solid transparent; cursor:move; user-select:none; box-shadow:0 2px 12px rgba(0,0,0,.3); transition:box-shadow .15s; z-index:10; }
+.vb-node:hover, .vb-node.selected { box-shadow:0 4px 20px rgba(0,0,0,.5); z-index:20; }
+.vb-node-hd { padding:8px 10px; border-radius:8px 8px 0 0; display:flex; align-items:center; gap:6px; font-size:12px; font-weight:700; color:#fff; }
+.vb-node-body { padding:10px; font-size:11px; color:var(--ts); min-height:32px; word-break:break-word; }
+.vb-node-body .nb-val { color:var(--tx); font-weight:600; font-size:12px; }
+.vb-ports { display:flex; justify-content:space-between; padding:4px 10px 8px; gap:4px; }
+.vb-port { width:12px; height:12px; border-radius:50%; border:2px solid #fff; cursor:pointer; transition:.15s; flex-shrink:0; }
+.vb-port:hover { transform:scale(1.4); }
+.vb-port-in  { background:#6366f1; }
+.vb-port-out { background:#10b981; }
+.vb-port-else{ background:#ef4444; }
+.vb-port-label { font-size:9px; color:var(--ts); display:flex; align-items:center; gap:3px; }
+.vb-node-del { position:absolute; top:4px; left:4px; background:rgba(239,68,68,.8); color:#fff; border:none; border-radius:4px; width:18px; height:18px; font-size:10px; cursor:pointer; display:none; align-items:center; justify-content:center; line-height:1; }
+.vb-node:hover .vb-node-del { display:flex; }
+/* Right panel */
+#vb-props { width:260px; background:var(--bg1); border-right:1px solid var(--bdr); padding:14px; overflow-y:auto; flex-shrink:0; }
+#vb-props .prop-hd { font-weight:700; margin-bottom:12px; padding-bottom:8px; border-bottom:1px solid var(--bdr); }
+/* Toolbar */
+#vb-toolbar { display:flex; align-items:center; gap:8px; padding:10px 14px; background:var(--bg1); border-bottom:1px solid var(--bdr); }
+/* Connecting mode */
+.vb-connecting .vb-port-out, .vb-connecting .vb-port-else { animation:pulse .6s infinite; cursor:crosshair; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+.vb-canvas-wrap.vb-connecting { cursor:crosshair; }
+/* Arrow markers */
+#vb-arrow-yes { fill:#10b981; } #vb-arrow-no { fill:#ef4444; } #vb-arrow-def { fill:#6366f1; }
+</style>
+
+<div class="page-hd" style="margin-bottom:8px">
+  <div>
+    <h1 class="page-tt">🎨 منشئ الـ Chatbot المرئي</h1>
+    <p class="page-st" id="vb-current-flow-name">اختر تدفقاً أو أنشئ جديداً</p>
+  </div>
+  <div class="flex gap8">
+    <select id="vb-flow-sel" class="inp" style="width:200px" onchange="vbLoadFlow()">
+      <option value="">— اختر تدفقاً —</option>
+    </select>
+    <button class="btn bo" onclick="vbNewFlow()">+ جديد</button>
+    <button class="btn bp" onclick="vbSave()">💾 حفظ</button>
+    <button class="btn bo" onclick="vbExport()">📤 تصدير JSON</button>
+  </div>
+</div>
+
+<div id="vb-wrap">
+  <!-- Left: Node Palette -->
+  <div id="vb-palette">
+    <div class="f12 ts ta" style="margin-bottom:8px">اضغط لإضافة عقدة</div>
+    <div class="pal-sec">🚀 بداية</div>
+    <div class="pal-node" style="background:#22c55e20;color:#22c55e;border-color:#22c55e40" onclick="vbAddNode('start')">🟢 بداية التدفق</div>
+    <div class="pal-sec">💬 رسائل</div>
+    <div class="pal-node" style="background:#6366f120;color:#818cf8;border-color:#6366f140" onclick="vbAddNode('message')">💬 رسالة نصية</div>
+    <div class="pal-node" style="background:#8b5cf620;color:#a78bfa;border-color:#8b5cf640" onclick="vbAddNode('media')">🖼️ وسائط / صورة</div>
+    <div class="pal-node" style="background:#06b6d420;color:#22d3ee;border-color:#06b6d440" onclick="vbAddNode('buttons')">🔘 أزرار</div>
+    <div class="pal-sec">🔀 تحكم</div>
+    <div class="pal-node" style="background:#f59e0b20;color:#fbbf24;border-color:#f59e0b40" onclick="vbAddNode('condition')">🔀 شرط / تفرع</div>
+    <div class="pal-node" style="background:#f97316'20;color:#fb923c;border-color:#f9731640" onclick="vbAddNode('input')">⌨️ انتظر رد العميل</div>
+    <div class="pal-node" style="background:#64748b20;color:#94a3b8;border-color:#64748b40" onclick="vbAddNode('delay')">⏱️ تأخير</div>
+    <div class="pal-node" style="background:#0ea5e920;color:#38bdf8;border-color:#0ea5e940" onclick="vbAddNode('jump')">↪️ انتقل لعقدة</div>
+    <div class="pal-sec">🏁 نهاية</div>
+    <div class="pal-node" style="background:#ef444420;color:#f87171;border-color:#ef444440" onclick="vbAddNode('end')">🔴 إنهاء التدفق</div>
+    <div style="height:1px;background:var(--bdr);margin:12px 0"></div>
+    <div class="f11 ts" style="line-height:1.6">
+      <b>كيفية الاستخدام:</b><br>
+      1. اضغط على نوع العقدة لإضافتها<br>
+      2. اسحب العقدة لتحريكها<br>
+      3. اضغط ⭕ الخضراء لبدء ربط<br>
+      4. اضغط على عقدة أخرى للربط<br>
+      5. اضغط العقدة لتعديل خصائصها
+    </div>
+  </div>
+
+  <!-- Center: Canvas -->
+  <div id="vb-canvas-wrap">
+    <div id="vb-toolbar">
+      <span class="f12 ts" id="vb-status">لا يوجد تدفق محدد</span>
+      <div style="flex:1"></div>
+      <label class="f12 ts ic flex gap6"><input type="text" id="vb-flow-name-inp" class="inp" style="width:200px" placeholder="اسم التدفق..."></label>
+      <label class="f12 ts ic flex gap6"><input type="text" id="vb-flow-keywords" class="inp" style="width:200px" placeholder="كلمات مفتاحية (مفصولة بفواصل)..."></label>
+      <label class="flex ic gap6 f12"><input type="checkbox" id="vb-flow-active" checked><span>نشط</span></label>
+      <button class="btn bsm bo" id="vb-cancel-connect" style="display:none" onclick="vbCancelConnect()">❌ إلغاء الربط</button>
+      <button class="btn bsm bo" onclick="vbClearCanvas()">🗑️ مسح الكل</button>
+    </div>
+    <div id="vb-canvas">
+      <svg id="vb-svg" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="arr-def" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#6366f1"/></marker>
+          <marker id="arr-yes" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#10b981"/></marker>
+          <marker id="arr-no"  markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#ef4444"/></marker>
+        </defs>
+      </svg>
+      <div id="vb-empty-hint" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;color:var(--ts);pointer-events:none">
+        <div style="font-size:48px;margin-bottom:12px">🎨</div>
+        <div class="f14 fw7">ابدأ ببناء تدفق الـ Chatbot</div>
+        <div class="f12 mt4">اختر تدفقاً من القائمة أو أنشئ جديداً، ثم أضف عقداً من اللوحة اليسرى</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: Properties Panel -->
+  <div id="vb-props">
+    <div class="prop-hd">⚙️ خصائص العقدة</div>
+    <div id="vb-props-body" class="ta ts f12" style="padding-top:20px">اختر عقدة لتعديل خصائصها</div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════════
+let VB = {
+  flowId:    null,
+  nodes:     [],    // [{id, type, x, y, data, next, next_else}]
+  selected:  null,  // node id
+  dragging:  null,  // {id, offX, offY}
+  connecting: null, // {fromId, portType: 'next'|'next_else'}
+};
+
+const VB_COLORS = {
+  start:     '#22c55e', message: '#6366f1', media: '#8b5cf6',
+  buttons:   '#06b6d4', condition: '#f59e0b', input: '#f97316',
+  delay:     '#64748b', jump:    '#0ea5e9', end:   '#ef4444',
+};
+const VB_ICONS = {
+  start:'🟢', message:'💬', media:'🖼️', buttons:'🔘',
+  condition:'🔀', input:'⌨️', delay:'⏱️', jump:'↪️', end:'🔴',
+};
+const VB_LABELS = {
+  start:'بداية', message:'رسالة نصية', media:'وسائط', buttons:'أزرار',
+  condition:'شرط', input:'انتظر رد', delay:'تأخير', jump:'انتقل', end:'إنهاء',
+};
+
+// ═══════════════════════════════════════════════════════════════════
+// FLOWS LIST
+// ═══════════════════════════════════════════════════════════════════
+async function vbRefreshFlowList() {
+  if (!IS_ELECTRON) return;
+  const r = await BE.chatbot.list();
+  const flows = r.data || r || [];
+  const sel = document.getElementById('vb-flow-sel');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">— اختر تدفقاً —</option>' +
+    flows.map(f => `<option value="${f.id}">${f.name}${f.active ? '' : ' (موقف)'}</option>`).join('');
+  if (cur) sel.value = cur;
+}
+
+async function vbNewFlow() {
+  VB.flowId  = null;
+  VB.nodes   = [];
+  VB.selected= null;
+  VB.connecting = null;
+  document.getElementById('vb-flow-sel').value        = '';
+  document.getElementById('vb-flow-name-inp').value   = 'تدفق جديد';
+  document.getElementById('vb-flow-keywords').value   = '';
+  document.getElementById('vb-flow-active').checked   = true;
+  document.getElementById('vb-current-flow-name').textContent = 'تدفق جديد (غير محفوظ)';
+  document.getElementById('vb-empty-hint').style.display = 'block';
+  document.getElementById('vb-status').textContent = 'تدفق جديد';
+  vbRender();
+}
+
+async function vbLoadFlow() {
+  const id = document.getElementById('vb-flow-sel').value;
+  if (!id) { vbNewFlow(); return; }
+  const r = await BE.chatbot.get(id);
+  const flow = r.data || r;
+  if (!flow) { beErr('تعذر تحميل التدفق'); return; }
+  VB.flowId   = flow.id;
+  VB.nodes    = (() => { try { return JSON.parse(flow.nodes_json || '[]'); } catch(_) { return []; } })();
+  VB.selected = null;
+  VB.connecting = null;
+  document.getElementById('vb-flow-name-inp').value   = flow.name || '';
+  document.getElementById('vb-flow-keywords').value   = flow.trigger_keywords || '';
+  document.getElementById('vb-flow-active').checked   = !!flow.active;
+  document.getElementById('vb-current-flow-name').textContent = flow.name;
+  document.getElementById('vb-empty-hint').style.display = VB.nodes.length ? 'none' : 'block';
+  document.getElementById('vb-status').textContent = `${VB.nodes.length} عقدة`;
+  vbRender();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SAVE
+// ═══════════════════════════════════════════════════════════════════
+async function vbSave() {
+  const name = document.getElementById('vb-flow-name-inp').value.trim();
+  if (!name) { beErr('أدخل اسم التدفق'); return; }
+  const payload = {
+    id:               VB.flowId || undefined,
+    name,
+    nodes_json:       JSON.stringify(VB.nodes),
+    trigger_keywords: document.getElementById('vb-flow-keywords').value.trim(),
+    active:           document.getElementById('vb-flow-active').checked ? 1 : 0,
+  };
+  const r = await BE.chatbot.save(payload);
+  if (r.ok) {
+    beOk('تم حفظ التدفق');
+    await vbRefreshFlowList();
+    if (!VB.flowId) {
+      // Find newly created flow
+      const list = await BE.chatbot.list();
+      const flows = list.data || list || [];
+      const newest = flows[0];
+      if (newest) { VB.flowId = newest.id; document.getElementById('vb-flow-sel').value = newest.id; }
+    }
+    document.getElementById('vb-current-flow-name').textContent = name;
+  } else beErr(r.error);
+}
+
+function vbExport() {
+  const json = JSON.stringify({ name: document.getElementById('vb-flow-name-inp').value, nodes: VB.nodes }, null, 2);
+  const blob = new Blob([json], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `chatbot-flow-${Date.now()}.json`;
+  a.click();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ADD NODE
+// ═══════════════════════════════════════════════════════════════════
+function vbAddNode(type) {
+  document.getElementById('vb-empty-hint').style.display = 'none';
+  const canvas = document.getElementById('vb-canvas');
+  const wrap   = document.getElementById('vb-canvas-wrap');
+  // Place at visible center of scroll
+  const cx = wrap.scrollLeft + wrap.clientWidth / 2 - 105;
+  const cy = wrap.scrollTop  + wrap.clientHeight / 2 - 60;
+  const id = 'n' + Date.now();
+  const node = {
+    id, type,
+    x: Math.max(20, cx), y: Math.max(20, cy),
+    data: _defaultData(type),
+    next: null, next_else: null,
+  };
+  VB.nodes.push(node);
+  vbRender();
+  vbSelectNode(id);
+  document.getElementById('vb-status').textContent = `${VB.nodes.length} عقدة`;
+}
+
+function _defaultData(type) {
+  const d = {
+    start:     { },
+    message:   { text: '' },
+    media:     { url: '', caption: '' },
+    buttons:   { text: '', buttons: ['خيار 1', 'خيار 2'] },
+    condition: { match: '', matchType: 'contains' },
+    input:     { save_as: 'user_reply', timeout_sec: 60 },
+    delay:     { seconds: 5 },
+    jump:      { target: '' },
+    end:       { },
+  };
+  return d[type] || {};
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════════════════════════════════
+function vbRender() {
+  const canvas = document.getElementById('vb-canvas');
+  // Remove old nodes (keep SVG)
+  canvas.querySelectorAll('.vb-node').forEach(el => el.remove());
+
+  VB.nodes.forEach(node => {
+    const el = document.createElement('div');
+    el.className = 'vb-node' + (VB.selected === node.id ? ' selected' : '');
+    el.id = 'vb-node-' + node.id;
+    el.style.left = node.x + 'px';
+    el.style.top  = node.y + 'px';
+    el.style.borderColor = VB.selected === node.id ? VB_COLORS[node.type] : 'transparent';
+
+    const hasOut  = !['end'].includes(node.type);
+    const hasElse = node.type === 'condition';
+
+    el.innerHTML = `
+      <button class="vb-node-del" onclick="vbDeleteNode('${node.id}')">×</button>
+      <div class="vb-node-hd" style="background:${VB_COLORS[node.type]}">
+        ${VB_ICONS[node.type]} ${VB_LABELS[node.type]}
+      </div>
+      <div class="vb-node-body">${_nodePreview(node)}</div>
+      <div class="vb-ports">
+        <div class="vb-port-label"><div class="vb-port vb-port-in" title="مدخل" onclick="vbPortClick(event,'${node.id}','in')"></div></div>
+        <div class="flex gap8">
+          ${hasElse ? `<div class="vb-port-label"><span style="color:#ef4444;font-size:9px">لا</span> <div class="vb-port vb-port-else" title="مخرج: لا" onclick="vbPortClick(event,'${node.id}','next_else')"></div></div>` : ''}
+          ${hasOut  ? `<div class="vb-port-label">${hasElse?'<span style="color:#10b981;font-size:9px">نعم</span> ':''}<div class="vb-port vb-port-out" title="مخرج" onclick="vbPortClick(event,'${node.id}','next')"></div></div>` : ''}
+        </div>
+      </div>`;
+
+    // Drag
+    el.querySelector('.vb-node-hd').addEventListener('mousedown', (e) => { e.preventDefault(); vbStartDrag(e, node.id); });
+    el.addEventListener('click', (e) => {
+      if (VB.connecting && e.target.closest('.vb-node') && !e.target.closest('.vb-port') && !e.target.closest('.vb-node-del')) {
+        vbConnect(node.id);
+      } else if (!e.target.closest('.vb-port') && !e.target.closest('.vb-node-del')) {
+        vbSelectNode(node.id);
+      }
+    });
+
+    canvas.appendChild(el);
+  });
+
+  vbRenderEdges();
+}
+
+function _nodePreview(node) {
+  const d = node.data || {};
+  const next = node.next ? `<div class="mt4" style="color:#10b981;font-size:9px">→ ${_shortId(node.next)}</div>` : '';
+  const ne   = node.next_else ? `<div style="color:#ef4444;font-size:9px">✗ → ${_shortId(node.next_else)}</div>` : '';
+  switch(node.type) {
+    case 'start':     return `<span>كلمات مفتاحية تُطلق هذا التدفق</span>${next}`;
+    case 'message':   return `<div class="nb-val">${_trunc(d.text || 'لم يُحدد نص...')}</div>${next}`;
+    case 'media':     return `<div class="nb-val">${_trunc(d.url || 'رابط الوسائط...')}</div>${d.caption?`<div>${_trunc(d.caption)}</div>`:''}${next}`;
+    case 'buttons':   return `<div class="nb-val">${_trunc(d.text||'...')}</div><div style="color:#06b6d4">${(d.buttons||[]).join(' | ')}</div>${next}`;
+    case 'condition': return `<div>إذا كان الرد يحتوي على:</div><div class="nb-val">"${_trunc(d.match||'...')}"</div>${next}${ne}`;
+    case 'input':     return `<div>انتظر رد وحفظه في: <span class="nb-val">${d.save_as||'user_reply'}</span></div><div>مهلة: ${d.timeout_sec||60}ث</div>${next}`;
+    case 'delay':     return `<div>انتظر <span class="nb-val">${d.seconds||5}</span> ثانية</div>${next}`;
+    case 'jump':      return `<div>انتقل إلى: <span class="nb-val">${d.target ? _shortId(d.target) : '...'}</span></div>`;
+    case 'end':       return `<span>إنهاء التدفق</span>`;
+    default:          return JSON.stringify(d);
+  }
+}
+function _trunc(s, n=40) { return String(s||'').length>n ? String(s).slice(0,n)+'…' : String(s); }
+function _shortId(id) { return id ? id.slice(0,8)+'…' : ''; }
+
+// ═══════════════════════════════════════════════════════════════════
+// EDGES (SVG arrows)
+// ═══════════════════════════════════════════════════════════════════
+function vbRenderEdges() {
+  const svg = document.getElementById('vb-svg');
+  svg.querySelectorAll('path,line').forEach(e => e.remove());
+
+  VB.nodes.forEach(node => {
+    if (node.next)      vbDrawArrow(svg, node, node.next,      '#6366f1', 'arr-def', 'next');
+    if (node.next_else) vbDrawArrow(svg, node, node.next_else, '#ef4444', 'arr-no',  'else');
+  });
+}
+
+function vbDrawArrow(svg, fromNode, toId, color, marker, portType) {
+  const toNode = VB.nodes.find(n => n.id === toId);
+  if (!toNode) return;
+  const NODE_W = 210, NODE_H = 100;
+  // From: right side of from node (output port)
+  const x1 = fromNode.x + (portType === 'else' ? NODE_W * 0.35 : NODE_W * 0.85);
+  const y1 = fromNode.y + NODE_H;
+  // To: top center of to node (input port)
+  const x2 = toNode.x + NODE_W / 2;
+  const y2 = toNode.y;
+
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  const cy1  = y1 + Math.abs(y2 - y1) * 0.5;
+  const cy2  = y2 - Math.abs(y2 - y1) * 0.5;
+  path.setAttribute('d', `M${x1},${y1} C${x1},${cy1} ${x2},${cy2} ${x2},${y2}`);
+  path.setAttribute('stroke', color);
+  path.setAttribute('stroke-width', '2');
+  path.setAttribute('fill', 'none');
+  path.setAttribute('marker-end', `url(#${marker})`);
+  path.setAttribute('opacity', '0.8');
+  svg.appendChild(path);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// DRAG
+// ═══════════════════════════════════════════════════════════════════
+function vbStartDrag(e, id) {
+  if (VB.connecting) return;
+  const node = VB.nodes.find(n => n.id === id);
+  if (!node) return;
+  const rect = document.getElementById('vb-canvas').getBoundingClientRect();
+  VB.dragging = { id, offX: e.clientX - rect.left - node.x, offY: e.clientY - rect.top - node.y };
+  vbSelectNode(id);
+}
+
+document.addEventListener('mousemove', (e) => {
+  if (!VB.dragging) return;
+  const canvas = document.getElementById('vb-canvas');
+  if (!canvas) return;
+  const rect = canvas.getBoundingClientRect();
+  const node = VB.nodes.find(n => n.id === VB.dragging.id);
+  if (!node) return;
+  node.x = Math.max(0, e.clientX - rect.left - VB.dragging.offX);
+  node.y = Math.max(0, e.clientY - rect.top  - VB.dragging.offY);
+  const el = document.getElementById('vb-node-' + node.id);
+  if (el) { el.style.left = node.x + 'px'; el.style.top = node.y + 'px'; }
+  vbRenderEdges();
+});
+
+document.addEventListener('mouseup', () => { VB.dragging = null; });
+
+// ═══════════════════════════════════════════════════════════════════
+// CONNECT
+// ═══════════════════════════════════════════════════════════════════
+function vbPortClick(e, id, portType) {
+  e.stopPropagation();
+  if (portType === 'in') {
+    if (VB.connecting) { vbConnect(id); }
+    return;
+  }
+  // Output port clicked — start connecting
+  VB.connecting = { fromId: id, portType };
+  document.getElementById('vb-cancel-connect').style.display = 'block';
+  document.getElementById('vb-canvas-wrap').style.cursor = 'crosshair';
+  document.getElementById('vb-status').textContent = 'انقر على عقدة أخرى للربط... أو اضغط ESC للإلغاء';
+}
+
+function vbConnect(toId) {
+  if (!VB.connecting) return;
+  const { fromId, portType } = VB.connecting;
+  if (fromId === toId) { vbCancelConnect(); return; }
+  const fromNode = VB.nodes.find(n => n.id === fromId);
+  if (fromNode) { fromNode[portType] = toId; }
+  vbCancelConnect();
+  vbRender();
+}
+
+function vbCancelConnect() {
+  VB.connecting = null;
+  document.getElementById('vb-cancel-connect').style.display = 'none';
+  document.getElementById('vb-canvas-wrap').style.cursor = '';
+  document.getElementById('vb-status').textContent = `${VB.nodes.length} عقدة`;
+}
+
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') vbCancelConnect(); });
+
+// ═══════════════════════════════════════════════════════════════════
+// SELECT NODE → show props panel
+// ═══════════════════════════════════════════════════════════════════
+function vbSelectNode(id) {
+  VB.selected = id;
+  // Update border
+  document.querySelectorAll('.vb-node').forEach(el => {
+    el.classList.remove('selected');
+    el.style.borderColor = 'transparent';
+  });
+  const node = VB.nodes.find(n => n.id === id);
+  if (node) {
+    const el = document.getElementById('vb-node-' + id);
+    if (el) { el.classList.add('selected'); el.style.borderColor = VB_COLORS[node.type]; }
+    vbShowProps(node);
+  }
+}
+
+function vbShowProps(node) {
+  const d = node.data || {};
+  const inputs = _propsHTML(node.type, d, node);
+  document.getElementById('vb-props-body').innerHTML = `
+    <div class="mb10" style="padding:6px 10px;background:${VB_COLORS[node.type]}20;border-radius:6px;border-right:3px solid ${VB_COLORS[node.type]}">
+      <div class="fw7 f12">${VB_ICONS[node.type]} ${VB_LABELS[node.type]}</div>
+      <div class="f11 ts">${node.id}</div>
+    </div>
+    <div id="vb-props-inputs">${inputs}</div>
+    <button class="btn bp w100 mt12 bsm" onclick="vbApplyProps('${node.id}')">✓ تطبيق التغييرات</button>
+    <button class="btn w100 mt6 bsm" style="background:#ef444420;color:#ef4444" onclick="vbDeleteNode('${node.id}')">🗑️ حذف هذه العقدة</button>
+    <hr style="border-color:var(--bdr);margin:12px 0">
+    <div class="f11 fw7 mb6 ts">ربط المخرجات</div>
+    <div class="f11 ts mb4">المخرج الرئيسي (next):</div>
+    <select class="inp w100 mb8" id="prop-next" style="font-size:11px">
+      <option value="">— لا يوجد —</option>
+      ${VB.nodes.filter(n=>n.id!==node.id).map(n=>`<option value="${n.id}" ${node.next===n.id?'selected':''}>${VB_ICONS[n.type]} ${n.id.slice(0,8)} — ${VB_LABELS[n.type]}</option>`).join('')}
+    </select>
+    ${node.type==='condition' ? `<div class="f11 ts mb4">المخرج عند عدم التطابق (else):</div>
+    <select class="inp w100 mb8" id="prop-next-else" style="font-size:11px">
+      <option value="">— لا يوجد —</option>
+      ${VB.nodes.filter(n=>n.id!==node.id).map(n=>`<option value="${n.id}" ${node.next_else===n.id?'selected':''}>${VB_ICONS[n.type]} ${n.id.slice(0,8)} — ${VB_LABELS[n.type]}</option>`).join('')}
+    </select>` : ''}
+    <button class="btn bp w100 bsm" onclick="vbApplyConnections('${node.id}')">ربط</button>
+  `;
+}
+
+function _propsHTML(type, d, node) {
+  switch(type) {
+    case 'start':
+      return `<div class="f11 ts mb4">يُطلَق التدفق عند تطابق الكلمات المفتاحية المذكورة في أعلى الصفحة</div>`;
+    case 'message':
+      return `<label class="lbl">نص الرسالة</label><textarea id="prop-text" class="inp w100" rows="5">${d.text||''}</textarea>
+      <div class="f11 ts mt6">يمكن استخدام: <b>{name}</b> (اسم العميل)</div>`;
+    case 'media':
+      return `<label class="lbl">رابط الصورة/الملف</label><input id="prop-url" class="inp w100 mb8" value="${d.url||''}">
+      <label class="lbl">تعليق (اختياري)</label><textarea id="prop-caption" class="inp w100" rows="3">${d.caption||''}</textarea>`;
+    case 'buttons':
+      return `<label class="lbl">نص السؤال</label><textarea id="prop-text" class="inp w100 mb8" rows="3">${d.text||''}</textarea>
+      <label class="lbl">الأزرار (كل زر في سطر)</label>
+      <textarea id="prop-buttons" class="inp w100" rows="4">${(d.buttons||[]).join('\n')}</textarea>`;
+    case 'condition':
+      return `<label class="lbl">نمط التطابق (Regex أو نص)</label><input id="prop-match" class="inp w100 mb8" value="${d.match||''}">
+      <label class="lbl">نوع التطابق</label>
+      <select id="prop-matchType" class="inp w100">
+        <option value="contains" ${d.matchType==='contains'?'selected':''}>يحتوي على</option>
+        <option value="exact"    ${d.matchType==='exact'?'selected':''}>مطابقة تامة</option>
+        <option value="regex"    ${d.matchType==='regex'?'selected':''}>Regex</option>
+      </select>`;
+    case 'input':
+      return `<label class="lbl">احفظ الرد في متغير</label><input id="prop-save-as" class="inp w100 mb8" value="${d.save_as||'user_reply'}">
+      <label class="lbl">مهلة الانتظار (ثانية)</label><input id="prop-timeout" class="inp w100" type="number" value="${d.timeout_sec||60}">`;
+    case 'delay':
+      return `<label class="lbl">عدد الثواني</label><input id="prop-seconds" class="inp w100" type="number" min="1" value="${d.seconds||5}">`;
+    case 'jump':
+      return `<label class="lbl">اذهب إلى عقدة</label>
+      <select id="prop-target" class="inp w100">
+        <option value="">— اختر —</option>
+        ${VB.nodes.filter(n=>n.id!==node.id).map(n=>`<option value="${n.id}" ${d.target===n.id?'selected':''}>${VB_ICONS[n.type]} ${n.id.slice(0,8)} — ${VB_LABELS[n.type]}</option>`).join('')}
+      </select>`;
+    case 'end':
+      return `<div class="ta ts f12 py12">🔴 إنهاء التدفق — لا توجد خصائص</div>`;
+    default: return '';
+  }
+}
+
+function vbApplyProps(id) {
+  const node = VB.nodes.find(n => n.id === id);
+  if (!node) return;
+  const d = {};
+  switch(node.type) {
+    case 'message':   d.text = document.getElementById('prop-text')?.value || ''; break;
+    case 'media':     d.url  = document.getElementById('prop-url')?.value||''; d.caption = document.getElementById('prop-caption')?.value||''; break;
+    case 'buttons':   d.text = document.getElementById('prop-text')?.value||''; d.buttons = (document.getElementById('prop-buttons')?.value||'').split('\n').map(s=>s.trim()).filter(Boolean); break;
+    case 'condition': d.match = document.getElementById('prop-match')?.value||''; d.matchType = document.getElementById('prop-matchType')?.value||'contains'; break;
+    case 'input':     d.save_as = document.getElementById('prop-save-as')?.value||'user_reply'; d.timeout_sec = parseInt(document.getElementById('prop-timeout')?.value)||60; break;
+    case 'delay':     d.seconds = parseInt(document.getElementById('prop-seconds')?.value)||5; break;
+    case 'jump':      d.target = document.getElementById('prop-target')?.value||''; break;
+  }
+  node.data = d;
+  vbRender();
+  vbSelectNode(id);
+  beOk('تم تطبيق التغييرات');
+}
+
+function vbApplyConnections(id) {
+  const node = VB.nodes.find(n => n.id === id);
+  if (!node) return;
+  node.next      = document.getElementById('prop-next')?.value || null;
+  if (node.type === 'condition') node.next_else = document.getElementById('prop-next-else')?.value || null;
+  vbRender();
+  vbSelectNode(id);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// DELETE
+// ═══════════════════════════════════════════════════════════════════
+function vbDeleteNode(id) {
+  if (!confirm('هل تريد حذف هذه العقدة؟')) return;
+  VB.nodes = VB.nodes.filter(n => n.id !== id);
+  // Clean up references
+  VB.nodes.forEach(n => {
+    if (n.next      === id) n.next      = null;
+    if (n.next_else === id) n.next_else = null;
+    if (n.data?.target === id) n.data.target = '';
+  });
+  if (VB.selected === id) {
+    VB.selected = null;
+    document.getElementById('vb-props-body').innerHTML = '<div class="ta ts f12 py20">اختر عقدة لتعديل خصائصها</div>';
+  }
+  document.getElementById('vb-status').textContent = `${VB.nodes.length} عقدة`;
+  if (!VB.nodes.length) document.getElementById('vb-empty-hint').style.display = 'block';
+  vbRender();
+}
+
+function vbClearCanvas() {
+  if (!confirm('هل تريد مسح جميع العقد في هذا التدفق؟')) return;
+  VB.nodes = [];
+  VB.selected = null;
+  document.getElementById('vb-status').textContent = '0 عقدة';
+  document.getElementById('vb-empty-hint').style.display = 'block';
+  document.getElementById('vb-props-body').innerHTML = '<div class="ta ts f12 py20">اختر عقدة لتعديل خصائصها</div>';
+  vbRender();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// BOOT
+// ═══════════════════════════════════════════════════════════════════
+window.addEventListener('page:chatbot-builder', async () => {
+  await vbRefreshFlowList();
+  vbRender();
+});
+</script>

@@ -91,6 +91,11 @@ function register(ctx) {
   });
 
   // ── VARIANTS ───────────────────────────────────────────────────────────────
+  handle('ec:variants:list', (productId) => {
+    const rows = db._db.prepare('SELECT * FROM ec_product_variants WHERE product_id=? AND is_active=1 ORDER BY rowid').all(productId);
+    return { ok: true, data: rows };
+  });
+
   handle('ec:variants:save', (data) => {
     const row = { product_id: data.product_id, name: data.name, options: jObj(data.options), price: data.price ? parseFloat(data.price) : null, stock_quantity: parseInt(data.stock_quantity)||0, sku: data.sku||null, image_url: data.image_url||null, is_active: 1 };
     if (data.id) { db.ecVariantUpdate(data.id, row); return { id: data.id }; }

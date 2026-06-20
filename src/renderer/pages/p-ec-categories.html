@@ -1,0 +1,135 @@
+<!-- E-Commerce Categories -->
+<div class="page-hd">
+  <div>
+    <h1 class="page-tt">🗂️ الفئات</h1>
+    <p class="page-st" id="ec-cat-count">—</p>
+  </div>
+  <button class="btn bp" onclick="ecCatOpenForm()">+ فئة جديدة</button>
+</div>
+
+<div class="card">
+  <div id="ec-cat-table"><div class="ta ts f12 py20">جارٍ التحميل...</div></div>
+</div>
+
+<!-- Category Form Modal -->
+<div class="modal" id="m-ec-cat" style="display:none">
+  <div class="modal-box" style="max-width:480px">
+    <div class="modal-hd"><span id="ec-cat-form-title">فئة جديدة</span><button class="btn-x" onclick="closeM('m-ec-cat')">×</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="ec-cat-id">
+      <div style="display:grid;grid-template-columns:1fr;gap:12px">
+        <div><label class="lbl">اسم الفئة *</label><input id="ec-cat-name" class="inp w100" placeholder="مثال: ملابس رجالية"></div>
+        <div><label class="lbl">الفئة الأم</label>
+          <select id="ec-cat-parent" class="inp w100">
+            <option value="">بدون — فئة رئيسية</option>
+          </select>
+        </div>
+        <div><label class="lbl">الوصف</label><textarea id="ec-cat-desc" class="inp w100" rows="2" placeholder="وصف الفئة..."></textarea></div>
+        <div><label class="lbl">رابط الصورة</label><input id="ec-cat-img" class="inp w100" placeholder="https://..."></div>
+        <div><label class="lbl">الترتيب</label><input id="ec-cat-order" class="inp w100" type="number" min="0" placeholder="0"></div>
+        <div class="flex ic gap8"><input type="checkbox" id="ec-cat-active" checked><label for="ec-cat-active">فئة نشطة</label></div>
+      </div>
+    </div>
+    <div class="modal-ft flex gap8 jb">
+      <button class="btn bo" onclick="closeM('m-ec-cat')">إلغاء</button>
+      <button class="btn bp" onclick="ecCatSave()">حفظ الفئة</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let _ecCatData = [];
+
+async function ecCatLoad() {
+  if (!IS_ELECTRON) return;
+  try {
+    const r = await BE.ec.categories.list();
+    _ecCatData = r.data || [];
+    document.getElementById('ec-cat-count').textContent = `${_ecCatData.length} فئة`;
+    if (!_ecCatData.length) {
+      document.getElementById('ec-cat-table').innerHTML = '<div class="ta ts f12 py20">لا توجد فئات — أضف فئة جديدة</div>';
+      return;
+    }
+    // Build tree: roots first then children
+    const roots    = _ecCatData.filter(c => !c.parent_id);
+    const children = _ecCatData.filter(c =>  c.parent_id);
+    const rows = [];
+    for (const root of roots) {
+      rows.push(_ecCatRow(root, false));
+      children.filter(c => c.parent_id === root.id).forEach(c => rows.push(_ecCatRow(c, true)));
+    }
+    document.getElementById('ec-cat-table').innerHTML =
+      `<table class="tbl"><thead><tr><th>الفئة</th><th>الفئة الأم</th><th>المنتجات</th><th>الترتيب</th><th>الحالة</th><th></th></tr></thead><tbody>${rows.join('')}</tbody></table>`;
+  } catch(e) { console.error('[EC-Cat]', e); }
+}
+
+function _ecCatRow(c, isChild) {
+  const parent = isChild ? (_ecCatData.find(x => x.id === c.parent_id)?.name || '—') : '—';
+  return `<tr>
+    <td><div class="${isChild ? 'ts' : 'fw7'}" style="${isChild ? 'padding-right:20px' : ''}">${isChild ? '↳ ' : ''}${c.name}</div>${c.description ? `<div class="f11 ts">${c.description}</div>` : ''}</td>
+    <td class="f12 ts">${isChild ? parent : '<span class="fw7">رئيسية</span>'}</td>
+    <td class="ta ts">${c.products_count || 0}</td>
+    <td class="ta ts">${c.sort_order || 0}</td>
+    <td><span class="bge f11" style="background:${c.is_active ? '#10b98120' : '#6b728020'};color:${c.is_active ? '#10b981' : '#6b7280'}">${c.is_active ? 'نشطة' : 'موقفة'}</span></td>
+    <td class="flex gap4">
+      <button class="btn bo bsm" onclick="ecCatOpenForm('${c.id}')">تعديل</button>
+      <button class="btn bsm" style="background:#ef444420;color:#ef4444" onclick="ecCatDelete('${c.id}','${c.name.replace(/'/g,'')}')">حذف</button>
+    </td>
+  </tr>`;
+}
+
+function ecCatOpenForm(id) {
+  // Populate parent options
+  const parentOpts = '<option value="">بدون — فئة رئيسية</option>' +
+    _ecCatData.filter(c => !c.parent_id && c.id !== id).map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+  document.getElementById('ec-cat-parent').innerHTML = parentOpts;
+
+  if (id) {
+    const c = _ecCatData.find(x => x.id === id);
+    if (!c) { beErr('تعذر تحميل الفئة'); return; }
+    document.getElementById('ec-cat-form-title').textContent = 'تعديل الفئة';
+    document.getElementById('ec-cat-id').value      = c.id;
+    document.getElementById('ec-cat-name').value    = c.name || '';
+    document.getElementById('ec-cat-parent').value  = c.parent_id || '';
+    document.getElementById('ec-cat-desc').value    = c.description || '';
+    document.getElementById('ec-cat-img').value     = c.image_url || '';
+    document.getElementById('ec-cat-order').value   = c.sort_order || 0;
+    document.getElementById('ec-cat-active').checked= !!c.is_active;
+  } else {
+    document.getElementById('ec-cat-form-title').textContent = 'فئة جديدة';
+    ['ec-cat-id','ec-cat-name','ec-cat-desc','ec-cat-img'].forEach(i => { document.getElementById(i).value = ''; });
+    document.getElementById('ec-cat-order').value   = 0;
+    document.getElementById('ec-cat-parent').value  = '';
+    document.getElementById('ec-cat-active').checked= true;
+  }
+  openM('m-ec-cat');
+}
+
+async function ecCatSave() {
+  const id   = document.getElementById('ec-cat-id').value;
+  const name = document.getElementById('ec-cat-name').value.trim();
+  if (!name) { beErr('أدخل اسم الفئة'); return; }
+  const data = {
+    id:          id || undefined,
+    name,
+    parent_id:   document.getElementById('ec-cat-parent').value  || null,
+    description: document.getElementById('ec-cat-desc').value.trim() || null,
+    image_url:   document.getElementById('ec-cat-img').value.trim()  || null,
+    sort_order:  parseInt(document.getElementById('ec-cat-order').value) || 0,
+    is_active:   document.getElementById('ec-cat-active').checked,
+  };
+  // preload: BE.ec.categories.save(data)
+  const r = await BE.ec.categories.save(data);
+  if (r.ok) { beOk(id ? 'تم تحديث الفئة' : 'تم إضافة الفئة'); closeM('m-ec-cat'); ecCatLoad(); }
+  else beErr(r.error);
+}
+
+async function ecCatDelete(id, name) {
+  if (!confirm(`هل تريد حذف الفئة: ${name}؟`)) return;
+  const r = await BE.ec.categories.delete(id);
+  if (r.ok) { beOk('تم حذف الفئة'); ecCatLoad(); }
+  else beErr(r.error);
+}
+
+window.addEventListener('page:ec-categories', () => ecCatLoad());
+</script>

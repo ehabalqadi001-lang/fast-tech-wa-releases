@@ -43,6 +43,31 @@
         <div class="span2"><label class="lbl">رابط الصورة</label><input id="ec-prod-img" class="inp w100" placeholder="https://..."></div>
         <div class="span2"><label class="lbl">الكلمات المفتاحية (مفصولة بفواصل)</label><input id="ec-prod-tags" class="inp w100" placeholder="قميص, ملابس, رجالي"></div>
       </div>
+      <!-- Variants Section (shown only when editing existing product) -->
+      <div id="ec-prod-variants-wrap" style="display:none;margin-top:16px;border-top:1px solid var(--bdr);padding-top:14px">
+        <div class="flex jb ic mb10">
+          <div class="fw7 f13">🔀 المتغيرات (مقاسات / ألوان...)</div>
+          <button class="btn bp bsm" onclick="ecVariantOpenForm()">+ إضافة متغير</button>
+        </div>
+        <div id="ec-prod-variants-list" class="f12 ts ta">لا توجد متغيرات</div>
+        <!-- Variant mini form -->
+        <div id="ec-variant-form" style="display:none;background:var(--bg2);border-radius:8px;padding:12px;margin-top:10px">
+          <input type="hidden" id="vr-id">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">
+            <div><label class="lbl f11">الاسم *</label><input id="vr-name" class="inp w100" placeholder="M / أحمر"></div>
+            <div><label class="lbl f11">السعر (اتركه فارغاً للأساسي)</label><input id="vr-price" class="inp w100" type="number" min="0" step="0.01" placeholder="—"></div>
+            <div><label class="lbl f11">المخزون</label><input id="vr-stock" class="inp w100" type="number" min="0" placeholder="0"></div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+            <div><label class="lbl f11">SKU</label><input id="vr-sku" class="inp w100" placeholder="—"></div>
+            <div><label class="lbl f11">الخصائص (JSON اختياري)</label><input id="vr-options" class="inp w100" placeholder='{"size":"M","color":"red"}'></div>
+          </div>
+          <div class="flex gap8">
+            <button class="btn bp bsm" onclick="ecVariantSave()">حفظ المتغير</button>
+            <button class="btn bo bsm" onclick="document.getElementById('ec-variant-form').style.display='none'">إلغاء</button>
+          </div>
+        </div>
+      </div>
     </div>
     <div class="modal-ft flex gap8 jb">
       <button class="btn bo" onclick="closeM('m-ec-prod')">إلغاء</button>
@@ -103,8 +128,74 @@ async function ecProdOpenForm(id) {
     document.getElementById('ec-prod-active').checked  = true;
     document.getElementById('ec-prod-featured').checked= false;
     document.getElementById('ec-prod-cat-sel').value   = '';
+    document.getElementById('ec-prod-variants-wrap').style.display = 'none';
+    _ecVariantProdId = null; _ecVariants = [];
   }
   openM('m-ec-prod');
+  if (id) await ecVariantLoadList(id);
+}
+
+// ── Variants ─────────────────────────────────────────────────────────────────
+let _ecVariantProdId = null;
+let _ecVariants = [];
+
+async function ecVariantLoadList(productId) {
+  _ecVariantProdId = productId;
+  document.getElementById('ec-prod-variants-wrap').style.display = 'block';
+  const r = await BE.ec.variants.list(productId);
+  _ecVariants = (r.data || []);
+  const listEl = document.getElementById('ec-prod-variants-list');
+  if (!_ecVariants.length) { listEl.innerHTML = '<div class="ta ts f12 py8">لا توجد متغيرات بعد</div>'; return; }
+  listEl.innerHTML = `<table class="tbl" style="font-size:11px"><thead><tr><th>الاسم</th><th>السعر</th><th>المخزون</th><th>SKU</th><th></th></tr></thead><tbody>
+    ${_ecVariants.map(v=>`<tr><td class="fw7">${v.name}</td><td>${v.price!=null ? v.price+' ج.م' : '(أساسي)'}</td><td>${v.stock_quantity||0}</td><td class="ts">${v.sku||'—'}</td>
+    <td class="flex gap4"><button class="btn bo bsm" onclick="ecVariantOpenForm('${v.id}')">تعديل</button><button class="btn bsm" style="background:#ef444420;color:#ef4444" onclick="ecVariantDelete('${v.id}')">حذف</button></td></tr>`).join('')}
+  </tbody></table>`;
+}
+
+function ecVariantOpenForm(id) {
+  const form = document.getElementById('ec-variant-form');
+  form.style.display = 'block';
+  if (id) {
+    const v = _ecVariants.find(x => x.id === id);
+    if (!v) return;
+    document.getElementById('vr-id').value      = v.id;
+    document.getElementById('vr-name').value    = v.name || '';
+    document.getElementById('vr-price').value   = v.price != null ? v.price : '';
+    document.getElementById('vr-stock').value   = v.stock_quantity || 0;
+    document.getElementById('vr-sku').value     = v.sku || '';
+    document.getElementById('vr-options').value = v.options ? (typeof v.options === 'string' ? v.options : JSON.stringify(v.options)) : '';
+  } else {
+    ['vr-id','vr-name','vr-price','vr-stock','vr-sku','vr-options'].forEach(i => { document.getElementById(i).value = ''; });
+  }
+}
+
+async function ecVariantSave() {
+  const name = document.getElementById('vr-name').value.trim();
+  if (!name) { beErr('أدخل اسم المتغير'); return; }
+  if (!_ecVariantProdId) { beErr('احفظ المنتج أولاً'); return; }
+  const priceVal = document.getElementById('vr-price').value;
+  const data = {
+    id:             document.getElementById('vr-id').value || undefined,
+    product_id:     _ecVariantProdId,
+    name,
+    price:          priceVal !== '' ? parseFloat(priceVal) : null,
+    stock_quantity: parseInt(document.getElementById('vr-stock').value) || 0,
+    sku:            document.getElementById('vr-sku').value.trim() || null,
+    options:        document.getElementById('vr-options').value.trim() || null,
+  };
+  const r = await BE.ec.variants.save(data);
+  if (r.id || r.ok) {
+    beOk('تم حفظ المتغير');
+    document.getElementById('ec-variant-form').style.display = 'none';
+    await ecVariantLoadList(_ecVariantProdId);
+  } else beErr(r.error || 'خطأ في الحفظ');
+}
+
+async function ecVariantDelete(id) {
+  if (!confirm('هل تريد حذف هذا المتغير؟')) return;
+  const r = await BE.ec.variants.delete(id);
+  if (r.ok) { beOk('تم الحذف'); await ecVariantLoadList(_ecVariantProdId); }
+  else beErr(r.error);
 }
 
 async function ecProdSave() {
