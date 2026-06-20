@@ -198,6 +198,13 @@ textarea.fc{resize:vertical;min-height:90px}
 /* MODAL */
 .mo{position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9000;display:none;align-items:center;justify-content:center}
 .mo.open{display:flex}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9000;display:none;align-items:center;justify-content:center}
+.modal.open{display:flex}
+.modal-box{background:var(--card);border:1px solid var(--border-h);border-radius:14px;width:90%;max-width:600px;box-shadow:0 20px 60px rgba(0,0,0,0.6);overflow:hidden;max-height:90vh;display:flex;flex-direction:column}
+.modal-hd{padding:16px 20px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;font-weight:700;font-size:15px;flex-shrink:0}
+.modal-body{padding:20px;overflow-y:auto;flex:1}
+.modal-ft{padding:14px 20px;border-top:1px solid var(--bdr);display:flex;justify-content:flex-end;gap:8px;flex-shrink:0}
+.btn-x{background:none;border:none;color:var(--ts);font-size:20px;cursor:pointer;line-height:1;padding:0 4px;transition:color .15s}.btn-x:hover{color:var(--tx)}
 .md{background:var(--card);border:1px solid var(--border-h);border-radius:14px;padding:28px;width:90%;max-width:500px;box-shadow:0 20px 60px rgba(0,0,0,0.6)}
 .md-tt{font-size:16px;font-weight:700;color:var(--tx);margin-bottom:4px}
 .md-st{font-size:12px;color:var(--ts);margin-bottom:22px}

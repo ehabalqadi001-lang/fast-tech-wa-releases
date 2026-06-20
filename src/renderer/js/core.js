@@ -23,6 +23,14 @@ async function nav(page) {
   const main = document.getElementById('main');
   main.innerHTML = window._pgCache[page];
 
+  // Execute <script> tags inside injected HTML (innerHTML skips them)
+  main.querySelectorAll('script').forEach(old => {
+    const s = document.createElement('script');
+    s.textContent = old.textContent;
+    document.head.appendChild(s);
+    document.head.removeChild(s);
+  });
+
   // Show the injected page (CSS default is display:none, .on = display:block)
   document.getElementById('p-' + page)?.classList.add('on');
 
@@ -114,8 +122,18 @@ function setT(theme, el) {
 }
 
 // ── MODALS ──
-function openM(id) { document.getElementById(id).classList.add('open'); }
-function closeM(id) { document.getElementById(id).classList.remove('open'); }
+function openM(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.style.removeProperty('display');
+  el.classList.add('open');
+}
+function closeM(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.remove('open');
+  if (el.classList.contains('modal')) el.style.display = 'none';
+}
 document.querySelectorAll('.mo').forEach(m => m.addEventListener('click', function(e) {
   if (e.target === this) this.classList.remove('open');
 }));
