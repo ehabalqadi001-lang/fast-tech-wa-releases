@@ -56,6 +56,9 @@ async function nav(page) {
   if (fn) fn();
 }
 
+// Alias used by Marketing Pro pages
+window.navigate = nav;
+
 function startDashAutoRefresh() {
   stopDashAutoRefresh();
   _dashRefreshTimer = setTimeout(() => {

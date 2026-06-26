@@ -1,0 +1,67 @@
+<div class="pg-hdr">
+  <div>
+    <h1 class="f18 fw7">📣 Marketing Pro — لوحة التحكم</h1>
+    <p class="ts f12">نظرة عامة على نشاط التسويق عبر وسائل التواصل الاجتماعي</p>
+  </div>
+  <div class="flex gap8">
+    <button class="btn bp bsm" onclick="nav('mp-campaigns')">🚀 حملة جديدة</button>
+    <button class="btn bo bsm" onclick="nav('mp-extractor')">🔍 استخراج</button>
+  </div>
+</div>
+
+<!-- Stats Grid -->
+<div id="mp-stats-grid" class="g4 mb20" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr))">
+  <div class="card p14 tc"><div class="f22 fw7 c-acc" id="mp-stat-accounts">—</div><div class="f11 ts mt4">حسابات نشطة</div></div>
+  <div class="card p14 tc"><div class="f22 fw7" style="color:#10b981" id="mp-stat-campaigns">—</div><div class="f11 ts mt4">حملات تعمل</div></div>
+  <div class="card p14 tc"><div class="f22 fw7" style="color:#f59e0b" id="mp-stat-leads-today">—</div><div class="f11 ts mt4">عملاء اليوم</div></div>
+  <div class="card p14 tc"><div class="f22 fw7" style="color:#8b5cf6" id="mp-stat-posts-today">—</div><div class="f11 ts mt4">منشورات اليوم</div></div>
+  <div class="card p14 tc"><div class="f22 fw7" style="color:#ef4444" id="mp-stat-mentions">—</div><div class="f11 ts mt4">حملات إشارة</div></div>
+  <div class="card p14 tc"><div class="f22 fw7" style="color:#06b6d4" id="mp-stat-leads-total">—</div><div class="f11 ts mt4">إجمالي العملاء</div></div>
+</div>
+
+<!-- Quick Actions -->
+<div class="card mb20 p16">
+  <div class="f13 fw6 mb12">⚡ إجراءات سريعة</div>
+  <div class="flex gap8" style="flex-wrap:wrap">
+    <button class="btn bo bsm" onclick="nav('mp-accounts')">👤 إضافة حساب</button>
+    <button class="btn bo bsm" onclick="nav('mp-extractor')">🔍 استخراج أعضاء</button>
+    <button class="btn bo bsm" onclick="nav('mp-campaigns')">📢 حملة نشر</button>
+    <button class="btn bo bsm" onclick="nav('mp-groups')">👥 نشر في مجموعات</button>
+    <button class="btn bo bsm" onclick="nav('mp-mention')">📌 حملة إشارة</button>
+    <button class="btn bo bsm" onclick="nav('mp-broadcast')">📨 رسائل جماعية</button>
+  </div>
+</div>
+
+<!-- Activity Feed -->
+<div class="card p16">
+  <div class="f13 fw6 mb12">📋 سجل النشاط الأخير</div>
+  <div id="mp-activity-list" class="ts f12">
+    <div class="tc p20 ts">جار التحميل...</div>
+  </div>
+</div>
+
+<script>
+window['_pg_mp-dashboard'] = async function() {
+  try {
+    const stats = await mp.dashboard.stats();
+    document.getElementById('mp-stat-accounts').textContent   = stats.activeAccounts   ?? 0;
+    document.getElementById('mp-stat-campaigns').textContent  = stats.activeCampaigns  ?? 0;
+    document.getElementById('mp-stat-leads-today').textContent= stats.leadsToday       ?? 0;
+    document.getElementById('mp-stat-posts-today').textContent= stats.postsToday       ?? 0;
+    document.getElementById('mp-stat-mentions').textContent   = stats.mentionCampaigns ?? 0;
+    document.getElementById('mp-stat-leads-total').textContent= stats.totalLeads       ?? 0;
+  } catch(e) { console.error('[mp-dashboard] stats:', e); }
+
+  try {
+    const activity = await mp.dashboard.activity(20);
+    const el = document.getElementById('mp-activity-list');
+    if (!activity || !activity.length) { el.innerHTML = '<div class="tc p20 ts">لا يوجد نشاط حتى الآن</div>'; return; }
+    el.innerHTML = activity.map(a => `
+      <div class="flex ic gap8 p8" style="border-bottom:1px solid rgba(var(--ar),.06)">
+        <span class="f10 ts" style="min-width:140px">${new Date(a.created_at).toLocaleString('ar')}</span>
+        <span class="f11 fw5">${a.message || ''}</span>
+        <span class="badge ${a.level === 'error' ? 'badge-red' : 'badge-green'} ms-auto">${a.type || ''}</span>
+      </div>`).join('');
+  } catch(e) { console.error('[mp-dashboard] activity:', e); }
+};
+</script>

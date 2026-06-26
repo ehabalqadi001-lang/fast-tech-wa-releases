@@ -23,6 +23,7 @@ const SequenceService       = require('./sequence-service');
 const Container             = require('./container');
 const OrderConfirmationBot  = require('./order-confirmation-bot');
 const EventEmitter          = require('events');
+const MpScheduler           = require('./mp-scheduler');
 
 // Internal bus — used to signal from IPC handlers to window lifecycle code
 const _bus = new EventEmitter();
@@ -157,7 +158,7 @@ function createWindow() {
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
-    // Open DevTools in dev mode
+    MpScheduler.setWindow(mainWindow);
     if (process.argv.includes('--dev')) {
       mainWindow.webContents.openDevTools({ mode: 'detach' });
     }
@@ -314,6 +315,7 @@ app.whenReady().then(async () => {
       .register('ipcMain',    ipcMain);
 
     IpcHandlers.register(ipcMain, container.toDeps());
+    MpScheduler.initScheduler(db._db);
 
     // 6. Window + tray
     setAppMenu();

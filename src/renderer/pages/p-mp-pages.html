@@ -1,0 +1,168 @@
+<div class="pg-hdr">
+  <div>
+    <h1 class="f18 fw7">📄 صفحات Facebook</h1>
+    <p class="ts f12">نشر في صفحات Facebook مع دعم الجدولة</p>
+  </div>
+  <button class="btn bp bsm" onclick="openM('mp-pg-add')">➕ إضافة صفحة</button>
+</div>
+
+<!-- Pages Grid -->
+<div class="g3 mb16" id="mp-pages-grid">
+  <div class="card p16 tc ts">جار التحميل...</div>
+</div>
+
+<!-- Post Modal -->
+<div class="mo" id="mp-pg-post" onclick="if(event.target===this)closeM('mp-pg-post')">
+  <div class="md" style="max-width:520px">
+    <div class="md-tt">📤 نشر في: <span id="mp-pg-post-name"></span></div>
+    <input type="hidden" id="mp-pg-post-id">
+    <div class="fg"><label class="fl">نوع النشر</label>
+      <div class="flex gap8">
+        <label class="flex ic gap4 f12"><input type="radio" name="post-type" value="now" checked onchange="mpPgToggleSchedule(false)"> الآن</label>
+        <label class="flex ic gap4 f12"><input type="radio" name="post-type" value="schedule" onchange="mpPgToggleSchedule(true)"> جدولة</label>
+      </div>
+    </div>
+    <div id="mp-pg-schedule-row" class="fg" style="display:none">
+      <label class="fl">موعد النشر</label>
+      <input id="mp-pg-schedule-dt" class="fc" type="datetime-local">
+    </div>
+    <div class="fg"><label class="fl">الحساب</label>
+      <select id="mp-pg-post-acc" class="fc"><option value="">اختر...</option></select>
+    </div>
+    <div class="fg"><label class="fl">نص المنشور</label>
+      <textarea id="mp-pg-post-text" class="fc" rows="4" placeholder="اكتب نص المنشور..."></textarea>
+    </div>
+    <div class="md-cl">
+      <button class="btn bo" onclick="closeM('mp-pg-post')">إلغاء</button>
+      <button class="btn bp" onclick="mpPgPublish()">📤 نشر</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Page Modal -->
+<div class="mo" id="mp-pg-add" onclick="if(event.target===this)closeM('mp-pg-add')">
+  <div class="md" style="max-width:420px">
+    <div class="md-tt">➕ إضافة صفحة</div>
+    <div class="fg"><label class="fl">معرّف الصفحة أو الرابط</label><input id="mp-pg-add-id" class="fc" placeholder="mypage أو /pages/mypage/123" dir="ltr"></div>
+    <div class="fg"><label class="fl">الاسم</label><input id="mp-pg-add-name" class="fc" placeholder="صفحتي"></div>
+    <div class="md-cl">
+      <button class="btn bo" onclick="closeM('mp-pg-add')">إلغاء</button>
+      <button class="btn bp" onclick="mpPgAdd()">✅ إضافة</button>
+    </div>
+  </div>
+</div>
+
+<!-- Scheduled Posts -->
+<div class="card mt16 p16">
+  <div class="f13 fw6 mb12">🗓️ المنشورات المجدولة</div>
+  <table class="tbl">
+    <thead><tr><th>الصفحة</th><th>الوقت المجدول</th><th>الحالة</th><th>معاينة</th><th>إجراءات</th></tr></thead>
+    <tbody id="mp-sched-tbody"><tr><td colspan="5" class="tc ts p20">جار التحميل...</td></tr></tbody>
+  </table>
+</div>
+
+<script>
+window['_pg_mp-pages'] = async function() {
+  await mpPgLoad();
+  await mpPgLoadAccounts();
+  await mpSchedLoad();
+};
+
+async function mpPgLoad() {
+  const grid = document.getElementById('mp-pages-grid');
+  try {
+    const res = await mp.pages.list({});
+    const pages = Array.isArray(res) ? res : (res?.data || []);
+    grid.innerHTML = pages.length ? pages.map(p => `
+      <div class="card p16">
+        <div class="flex ic gap8 mb12">
+          <div class="f16">📄</div>
+          <div>
+            <div class="fw6 f13">${p.name || p.page_id}</div>
+            <div class="f11 ts">${p.page_id}</div>
+          </div>
+          <button class="btn bo bsm ms-auto" style="color:#ef4444" onclick="mpPgDelete('${p.id}')">🗑️</button>
+        </div>
+        <div class="flex gap8">
+          <button class="btn bp bsm fi" onclick="mpPgOpenPost('${p.id}','${p.name||p.page_id}')">📤 نشر الآن</button>
+        </div>
+      </div>`).join('') : '<div class="card p16 tc ts">لا توجد صفحات — أضف صفحة للبدء</div>';
+  } catch(e) { grid.innerHTML = `<div class="card p16 tc ts">خطأ: ${e.message}</div>`; }
+}
+
+async function mpPgLoadAccounts() {
+  const res = await mp.accounts.list({ platform: 'facebook' });
+  const accs = Array.isArray(res) ? res : (res?.data || []);
+  document.getElementById('mp-pg-post-acc').innerHTML = '<option value="">اختر...</option>' + accs.map(a => `<option value="${a.id}">${a.username}</option>`).join('');
+}
+
+async function mpSchedLoad() {
+  const tbody = document.getElementById('mp-sched-tbody');
+  try {
+    const res = await mp.pages.scheduled({});
+    const posts = Array.isArray(res) ? res : (res?.data || []);
+    tbody.innerHTML = posts.length ? posts.map(s => `<tr>
+      <td>${s.page_id||'—'}</td>
+      <td class="f11">${s.scheduled_at ? new Date(s.scheduled_at).toLocaleString('ar') : '—'}</td>
+      <td><span class="badge ${s.status==='pending'?'badge-gray':s.status==='posted'?'badge-green':'badge-red'}">${s.status}</span></td>
+      <td class="f11 ts" style="max-width:200px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${s.content?.text||''}</td>
+      <td><button class="btn bo bsm" style="color:#ef4444" onclick="mpSchedDelete('${s.id}')">🗑️</button></td>
+    </tr>`).join('') : '<tr><td colspan="5" class="tc ts p20">لا توجد منشورات مجدولة</td></tr>';
+  } catch(e) { tbody.innerHTML = `<tr><td colspan="5" class="tc ts p20">خطأ: ${e.message}</td></tr>`; }
+}
+
+function mpPgOpenPost(pageId, pageName) {
+  document.getElementById('mp-pg-post-id').value = pageId;
+  document.getElementById('mp-pg-post-name').textContent = pageName;
+  document.getElementById('mp-pg-post-text').value = '';
+  document.querySelector('input[name="post-type"][value="now"]').checked = true;
+  document.getElementById('mp-pg-schedule-row').style.display = 'none';
+  openM('mp-pg-post');
+}
+
+function mpPgToggleSchedule(show) {
+  document.getElementById('mp-pg-schedule-row').style.display = show ? '' : 'none';
+}
+
+async function mpPgPublish() {
+  const pageId    = document.getElementById('mp-pg-post-id').value;
+  const accountId = document.getElementById('mp-pg-post-acc').value;
+  const text      = document.getElementById('mp-pg-post-text').value.trim();
+  const isSchedule= document.querySelector('input[name="post-type"]:checked').value === 'schedule';
+  const schedAt   = document.getElementById('mp-pg-schedule-dt').value;
+  if (!accountId || !text) { alert('اختر حساباً وأدخل النص'); return; }
+  if (isSchedule) {
+    if (!schedAt) { alert('حدد وقت الجدولة'); return; }
+    const res = await mp.pages.schedule({ pageId, accountId, text, scheduledAt: schedAt });
+    if (res?.ok) { alert('✅ تمت الجدولة'); closeM('mp-pg-post'); await mpSchedLoad(); }
+    else alert('❌ ' + (res?.error||'فشل'));
+  } else {
+    const res = await mp.pages.post({ pageId, accountId, text });
+    if (res?.ok) { alert('✅ تم النشر بنجاح'); closeM('mp-pg-post'); }
+    else alert('❌ ' + (res?.error||'فشل'));
+  }
+}
+
+async function mpPgAdd() {
+  const raw = document.getElementById('mp-pg-add-id').value.trim();
+  const name = document.getElementById('mp-pg-add-name').value.trim();
+  const page_id = raw.includes('facebook.com') ? raw.split('/').filter(Boolean).pop() : raw;
+  if (!page_id) { alert('أدخل المعرف أو الرابط'); return; }
+  await mp.pages.add({ page_id, name, platform: 'facebook', url: `https://www.facebook.com/${page_id}` });
+  closeM('mp-pg-add');
+  await mpPgLoad();
+}
+
+async function mpPgDelete(id) {
+  if (!confirm('حذف الصفحة؟')) return;
+  await mp.pages.delete(id);
+  await mpPgLoad();
+}
+
+async function mpSchedDelete(id) {
+  if (!confirm('حذف المنشور المجدول؟')) return;
+  const posts = await mp.pages.scheduled({});
+  alert('سيتم إلغاء هذا المنشور المجدول عند التحديث التالي');
+  await mpSchedLoad();
+}
+</script>

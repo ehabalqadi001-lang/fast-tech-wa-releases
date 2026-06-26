@@ -1,0 +1,146 @@
+<div class="pg-hdr">
+  <div>
+    <h1 class="f18 fw7">🔍 استخراج البيانات</h1>
+    <p class="ts f12">استخراج أعضاء مجموعات Facebook مع روابط الإشارة</p>
+  </div>
+  <div class="flex gap8">
+    <button class="btn bo bsm" onclick="mpExtExport('xlsx')">📥 تصدير Excel</button>
+    <button class="btn bo bsm" onclick="mpExtExport('json')">📄 تصدير JSON</button>
+  </div>
+</div>
+
+<div class="g2 mb16">
+  <!-- Control Panel -->
+  <div class="card p16">
+    <div class="f13 fw6 mb12">⚙️ إعدادات الاستخراج</div>
+    <div class="fg"><label class="fl">الحساب</label>
+      <select id="mp-ext-account" class="fc"><option value="">اختر حساب...</option></select>
+    </div>
+    <div class="fg"><label class="fl">رابط المجموعة</label>
+      <input id="mp-ext-url" class="fc" placeholder="https://www.facebook.com/groups/..." dir="ltr">
+    </div>
+    <div class="fg"><label class="fl">الحد الأقصى للأعضاء</label>
+      <input id="mp-ext-max" class="fc" type="number" value="5000">
+    </div>
+    <div class="flex gap8 mt12">
+      <button class="btn bp fi" onclick="mpStartExt()" id="mp-ext-start-btn">🚀 بدء الاستخراج</button>
+      <button class="btn bo" onclick="mpStopExt()" id="mp-ext-stop-btn" style="display:none">⏹ إيقاف</button>
+    </div>
+    <div id="mp-ext-progress" class="mt12" style="display:none">
+      <div class="f12 ts mb4">جار الاستخراج... <span id="mp-ext-count">0</span> عضو</div>
+      <div style="height:6px;background:rgba(var(--ar),.1);border-radius:3px">
+        <div id="mp-ext-bar" style="height:100%;width:0%;background:var(--acc);border-radius:3px;transition:width .3s"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="card p16">
+    <div class="f13 fw6 mb12">📊 إحصائيات العملاء</div>
+    <div class="f11 ts mb4">إجمالي العملاء المستخرجين</div>
+    <div class="f24 fw7 c-acc mb12" id="mp-leads-total">—</div>
+    <button class="btn bo bsm fi" onclick="mpLoadLeads()">🔄 تحديث القائمة</button>
+  </div>
+</div>
+
+<!-- Leads Table -->
+<div class="card">
+  <div class="flex ic gap8 mb12 p16 pb0">
+    <div class="f13 fw6">📋 قائمة العملاء</div>
+    <button class="btn bo bsm ms-auto" onclick="mpClearAllLeads()">🗑️ حذف الكل</button>
+  </div>
+  <table class="tbl">
+    <thead><tr><th>الاسم</th><th>رابط الملف</th><th>تاريخ الاستخراج</th><th>إجراءات</th></tr></thead>
+    <tbody id="mp-leads-tbody"><tr><td colspan="4" class="tc ts p20">جار التحميل...</td></tr></tbody>
+  </table>
+</div>
+
+<script>
+let _mpExtId = null;
+
+window['_pg_mp-extractor'] = async function() {
+  await mpExtLoadAccounts();
+  await mpLoadLeads();
+  mp.on('mp:extractor:progress', d => {
+    if (!_mpExtId || d.extractionId !== _mpExtId) return;
+    document.getElementById('mp-ext-count').textContent = d.total;
+    const pct = Math.min(100, Math.round((d.total / d.maxMembers) * 100));
+    document.getElementById('mp-ext-bar').style.width = pct + '%';
+  });
+  mp.on('mp:extractor:done', d => {
+    if (d.extractionId !== _mpExtId) return;
+    _mpExtId = null;
+    document.getElementById('mp-ext-start-btn').style.display = '';
+    document.getElementById('mp-ext-stop-btn').style.display = 'none';
+    document.getElementById('mp-ext-progress').style.display = 'none';
+    alert(`✅ اكتمل الاستخراج: ${d.total} عضو`);
+    mpLoadLeads();
+  });
+};
+
+async function mpExtLoadAccounts() {
+  try {
+    const res = await mp.accounts.list({ platform: 'facebook' });
+    const accs = Array.isArray(res) ? res : (res?.data || []);
+    const sel = document.getElementById('mp-ext-account');
+    sel.innerHTML = '<option value="">اختر حساب...</option>' + accs.map(a => `<option value="${a.id}">${a.username}</option>`).join('');
+  } catch {}
+}
+
+async function mpStartExt() {
+  const accountId = document.getElementById('mp-ext-account').value;
+  const groupUrl  = document.getElementById('mp-ext-url').value.trim();
+  const maxMembers = parseInt(document.getElementById('mp-ext-max').value) || 5000;
+  if (!accountId || !groupUrl) { alert('اختر حساب وأدخل رابط المجموعة'); return; }
+
+  const res = await mp.extractor.start({ accountId, groupUrl, maxMembers });
+  if (!res?.ok) { alert('خطأ: ' + res?.error); return; }
+  _mpExtId = res.extractionId;
+  document.getElementById('mp-ext-start-btn').style.display = 'none';
+  document.getElementById('mp-ext-stop-btn').style.display = '';
+  document.getElementById('mp-ext-progress').style.display = '';
+}
+
+async function mpStopExt() {
+  if (_mpExtId) { await mp.extractor.stop(_mpExtId); _mpExtId = null; }
+  document.getElementById('mp-ext-start-btn').style.display = '';
+  document.getElementById('mp-ext-stop-btn').style.display = 'none';
+  document.getElementById('mp-ext-progress').style.display = 'none';
+}
+
+async function mpLoadLeads() {
+  const tbody = document.getElementById('mp-leads-tbody');
+  try {
+    const leads = await mp.extractor.leads({ limit: 200 });
+    const arr = Array.isArray(leads) ? leads : (leads?.data || []);
+    document.getElementById('mp-leads-total').textContent = arr.length;
+    tbody.innerHTML = arr.length ? arr.map(l => `
+      <tr>
+        <td class="fw5">${l.name || '—'}</td>
+        <td><a href="${l.profile_url}" class="ts f11" target="_blank" style="color:var(--acc)">${l.profile_url?.substring(0,50)||'—'}...</a></td>
+        <td class="f11 ts">${l.extracted_at ? new Date(l.extracted_at).toLocaleDateString('ar') : '—'}</td>
+        <td><button class="btn bo bsm" style="color:#ef4444" onclick="mpDeleteLead('${l.id}')">🗑️</button></td>
+      </tr>`).join('') : '<tr><td colspan="4" class="tc ts p20">لا توجد بيانات مستخرجة بعد</td></tr>';
+  } catch(e) { tbody.innerHTML = `<tr><td colspan="4" class="tc ts p20">خطأ: ${e.message}</td></tr>`; }
+}
+
+async function mpExtExport(format) {
+  const fp = await ftwa.saveFile({ filters:[{ name: format === 'xlsx' ? 'Excel' : 'JSON', extensions: [format] }] });
+  if (!fp) return;
+  const res = await mp.extractor.export({ filePath: fp, format });
+  if (res?.ok) alert(`✅ تم تصدير ${res.count} عميل`); else alert('خطأ: ' + res?.error);
+}
+
+async function mpDeleteLead(id) {
+  await mp.extractor.deleteLead(id);
+  await mpLoadLeads();
+}
+
+async function mpClearAllLeads() {
+  if (!confirm('حذف جميع العملاء المستخرجين؟')) return;
+  const leads = await mp.extractor.leads({});
+  const arr = Array.isArray(leads) ? leads : [];
+  for (const l of arr) await mp.extractor.deleteLead(l.id);
+  await mpLoadLeads();
+}
+</script>

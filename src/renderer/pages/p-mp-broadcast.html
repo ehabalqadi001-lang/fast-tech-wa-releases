@@ -1,0 +1,187 @@
+<div class="pg-hdr">
+  <div>
+    <h1 class="f18 fw7">📡 البث الجماعي</h1>
+    <p class="ts f12">إرسال رسائل WhatsApp جماعية من قائمة جهات الاتصال</p>
+  </div>
+  <button class="btn bp bsm" onclick="openM('mp-bc-create')">➕ بث جديد</button>
+</div>
+
+<!-- Broadcasts Table -->
+<div class="card mb16">
+  <table class="tbl">
+    <thead><tr><th>الاسم</th><th>الحالة</th><th>جهات الاتصال</th><th>تم الإرسال</th><th>نجح</th><th>فشل</th><th>إجراءات</th></tr></thead>
+    <tbody id="mp-bc-tbody"><tr><td colspan="7" class="tc ts p20">جار التحميل...</td></tr></tbody>
+  </table>
+</div>
+
+<!-- Create Broadcast Modal -->
+<div class="mo" id="mp-bc-create" onclick="if(event.target===this)closeM('mp-bc-create')">
+  <div class="md" style="max-width:620px;max-height:90vh;overflow-y:auto">
+    <div class="md-tt">📡 إنشاء بث جديد</div>
+
+    <div class="fg"><label class="fl">اسم البث</label><input id="bc-name" class="fc" placeholder="حملة رمضان"></div>
+
+    <div class="fg"><label class="fl">نص الرسالة (يمكن استخدام {خيار1|خيار2} وسبين تكست)</label>
+      <textarea id="bc-message" class="fc" rows="5" placeholder="السلام عليكم {أهلاً|مرحباً} {{name}}...&#10;&#10;المتغيرات: {{name}}, {{phone}}"></textarea>
+    </div>
+    <div class="fg">
+      <label class="fl">قالب محفوظ (اختياري)</label>
+      <select id="bc-template" class="fc" onchange="mpBcLoadTemplate(this.value)">
+        <option value="">اختر قالباً...</option>
+      </select>
+    </div>
+
+    <div class="fg">
+      <label class="fl">استيراد جهات الاتصال (Excel/CSV)</label>
+      <div class="flex gap8 ic">
+        <button class="btn bo bsm" onclick="mpBcImport()">📥 استيراد ملف</button>
+        <span class="f11 ts" id="bc-contacts-count">لم يتم الاستيراد بعد</span>
+      </div>
+      <div class="f11 ts mt4">يجب أن تحتوي الأعمدة على: phone (إلزامي), name (اختياري)</div>
+    </div>
+
+    <div class="fg"><label class="fl">الحساب (WhatsApp)</label>
+      <select id="bc-account" class="fc"><option value="">اختر...</option></select>
+    </div>
+    <div class="g2">
+      <div class="fg"><label class="fl">تأخير أدنى (ثانية)</label><input id="bc-delay-min" class="fc" type="number" value="5"></div>
+      <div class="fg"><label class="fl">تأخير أقصى (ثانية)</label><input id="bc-delay-max" class="fc" type="number" value="20"></div>
+    </div>
+
+    <div class="md-cl">
+      <button class="btn bo" onclick="closeM('mp-bc-create')">إلغاء</button>
+      <button class="btn bp" onclick="mpBcCreate()">✅ إنشاء</button>
+    </div>
+  </div>
+</div>
+
+<!-- Progress Modal -->
+<div class="mo" id="mp-bc-progress" onclick="if(event.target===this)closeM('mp-bc-progress')">
+  <div class="md" style="max-width:500px">
+    <div class="md-tt">📊 تقدم البث</div>
+    <div class="f13 fw6 mb8" id="mp-bc-prog-name"></div>
+    <div class="g2 mb12">
+      <div class="card p12 tc"><div class="f18 fw7" style="color:#10b981" id="mp-bc-prog-success">0</div><div class="f11 ts">نجح</div></div>
+      <div class="card p12 tc"><div class="f18 fw7" style="color:#ef4444" id="mp-bc-prog-fail">0</div><div class="f11 ts">فشل</div></div>
+    </div>
+    <div class="f12 ts mb4">الإرسال: <span id="mp-bc-prog-done">0</span> / <span id="mp-bc-prog-total">0</span></div>
+    <div style="height:8px;background:rgba(var(--ar),.1);border-radius:4px;margin-bottom:16px">
+      <div id="mp-bc-bar" style="height:100%;width:0%;background:var(--acc);border-radius:4px;transition:width .3s"></div>
+    </div>
+    <div class="flex gap8">
+      <button class="btn bo bsm" onclick="mpBcPauseActive()">⏸ إيقاف مؤقت</button>
+      <button class="btn bo bsm" style="color:#ef4444" onclick="mpBcStopActive()">⏹ إيقاف</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let _mpBcActive = null;
+let _bcContacts = null;
+
+window['_pg_mp-broadcast'] = async function() {
+  await mpBcLoad();
+  await mpBcLoadAccounts();
+  await mpBcLoadTemplates();
+  mp.on('mp:broadcast:progress', d => {
+    if (d.broadcastId !== _mpBcActive) return;
+    document.getElementById('mp-bc-prog-done').textContent    = d.sent;
+    document.getElementById('mp-bc-prog-total').textContent   = d.total;
+    document.getElementById('mp-bc-prog-success').textContent = d.success;
+    document.getElementById('mp-bc-prog-fail').textContent    = d.failed;
+    document.getElementById('mp-bc-bar').style.width          = Math.round((d.sent / d.total) * 100) + '%';
+  });
+  mp.on('mp:broadcast:done', d => {
+    _mpBcActive = null;
+    setTimeout(() => closeM('mp-bc-progress'), 2000);
+    alert(`✅ اكتمل البث: ${d.success} نجح، ${d.failed} فشل`);
+    mpBcLoad();
+  });
+};
+
+async function mpBcLoad() {
+  const tbody = document.getElementById('mp-bc-tbody');
+  try {
+    const res = await mp.broadcast.list({});
+    const bcs = Array.isArray(res) ? res : (res?.data || []);
+    tbody.innerHTML = bcs.length ? bcs.map(b => `<tr>
+      <td class="fw5">${b.name}</td>
+      <td><span class="badge ${b.status==='running'?'badge-green':b.status==='completed'?'badge-blue':'badge-gray'}">${b.status}</span></td>
+      <td>${b.total_contacts||0}</td>
+      <td>${b.sent||0}</td>
+      <td style="color:#10b981">${b.success_count||0}</td>
+      <td style="color:#ef4444">${b.failed_count||0}</td>
+      <td><div class="flex gap4">
+        ${b.status !== 'running'
+          ? `<button class="btn bo bsm" onclick="mpBcStart('${b.id}','${b.name}')">▶ بدء</button>`
+          : `<button class="btn bo bsm" onclick="mpBcStop('${b.id}')">⏹ إيقاف</button>`}
+        <button class="btn bo bsm" style="color:#ef4444" onclick="mpBcDelete('${b.id}')">🗑️</button>
+      </div></td>
+    </tr>`).join('') : '<tr><td colspan="7" class="tc ts p20">لا توجد حملات بث</td></tr>';
+  } catch(e) { tbody.innerHTML = `<tr><td colspan="7" class="tc ts p20">خطأ: ${e.message}</td></tr>`; }
+}
+
+async function mpBcLoadAccounts() {
+  const res = await mp.accounts.list({ platform: 'whatsapp' });
+  const accs = Array.isArray(res) ? res : (res?.data || []);
+  document.getElementById('bc-account').innerHTML = '<option value="">اختر...</option>' + accs.map(a => `<option value="${a.id}">${a.username}</option>`).join('');
+}
+
+async function mpBcLoadTemplates() {
+  const res = await mp.settings.templates.list();
+  const tmps = Array.isArray(res) ? res : (res?.data || []);
+  document.getElementById('bc-template').innerHTML = '<option value="">اختر قالباً...</option>' + tmps.map(t => `<option value="${t.id}" data-content="${encodeURIComponent(t.content)}">${t.name}</option>`).join('');
+}
+
+function mpBcLoadTemplate(id) {
+  if (!id) return;
+  const opt = document.querySelector(`#bc-template option[value="${id}"]`);
+  if (opt) document.getElementById('bc-message').value = decodeURIComponent(opt.dataset.content || '');
+}
+
+async function mpBcImport() {
+  const fp = await mp.openFile({ filters: [{ name: 'Excel/CSV', extensions: ['xlsx','csv'] }] });
+  if (!fp) return;
+  const res = await mp.broadcast.import({ filePath: fp });
+  if (res?.ok) {
+    _bcContacts = res.contacts;
+    document.getElementById('bc-contacts-count').textContent = `✅ ${res.count} جهة اتصال`;
+  } else alert('❌ ' + (res?.error || 'فشل الاستيراد'));
+}
+
+async function mpBcCreate() {
+  if (!_bcContacts) { alert('استورد جهات الاتصال أولاً'); return; }
+  const data = {
+    name:     document.getElementById('bc-name').value.trim(),
+    message:  document.getElementById('bc-message').value.trim(),
+    accountId:document.getElementById('bc-account').value,
+    contacts: _bcContacts,
+    delay_min:parseInt(document.getElementById('bc-delay-min').value)||5,
+    delay_max:parseInt(document.getElementById('bc-delay-max').value)||20
+  };
+  if (!data.name || !data.message || !data.accountId) { alert('أدخل الاسم والرسالة والحساب'); return; }
+  const res = await mp.broadcast.create(data);
+  if (!res?.ok && !res?.id) { alert('خطأ: ' + (res?.error||'فشل')); return; }
+  _bcContacts = null;
+  document.getElementById('bc-contacts-count').textContent = 'لم يتم الاستيراد بعد';
+  closeM('mp-bc-create');
+  await mpBcLoad();
+}
+
+async function mpBcStart(id, name) {
+  _mpBcActive = id;
+  document.getElementById('mp-bc-prog-name').textContent = name;
+  document.getElementById('mp-bc-prog-done').textContent = '0';
+  document.getElementById('mp-bc-prog-success').textContent = '0';
+  document.getElementById('mp-bc-prog-fail').textContent = '0';
+  document.getElementById('mp-bc-bar').style.width = '0%';
+  openM('mp-bc-progress');
+  const res = await mp.broadcast.start(id);
+  if (!res?.ok) { _mpBcActive = null; closeM('mp-bc-progress'); alert('❌ ' + (res?.error||'فشل')); }
+}
+
+async function mpBcStop(id) { await mp.broadcast.stop(id); await mpBcLoad(); }
+async function mpBcPauseActive() { if (_mpBcActive) await mp.broadcast.pause(_mpBcActive); }
+async function mpBcStopActive() { if (_mpBcActive) { await mp.broadcast.stop(_mpBcActive); _mpBcActive = null; closeM('mp-bc-progress'); await mpBcLoad(); } }
+async function mpBcDelete(id) { if (!confirm('حذف البث؟')) return; await mp.broadcast.delete(id); await mpBcLoad(); }
+</script>

@@ -1,0 +1,153 @@
+<div class="pg-hdr">
+  <div>
+    <h1 class="f18 fw7">🚀 حملات النشر</h1>
+    <p class="ts f12">نشر تلقائي في مجموعات Facebook مع A/B Testing وSpin Text</p>
+  </div>
+  <button class="btn bp bsm" onclick="openM('mp-camp-modal')">➕ حملة جديدة</button>
+</div>
+
+<!-- Tabs -->
+<div class="tabs mb16">
+  <div class="tab on" onclick="mpCampFilter('')">الكل</div>
+  <div class="tab" onclick="mpCampFilter('running')">🔴 تعمل</div>
+  <div class="tab" onclick="mpCampFilter('completed')">✅ مكتملة</div>
+  <div class="tab" onclick="mpCampFilter('draft')">📝 مسودة</div>
+</div>
+
+<div class="card">
+  <table class="tbl">
+    <thead><tr><th>الاسم</th><th>المنصة</th><th>الحالة</th><th>التقدم</th><th>تاريخ الإنشاء</th><th>إجراءات</th></tr></thead>
+    <tbody id="mp-camp-tbody"><tr><td colspan="6" class="tc ts p20">جار التحميل...</td></tr></tbody>
+  </table>
+</div>
+
+<!-- Create Campaign Modal -->
+<div class="mo" id="mp-camp-modal" onclick="if(event.target===this)closeM('mp-camp-modal')">
+  <div class="md" style="max-width:600px;max-height:90vh;overflow-y:auto">
+    <div class="md-tt">🚀 حملة نشر جديدة</div>
+    <div class="fg"><label class="fl">اسم الحملة</label><input id="mc-name" class="fc" placeholder="حملة العقارات يناير"></div>
+    <div class="g2">
+      <div class="fg"><label class="fl">المنصة</label>
+        <select id="mc-platform" class="fc"><option value="facebook">Facebook</option><option value="instagram">Instagram</option></select>
+      </div>
+      <div class="fg"><label class="fl">النوع</label>
+        <select id="mc-type" class="fc"><option value="group_post">نشر في مجموعة</option><option value="page_post">نشر في صفحة</option></select>
+      </div>
+    </div>
+    <div class="fg"><label class="fl">محتوى المنشور (يمكن استخدام {خيار1|خيار2})</label>
+      <textarea id="mc-content" class="fc" rows="4" placeholder="اكتب نص المنشور هنا..."></textarea>
+    </div>
+    <div class="fg"><label class="fl">الهاشتاقات (اختياري)</label><input id="mc-hashtags" class="fc" placeholder="#عقارات #استثمار"></div>
+    <div class="fg"><label class="fl">الحسابات (اختر من القائمة)</label>
+      <div id="mc-accounts-list" class="p8" style="border:1px solid rgba(var(--ar),.15);border-radius:8px;max-height:120px;overflow-y:auto">
+        <div class="ts f12">جار تحميل الحسابات...</div>
+      </div>
+    </div>
+    <div class="fg"><label class="fl">المجموعات المستهدفة (رابط لكل سطر)</label>
+      <textarea id="mc-targets" class="fc" rows="3" placeholder="https://www.facebook.com/groups/..." dir="ltr"></textarea>
+    </div>
+    <div class="md-cl">
+      <button class="btn bo" onclick="closeM('mp-camp-modal')">إلغاء</button>
+      <button class="btn bp" onclick="mpCreateCampaign()">✅ إنشاء الحملة</button>
+    </div>
+  </div>
+</div>
+
+<!-- Logs Modal -->
+<div class="mo" id="mp-camp-logs" onclick="if(event.target===this)closeM('mp-camp-logs')">
+  <div class="md" style="max-width:700px;max-height:80vh;display:flex;flex-direction:column">
+    <div class="md-tt">📋 سجل الحملة</div>
+    <div id="mp-camp-logs-content" style="overflow-y:auto;flex:1"></div>
+    <div class="md-cl"><button class="btn bo" onclick="closeM('mp-camp-logs')">إغلاق</button></div>
+  </div>
+</div>
+
+<script>
+let _mpCampFilter = '';
+
+window['_pg_mp-campaigns'] = async function() {
+  await mpLoadCampaigns();
+  await mpLoadCampAccounts();
+  mp.on('mp:campaign:progress', d => {
+    const badge = document.querySelector(`[data-camp-id="${d.campaignId}"] .camp-status`);
+    if (badge) badge.textContent = `${d.status}: ${d.target}`;
+  });
+  mp.on('mp:campaign:done', d => { setTimeout(mpLoadCampaigns, 500); });
+};
+
+function mpCampFilter(s) { _mpCampFilter = s; mpLoadCampaigns(); }
+
+async function mpLoadCampaigns() {
+  const tbody = document.getElementById('mp-camp-tbody');
+  try {
+    const res = await mp.campaigns.list(_mpCampFilter ? { status: _mpCampFilter } : {});
+    const camps = Array.isArray(res) ? res : (res?.data || []);
+    tbody.innerHTML = camps.length ? camps.map(c => {
+      const pct = c.total_targets > 0 ? Math.round((c.completed / c.total_targets) * 100) : 0;
+      return `<tr data-camp-id="${c.id}">
+        <td class="fw5">${c.name}</td>
+        <td>${c.platform}</td>
+        <td><span class="badge ${c.status==='running'?'badge-green':c.status==='completed'?'badge-blue':'badge-gray'} camp-status">${c.status}</span></td>
+        <td>
+          <div style="display:flex;align-items:center;gap:6px">
+            <div style="flex:1;height:6px;background:rgba(var(--ar),.1);border-radius:3px">
+              <div style="height:100%;width:${pct}%;background:var(--acc);border-radius:3px"></div>
+            </div>
+            <span class="f10">${c.completed||0}/${c.total_targets||0}</span>
+          </div>
+        </td>
+        <td class="f11 ts">${c.created_at ? new Date(c.created_at).toLocaleDateString('ar') : ''}</td>
+        <td>
+          <div class="flex gap4">
+            ${c.status !== 'running' ? `<button class="btn bo bsm" onclick="mpCampStart('${c.id}')">▶ تشغيل</button>` : `<button class="btn bo bsm" onclick="mpCampStop('${c.id}')">⏹ إيقاف</button>`}
+            <button class="btn bo bsm" onclick="mpViewLogs('${c.id}')">📋</button>
+            <button class="btn bo bsm" style="color:#ef4444" onclick="mpDeleteCamp('${c.id}')">🗑️</button>
+          </div>
+        </td>
+      </tr>`;
+    }).join('') : '<tr><td colspan="6" class="tc ts p20">لا توجد حملات</td></tr>';
+  } catch(e) { tbody.innerHTML = `<tr><td colspan="6" class="tc ts p20">خطأ: ${e.message}</td></tr>`; }
+}
+
+async function mpLoadCampAccounts() {
+  const res = await mp.accounts.list({});
+  const accs = Array.isArray(res) ? res : (res?.data || []);
+  document.getElementById('mc-accounts-list').innerHTML = accs.map(a =>
+    `<label class="flex ic gap6 p4 f12"><input type="checkbox" value="${a.id}" name="mc-acc"> ${a.username} (${a.platform})</label>`
+  ).join('');
+}
+
+async function mpCreateCampaign() {
+  const accounts = [...document.querySelectorAll('input[name="mc-acc"]:checked')].map(c => c.value);
+  const targets  = document.getElementById('mc-targets').value.trim().split('\n').filter(Boolean).map(url => ({ id: url.trim(), url: url.trim(), type: 'group' }));
+  const data = {
+    name: document.getElementById('mc-name').value.trim(),
+    platform: document.getElementById('mc-platform').value,
+    type: document.getElementById('mc-type').value,
+    content: { text: document.getElementById('mc-content').value },
+    hashtags: document.getElementById('mc-hashtags').value.trim(),
+    accounts, targets
+  };
+  if (!data.name || !data.content.text) { alert('أدخل اسم الحملة والمحتوى'); return; }
+  const res = await mp.campaigns.create(data);
+  if (!res?.ok && !res?.id) { alert('خطأ: ' + (res?.error || 'فشل')); return; }
+  closeM('mp-camp-modal');
+  await mpLoadCampaigns();
+}
+
+async function mpCampStart(id) { await mp.campaigns.start(id); await mpLoadCampaigns(); }
+async function mpCampStop(id) { await mp.campaigns.stop(id); await mpLoadCampaigns(); }
+async function mpDeleteCamp(id) { if (!confirm('حذف الحملة؟')) return; await mp.campaigns.delete(id); await mpLoadCampaigns(); }
+
+async function mpViewLogs(id) {
+  const logs = await mp.campaigns.logs(id);
+  const arr = Array.isArray(logs) ? logs : (logs?.data || []);
+  document.getElementById('mp-camp-logs-content').innerHTML = arr.length ?
+    `<table class="tbl"><thead><tr><th>الوقت</th><th>الهدف</th><th>الحالة</th><th>تفاصيل</th></tr></thead><tbody>
+    ${arr.map(l => `<tr><td class="f11">${l.posted_at||''}</td><td class="f11">${l.target_id||''}</td>
+      <td><span class="badge ${l.status==='success'?'badge-green':'badge-red'}">${l.status}</span></td>
+      <td class="f11 ts">${l.error_message||''}</td></tr>`).join('')}
+    </tbody></table>` : '<div class="tc ts p20">لا توجد سجلات</div>';
+  openM('mp-camp-logs');
+}
+</script>

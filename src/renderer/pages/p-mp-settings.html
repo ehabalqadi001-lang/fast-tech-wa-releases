@@ -1,0 +1,227 @@
+<div class="pg-hdr">
+  <div>
+    <h1 class="f18 fw7">⚙️ إعدادات Marketing Pro</h1>
+    <p class="ts f12">الإعدادات العامة، البروكسيات، والقوالب</p>
+  </div>
+  <button class="btn bp bsm" onclick="mpSaveSettings()">💾 حفظ الإعدادات</button>
+</div>
+
+<!-- Settings Tabs -->
+<div class="tabs mb16">
+  <div class="tab on" onclick="mpSettTab('general',this)">⚙️ عام</div>
+  <div class="tab" onclick="mpSettTab('proxies',this)">🌐 بروكسيات</div>
+  <div class="tab" onclick="mpSettTab('templates',this)">📝 قوالب</div>
+</div>
+
+<!-- General Tab -->
+<div id="mp-sett-general">
+  <div class="card p16 mb16">
+    <div class="f13 fw6 mb12">🚀 إعدادات النشر</div>
+    <div class="g2">
+      <div class="fg"><label class="fl">حد الإجراءات اليومي للحساب</label><input id="sett-daily-limit" class="fc" type="number" value="200"></div>
+      <div class="fg"><label class="fl">تأخير بين المنشورات (ثانية)</label><input id="sett-post-delay" class="fc" type="number" value="30"></div>
+    </div>
+    <div class="g2">
+      <div class="fg"><label class="fl">تأخير أدنى (ثانية)</label><input id="sett-delay-min" class="fc" type="number" value="5"></div>
+      <div class="fg"><label class="fl">تأخير أقصى (ثانية)</label><input id="sett-delay-max" class="fc" type="number" value="15"></div>
+    </div>
+    <div class="fg"><label class="fl">حد معدل الطلبات في الساعة</label><input id="sett-rate-limit" class="fc" type="number" value="60"></div>
+  </div>
+  <div class="card p16 mb16">
+    <div class="f13 fw6 mb12">🛡️ إعدادات مكافحة الحظر</div>
+    <div class="g2">
+      <div class="fg"><label class="fl">الإشارات في كل تعليق</label><input id="sett-mentions-per" class="fc" type="number" value="3"></div>
+      <div class="fg"><label class="fl">تأخير بين الإشارات (ثانية)</label><input id="sett-mention-delay" class="fc" type="number" value="25"></div>
+    </div>
+    <div class="fg">
+      <label class="flex ic gap6 f12 mt8">
+        <input id="sett-stealth" type="checkbox" checked>
+        تفعيل وضع التخفي (puppeteer-extra-stealth)
+      </label>
+    </div>
+  </div>
+  <div class="card p16">
+    <div class="f13 fw6 mb12">🔄 إعدادات الجدولة</div>
+    <div class="fg"><label class="fl">فترة فحص المنشورات المجدولة (دقيقة)</label><input id="sett-sched-interval" class="fc" type="number" value="1"></div>
+  </div>
+</div>
+
+<!-- Proxies Tab -->
+<div id="mp-sett-proxies" style="display:none">
+  <div class="card mb16 p16">
+    <div class="flex ic gap8 mb12">
+      <div class="f13 fw6">🌐 إدارة البروكسيات</div>
+      <button class="btn bp bsm ms-auto" onclick="openM('mp-proxy-add')">➕ إضافة</button>
+    </div>
+    <table class="tbl">
+      <thead><tr><th>البروكسي</th><th>النوع</th><th>الحالة</th><th>إجراءات</th></tr></thead>
+      <tbody id="mp-proxy-tbody"><tr><td colspan="4" class="tc ts p20">جار التحميل...</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Templates Tab -->
+<div id="mp-sett-templates" style="display:none">
+  <div class="card mb16 p16">
+    <div class="flex ic gap8 mb12">
+      <div class="f13 fw6">📝 قوالب الرسائل</div>
+      <button class="btn bp bsm ms-auto" onclick="openM('mp-tmpl-add')">➕ إضافة قالب</button>
+    </div>
+    <div id="mp-tmpl-list" class="g2"></div>
+  </div>
+</div>
+
+<!-- Proxy Add Modal -->
+<div class="mo" id="mp-proxy-add" onclick="if(event.target===this)closeM('mp-proxy-add')">
+  <div class="md" style="max-width:380px">
+    <div class="md-tt">🌐 إضافة بروكسي</div>
+    <div class="fg"><label class="fl">عنوان البروكسي</label><input id="mp-proxy-url" class="fc" placeholder="http://host:port" dir="ltr"></div>
+    <div class="g2">
+      <div class="fg"><label class="fl">النوع</label>
+        <select id="mp-proxy-type" class="fc">
+          <option value="http">HTTP</option><option value="https">HTTPS</option><option value="socks5">SOCKS5</option>
+        </select>
+      </div>
+      <div class="fg"><label class="fl">معرّف (اختياري)</label><input id="mp-proxy-label" class="fc" placeholder="proxy-1"></div>
+    </div>
+    <div class="md-cl">
+      <button class="btn bo" onclick="closeM('mp-proxy-add')">إلغاء</button>
+      <button class="btn bp" onclick="mpProxyAdd()">✅ إضافة</button>
+    </div>
+  </div>
+</div>
+
+<!-- Template Add Modal -->
+<div class="mo" id="mp-tmpl-add" onclick="if(event.target===this)closeM('mp-tmpl-add')">
+  <div class="md" style="max-width:500px">
+    <div class="md-tt">📝 إضافة قالب</div>
+    <div class="fg"><label class="fl">اسم القالب</label><input id="mp-tmpl-name" class="fc" placeholder="قالب العروض الرمضانية"></div>
+    <div class="fg"><label class="fl">الفئة</label><select id="mp-tmpl-cat" class="fc"><option value="general">عام</option><option value="marketing">تسويق</option><option value="real_estate">عقارات</option><option value="ecommerce">تجارة</option><option value="whatsapp">واتساب</option></select></div>
+    <div class="fg"><label class="fl">المحتوى (استخدم {خيار1|خيار2} للسبين)</label>
+      <textarea id="mp-tmpl-content" class="fc" rows="5" placeholder="السلام عليكم {أهلاً|مرحباً}...&#10;&#10;{{name}} - للإشارة للاسم&#10;{{phone}} - للإشارة للهاتف"></textarea>
+    </div>
+    <div class="md-cl">
+      <button class="btn bo" onclick="closeM('mp-tmpl-add')">إلغاء</button>
+      <button class="btn bp" onclick="mpTmplAdd()">✅ إضافة</button>
+    </div>
+  </div>
+</div>
+
+<script>
+window['_pg_mp-settings'] = async function() {
+  await mpLoadSettings();
+};
+
+function mpSettTab(tab, el) {
+  ['general','proxies','templates'].forEach(t => {
+    document.getElementById('mp-sett-' + t).style.display = t === tab ? '' : 'none';
+  });
+  document.querySelectorAll('.tabs .tab').forEach(t => t.classList.remove('on'));
+  el.classList.add('on');
+  if (tab === 'proxies')   mpLoadProxies();
+  if (tab === 'templates') mpLoadTemplates();
+}
+
+async function mpLoadSettings() {
+  try {
+    const res = await mp.settings.all();
+    const s = Array.isArray(res) ? Object.fromEntries(res.map(r => [r.key, r.value])) : (res||{});
+    const g = k => document.getElementById(k);
+    if (s.daily_action_limit)   g('sett-daily-limit').value   = s.daily_action_limit;
+    if (s.post_delay_seconds)   g('sett-post-delay').value    = s.post_delay_seconds;
+    if (s.min_delay_seconds)    g('sett-delay-min').value     = s.min_delay_seconds;
+    if (s.max_delay_seconds)    g('sett-delay-max').value     = s.max_delay_seconds;
+    if (s.rate_limit_per_hour)  g('sett-rate-limit').value    = s.rate_limit_per_hour;
+    if (s.mentions_per_comment) g('sett-mentions-per').value  = s.mentions_per_comment;
+    if (s.mention_delay)        g('sett-mention-delay').value = s.mention_delay;
+    if (s.stealth_mode !== undefined) g('sett-stealth').checked = s.stealth_mode === '1' || s.stealth_mode === true;
+  } catch(e) { console.error('settings load', e); }
+}
+
+async function mpSaveSettings() {
+  const pairs = [
+    ['daily_action_limit',   document.getElementById('sett-daily-limit').value],
+    ['post_delay_seconds',   document.getElementById('sett-post-delay').value],
+    ['min_delay_seconds',    document.getElementById('sett-delay-min').value],
+    ['max_delay_seconds',    document.getElementById('sett-delay-max').value],
+    ['rate_limit_per_hour',  document.getElementById('sett-rate-limit').value],
+    ['mentions_per_comment', document.getElementById('sett-mentions-per').value],
+    ['mention_delay',        document.getElementById('sett-mention-delay').value],
+    ['stealth_mode',         document.getElementById('sett-stealth').checked ? '1' : '0']
+  ];
+  for (const [k, v] of pairs) await mp.settings.set(k, v);
+  alert('✅ تم حفظ الإعدادات');
+}
+
+async function mpLoadProxies() {
+  const tbody = document.getElementById('mp-proxy-tbody');
+  try {
+    const res = await mp.settings.proxies.list();
+    const proxies = Array.isArray(res) ? res : (res?.data || []);
+    tbody.innerHTML = proxies.length ? proxies.map(p => `<tr>
+      <td class="f12" dir="ltr">${p.proxy_url}</td>
+      <td>${p.type||'http'}</td>
+      <td><span class="badge ${p.status==='active'?'badge-green':'badge-gray'}">${p.status||'unknown'}</span></td>
+      <td><div class="flex gap4">
+        <button class="btn bo bsm" onclick="mpProxyCheck('${p.id}')">✅ فحص</button>
+        <button class="btn bo bsm" style="color:#ef4444" onclick="mpProxyDelete('${p.id}')">🗑️</button>
+      </div></td>
+    </tr>`).join('') : '<tr><td colspan="4" class="tc ts p20">لا توجد بروكسيات</td></tr>';
+  } catch(e) { tbody.innerHTML = `<tr><td colspan="4" class="tc ts p20">خطأ: ${e.message}</td></tr>`; }
+}
+
+async function mpProxyAdd() {
+  const url   = document.getElementById('mp-proxy-url').value.trim();
+  const type  = document.getElementById('mp-proxy-type').value;
+  const label = document.getElementById('mp-proxy-label').value.trim();
+  if (!url) { alert('أدخل عنوان البروكسي'); return; }
+  await mp.settings.proxies.add({ proxy_url: url, type, label });
+  closeM('mp-proxy-add');
+  await mpLoadProxies();
+}
+
+async function mpProxyCheck(id) {
+  const res = await mp.settings.proxies.check(id);
+  alert(res?.ok ? `✅ البروكسي يعمل (${res.latency}ms)` : '❌ ' + (res?.error||'فشل'));
+  await mpLoadProxies();
+}
+
+async function mpProxyDelete(id) {
+  if (!confirm('حذف البروكسي؟')) return;
+  await mp.settings.proxies.delete(id);
+  await mpLoadProxies();
+}
+
+async function mpLoadTemplates() {
+  const list = document.getElementById('mp-tmpl-list');
+  try {
+    const res = await mp.settings.templates.list();
+    const tmps = Array.isArray(res) ? res : (res?.data || []);
+    list.innerHTML = tmps.length ? tmps.map(t => `
+      <div class="card p12">
+        <div class="flex ic gap8 mb6">
+          <div class="fw6 f12">${t.name}</div>
+          <span class="badge badge-gray f10 ms-auto">${t.category||'عام'}</span>
+          <button class="btn bo bsm" style="color:#ef4444" onclick="mpTmplDelete('${t.id}')">🗑️</button>
+        </div>
+        <div class="f11 ts" style="white-space:pre-wrap;max-height:80px;overflow-y:auto">${t.content}</div>
+      </div>`).join('') : '<div class="tc ts p16">لا توجد قوالب</div>';
+  } catch(e) { list.innerHTML = `<div class="tc ts">خطأ: ${e.message}</div>`; }
+}
+
+async function mpTmplAdd() {
+  const name    = document.getElementById('mp-tmpl-name').value.trim();
+  const content = document.getElementById('mp-tmpl-content').value.trim();
+  const category= document.getElementById('mp-tmpl-cat').value;
+  if (!name || !content) { alert('أدخل الاسم والمحتوى'); return; }
+  await mp.settings.templates.add({ name, content, category });
+  closeM('mp-tmpl-add');
+  await mpLoadTemplates();
+}
+
+async function mpTmplDelete(id) {
+  if (!confirm('حذف القالب؟')) return;
+  await mp.settings.templates.delete(id);
+  await mpLoadTemplates();
+}
+</script>

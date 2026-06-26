@@ -23,6 +23,16 @@ const resellerH  = require('./handlers/reseller');
 const analyticsH = require('./handlers/analytics');
 const ecH        = require('./handlers/ecommerce');
 
+// ── Marketing Pro handlers ────────────────────────────────────────────────────
+const mpAccountsH  = require('./handlers/mp-accounts');
+const mpExtractorH = require('./handlers/mp-extractor');
+const mpCampaignsH = require('./handlers/mp-campaigns');
+const mpGroupsH    = require('./handlers/mp-groups');
+const mpPagesH     = require('./handlers/mp-pages');
+const mpBroadcastH = require('./handlers/mp-broadcast');
+const mpMentionH   = require('./handlers/mp-mention');
+const mpSettingsH  = require('./handlers/mp-settings');
+
 function register(ipcMain, deps) {
   const { db, engine, waSvc, antiBanSvc } = deps;
 
@@ -104,6 +114,16 @@ function register(ipcMain, deps) {
   resellerH.register(ctx);
   analyticsH.register(ctx);
   ecH.register(ctx);
+
+  // ── Marketing Pro ──────────────────────────────────────────────────────────
+  mpAccountsH.register(ctx);
+  mpExtractorH.register(ctx);
+  mpCampaignsH.register(ctx);
+  mpGroupsH.register(ctx);
+  mpPagesH.register(ctx);
+  mpBroadcastH.register(ctx);
+  mpMentionH.register(ctx);
+  mpSettingsH.register(ctx);
 }
 
 module.exports = { register };

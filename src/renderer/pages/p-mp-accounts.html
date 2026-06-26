@@ -1,0 +1,133 @@
+<div class="pg-hdr">
+  <div>
+    <h1 class="f18 fw7">👤 حسابات التواصل الاجتماعي</h1>
+    <p class="ts f12">إدارة حسابات Facebook / Instagram / WhatsApp / Twitter</p>
+  </div>
+  <button class="btn bp bsm" onclick="openM('mp-add-acc')">➕ إضافة حساب</button>
+</div>
+
+<div class="card">
+  <table class="tbl">
+    <thead><tr><th>المنصة</th><th>اسم المستخدم</th><th>المجموعة</th><th>الحالة</th><th>الصحة</th><th>الحد اليومي</th><th>إجراءات</th></tr></thead>
+    <tbody id="mp-acc-tbody"><tr><td colspan="7" class="tc ts p20">جار التحميل...</td></tr></tbody>
+  </table>
+</div>
+
+<!-- Add/Edit Modal -->
+<div class="mo" id="mp-add-acc" onclick="if(event.target===this)closeM('mp-add-acc')">
+  <div class="md" style="max-width:500px">
+    <div class="md-tt">➕ إضافة حساب تسويقي</div>
+    <input type="hidden" id="mp-acc-id">
+    <div class="g2">
+      <div class="fg"><label class="fl">المنصة</label>
+        <select id="mp-acc-platform" class="fc">
+          <option value="facebook">Facebook</option>
+          <option value="instagram">Instagram</option>
+          <option value="whatsapp">WhatsApp</option>
+          <option value="twitter">Twitter/X</option>
+        </select>
+      </div>
+      <div class="fg"><label class="fl">اسم المستخدم / البريد</label><input id="mp-acc-user" class="fc" placeholder="user@example.com"></div>
+    </div>
+    <div class="fg"><label class="fl">كلمة المرور</label><input id="mp-acc-pass" class="fc" type="password" placeholder="••••••••"></div>
+    <div class="g2">
+      <div class="fg"><label class="fl">Proxy (اختياري)</label><input id="mp-acc-proxy" class="fc" placeholder="http://host:port" dir="ltr"></div>
+      <div class="fg"><label class="fl">الحد اليومي</label><input id="mp-acc-limit" class="fc" type="number" value="200"></div>
+    </div>
+    <div class="fg"><label class="fl">المجموعة (اختياري)</label><input id="mp-acc-group" class="fc" placeholder="group-1"></div>
+    <div class="fg"><label class="fl">ملاحظات</label><textarea id="mp-acc-notes" class="fc" rows="2"></textarea></div>
+    <div class="md-cl">
+      <button class="btn bo" onclick="closeM('mp-add-acc')">إلغاء</button>
+      <button class="btn bp" onclick="mpSaveAcc()">✅ حفظ</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const MP_PLATFORM_ICONS = { facebook:'🔵', instagram:'🟣', whatsapp:'🟢', twitter:'🐦' };
+
+window['_pg_mp-accounts'] = async function() { await mpLoadAccounts(); };
+
+async function mpLoadAccounts() {
+  const tbody = document.getElementById('mp-acc-tbody');
+  try {
+    const res = await mp.accounts.list();
+    const accs = Array.isArray(res) ? res : (res?.data || []);
+    if (!accs.length) { tbody.innerHTML = '<tr><td colspan="7" class="tc ts p20">لا توجد حسابات بعد</td></tr>'; return; }
+    tbody.innerHTML = accs.map(a => `
+      <tr>
+        <td>${MP_PLATFORM_ICONS[a.platform] || '?'} ${a.platform}</td>
+        <td class="fw5">${a.username}</td>
+        <td>${a.group_name || '—'}</td>
+        <td><span class="badge ${a.status === 'active' ? 'badge-green' : a.status === 'banned' ? 'badge-red' : 'badge-gray'}">${a.status}</span></td>
+        <td>
+          <div style="display:flex;align-items:center;gap:6px">
+            <div style="flex:1;height:6px;background:rgba(var(--ar),.1);border-radius:3px;overflow:hidden">
+              <div style="height:100%;width:${a.health_score||100}%;background:${(a.health_score||100)>70?'#10b981':'#ef4444'};border-radius:3px"></div>
+            </div>
+            <span class="f10">${a.health_score||100}%</span>
+          </div>
+        </td>
+        <td>${a.daily_limit||200}</td>
+        <td>
+          <div class="flex gap4">
+            <button class="btn bo bsm" onclick="mpLoginAcc('${a.id}')">🔑 تسجيل</button>
+            <button class="btn bo bsm" onclick="mpCheckAcc('${a.id}')">✅ فحص</button>
+            <button class="btn bo bsm" onclick="mpEditAcc(${JSON.stringify(a).replace(/"/g,'&quot;')})">✏️</button>
+            <button class="btn bo bsm" style="color:#ef4444" onclick="mpDeleteAcc('${a.id}')">🗑️</button>
+          </div>
+        </td>
+      </tr>`).join('');
+  } catch(e) { tbody.innerHTML = `<tr><td colspan="7" class="tc ts p20">خطأ: ${e.message}</td></tr>`; }
+}
+
+async function mpSaveAcc() {
+  const id = document.getElementById('mp-acc-id').value;
+  const data = {
+    platform:   document.getElementById('mp-acc-platform').value,
+    username:   document.getElementById('mp-acc-user').value.trim(),
+    password:   document.getElementById('mp-acc-pass').value,
+    proxy:      document.getElementById('mp-acc-proxy').value.trim(),
+    daily_limit:parseInt(document.getElementById('mp-acc-limit').value) || 200,
+    group_name: document.getElementById('mp-acc-group').value.trim(),
+    notes:      document.getElementById('mp-acc-notes').value.trim()
+  };
+  try {
+    const res = id ? await mp.accounts.update(id, data) : await mp.accounts.add(data);
+    if (!res?.ok && !res?.id) throw new Error(res?.error || 'Failed');
+    closeM('mp-add-acc');
+    await mpLoadAccounts();
+  } catch(e) { alert('خطأ: ' + e.message); }
+}
+
+function mpEditAcc(a) {
+  document.getElementById('mp-acc-id').value = a.id;
+  document.getElementById('mp-acc-platform').value = a.platform;
+  document.getElementById('mp-acc-user').value = a.username;
+  document.getElementById('mp-acc-pass').value = '';
+  document.getElementById('mp-acc-proxy').value = a.proxy || '';
+  document.getElementById('mp-acc-limit').value = a.daily_limit || 200;
+  document.getElementById('mp-acc-group').value = a.group_name || '';
+  document.getElementById('mp-acc-notes').value = a.notes || '';
+  openM('mp-add-acc');
+}
+
+async function mpLoginAcc(id) {
+  if (!confirm('سيتم فتح متصفح Puppeteer لتسجيل الدخول. هل تريد المتابعة؟')) return;
+  const res = await mp.accounts.login(id);
+  alert(res?.ok ? '✅ تم تسجيل الدخول بنجاح' : '❌ ' + (res?.error || 'فشل'));
+  await mpLoadAccounts();
+}
+
+async function mpCheckAcc(id) {
+  const res = await mp.accounts.check(id);
+  alert(res?.ok ? `✅ الحالة: ${res.status}` : '❌ ' + (res?.error || 'فشل'));
+  await mpLoadAccounts();
+}
+
+async function mpDeleteAcc(id) {
+  if (!confirm('هل تريد حذف هذا الحساب؟')) return;
+  await mp.accounts.delete(id);
+  await mpLoadAccounts();
+}
+</script>

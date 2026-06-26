@@ -911,6 +911,281 @@ class Db {
       this.settingSet('db_version', '18');
       v = 18;
     }
+
+    if (v < 19) {
+      // ── Marketing Pro Module (mp_ tables) ───────────────────────────────────
+      this._db.exec(`
+        CREATE TABLE IF NOT EXISTS mp_accounts (
+          id              TEXT PRIMARY KEY,
+          platform        TEXT NOT NULL CHECK(platform IN ('facebook','instagram','whatsapp','twitter')),
+          username        TEXT NOT NULL,
+          password_enc    TEXT,
+          cookies_json    TEXT,
+          proxy           TEXT,
+          proxy_type      TEXT DEFAULT 'http',
+          user_agent      TEXT,
+          browser_profile TEXT,
+          status          TEXT DEFAULT 'active' CHECK(status IN ('active','banned','restricted','warming','inactive')),
+          health_score    INTEGER DEFAULT 100,
+          daily_limit     INTEGER DEFAULT 200,
+          actions_today   INTEGER DEFAULT 0,
+          group_name      TEXT,
+          totp_secret     TEXT,
+          notes           TEXT,
+          created_at      TEXT DEFAULT (datetime('now')),
+          last_used       TEXT,
+          last_login      TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS mp_leads (
+          id              TEXT PRIMARY KEY,
+          platform        TEXT NOT NULL,
+          source_id       TEXT,
+          source_type     TEXT DEFAULT 'group',
+          name            TEXT,
+          profile_url     TEXT,
+          fb_user_id      TEXT,
+          mention_tag     TEXT,
+          phone           TEXT,
+          email           TEXT,
+          location        TEXT,
+          is_active       INTEGER DEFAULT 1,
+          extracted_at    TEXT DEFAULT (datetime('now')),
+          campaign_id     TEXT
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_mp_leads_source ON mp_leads(source_id, platform);
+        CREATE INDEX IF NOT EXISTS idx_mp_leads_campaign ON mp_leads(campaign_id);
+
+        CREATE TABLE IF NOT EXISTS mp_campaigns (
+          id              TEXT PRIMARY KEY,
+          name            TEXT NOT NULL,
+          description     TEXT,
+          platform        TEXT NOT NULL,
+          type            TEXT DEFAULT 'group_post',
+          content_json    TEXT NOT NULL,
+          accounts_json   TEXT,
+          targets_json    TEXT,
+          schedule_json   TEXT,
+          ab_variants     TEXT,
+          hashtags        TEXT,
+          status          TEXT DEFAULT 'draft' CHECK(status IN ('draft','running','paused','completed','failed')),
+          total_targets   INTEGER DEFAULT 0,
+          completed       INTEGER DEFAULT 0,
+          failed_count    INTEGER DEFAULT 0,
+          pending         INTEGER DEFAULT 0,
+          created_at      TEXT DEFAULT (datetime('now')),
+          started_at      TEXT,
+          completed_at    TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS mp_campaign_logs (
+          id              TEXT PRIMARY KEY,
+          campaign_id     TEXT NOT NULL,
+          account_id      TEXT NOT NULL,
+          target_id       TEXT,
+          target_type     TEXT,
+          status          TEXT CHECK(status IN ('success','failed','skipped','rate_limited')),
+          posted_at       TEXT DEFAULT (datetime('now')),
+          error_message   TEXT,
+          post_url        TEXT
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_mp_logs_campaign ON mp_campaign_logs(campaign_id);
+
+        CREATE TABLE IF NOT EXISTS mp_groups (
+          id              TEXT PRIMARY KEY,
+          platform        TEXT NOT NULL,
+          group_id        TEXT NOT NULL,
+          name            TEXT,
+          url             TEXT,
+          members_count   INTEGER,
+          is_open         INTEGER DEFAULT 1,
+          is_member       INTEGER DEFAULT 1,
+          join_status     TEXT DEFAULT 'member',
+          account_id      TEXT,
+          last_posted     TEXT,
+          post_count      INTEGER DEFAULT 0,
+          created_at      TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_mp_groups_unique ON mp_groups(platform, group_id);
+
+        CREATE TABLE IF NOT EXISTS mp_pages (
+          id              TEXT PRIMARY KEY,
+          platform        TEXT NOT NULL,
+          page_id         TEXT NOT NULL,
+          name            TEXT,
+          url             TEXT,
+          account_id      TEXT,
+          category        TEXT,
+          followers       INTEGER DEFAULT 0,
+          access_token    TEXT,
+          auto_reply      INTEGER DEFAULT 0,
+          reply_rules     TEXT,
+          working_hours   TEXT,
+          away_message    TEXT,
+          created_at      TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS mp_scheduled_posts (
+          id              TEXT PRIMARY KEY,
+          page_id         TEXT,
+          campaign_id     TEXT,
+          content_json    TEXT NOT NULL,
+          scheduled_at    TEXT NOT NULL,
+          status          TEXT DEFAULT 'pending',
+          posted_at       TEXT,
+          created_at      TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS mp_broadcasts (
+          id              TEXT PRIMARY KEY,
+          name            TEXT NOT NULL,
+          platform        TEXT NOT NULL,
+          template_text   TEXT NOT NULL,
+          media_path      TEXT,
+          contacts_json   TEXT,
+          account_id      TEXT,
+          delay_min       INTEGER DEFAULT 5,
+          delay_max       INTEGER DEFAULT 15,
+          status          TEXT DEFAULT 'draft',
+          total           INTEGER DEFAULT 0,
+          sent            INTEGER DEFAULT 0,
+          delivered       INTEGER DEFAULT 0,
+          failed_count    INTEGER DEFAULT 0,
+          created_at      TEXT DEFAULT (datetime('now')),
+          started_at      TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS mp_broadcast_logs (
+          id              TEXT PRIMARY KEY,
+          broadcast_id    TEXT NOT NULL,
+          contact_name    TEXT,
+          contact_phone   TEXT,
+          status          TEXT CHECK(status IN ('sent','delivered','failed','skipped')),
+          sent_at         TEXT DEFAULT (datetime('now')),
+          error_message   TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS mp_mention_campaigns (
+          id              TEXT PRIMARY KEY,
+          name            TEXT NOT NULL,
+          group_id        TEXT NOT NULL,
+          post_id         TEXT,
+          post_url        TEXT,
+          post_content    TEXT,
+          total_members   INTEGER DEFAULT 0,
+          mentioned_count INTEGER DEFAULT 0,
+          failed_count    INTEGER DEFAULT 0,
+          comments_posted INTEGER DEFAULT 0,
+          status          TEXT DEFAULT 'draft' CHECK(status IN ('draft','extracting','posting','running','paused','completed','failed')),
+          config_json     TEXT,
+          started_at      TEXT,
+          completed_at    TEXT,
+          created_at      TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS mp_mention_logs (
+          id              TEXT PRIMARY KEY,
+          campaign_id     TEXT NOT NULL,
+          comment_id      TEXT,
+          account_id      TEXT,
+          members_json    TEXT,
+          comment_text    TEXT,
+          status          TEXT CHECK(status IN ('success','failed','rate_limited','skipped')),
+          posted_at       TEXT DEFAULT (datetime('now')),
+          error_message   TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS mp_group_members (
+          id              TEXT PRIMARY KEY,
+          group_id        TEXT NOT NULL,
+          member_name     TEXT,
+          profile_url     TEXT,
+          fb_user_id      TEXT,
+          mention_tag     TEXT,
+          is_active       INTEGER DEFAULT 1,
+          is_admin        INTEGER DEFAULT 0,
+          extracted_at    TEXT DEFAULT (datetime('now')),
+          last_mentioned_at TEXT,
+          mention_count   INTEGER DEFAULT 0,
+          mention_status  TEXT DEFAULT 'pending'
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_mp_members_group ON mp_group_members(group_id);
+        CREATE INDEX IF NOT EXISTS idx_mp_members_status ON mp_group_members(group_id, mention_status);
+
+        CREATE TABLE IF NOT EXISTS mp_proxies (
+          id              TEXT PRIMARY KEY,
+          host            TEXT NOT NULL,
+          port            INTEGER NOT NULL,
+          protocol        TEXT DEFAULT 'http',
+          username        TEXT,
+          password        TEXT,
+          country         TEXT,
+          status          TEXT DEFAULT 'unknown',
+          last_checked    TEXT,
+          latency_ms      INTEGER,
+          assigned_account TEXT,
+          created_at      TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS mp_templates (
+          id              TEXT PRIMARY KEY,
+          name            TEXT NOT NULL,
+          category        TEXT,
+          platform        TEXT,
+          content         TEXT NOT NULL,
+          media_path      TEXT,
+          tags            TEXT,
+          use_count       INTEGER DEFAULT 0,
+          is_ar           INTEGER DEFAULT 0,
+          created_at      TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS mp_settings (
+          key             TEXT PRIMARY KEY,
+          value           TEXT,
+          updated_at      TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS mp_activity_log (
+          id              TEXT PRIMARY KEY,
+          type            TEXT NOT NULL,
+          message         TEXT NOT NULL,
+          data            TEXT,
+          level           TEXT DEFAULT 'info',
+          created_at      TEXT DEFAULT (datetime('now'))
+        );
+      `);
+
+      // Seed MP default settings
+      const mpDefaults = [
+        ['mp_lang', 'ar'], ['mp_theme', 'dark'],
+        ['mp_delay_min', '3'], ['mp_delay_max', '8'],
+        ['mp_daily_limit', '200'],
+        ['mp_mentions_per_comment', '3'],
+        ['mp_mention_delay_min', '20'], ['mp_mention_delay_max', '45']
+      ];
+      const mpSet = this._db.prepare('INSERT OR IGNORE INTO mp_settings (key, value) VALUES (?, ?)');
+      for (const [k, v_] of mpDefaults) mpSet.run(k, v_);
+
+      // Seed MP Arabic templates
+      const mpTpls = [
+        ['عقارات - فرصة استثمارية', 'real_estate', '🏠 فرصة استثمارية لا تفوتك!\n\n{description}\n\n✅ السعر: {price}\n📍 الموقع: {location}\n\n📞 للتواصل: {contact}', 1, 'real_estate,investment'],
+        ['عرض مبيعات محدود', 'sales', '🔥 عرض محدود لأعضاء المجموعة فقط!\n\n{product_name}\n\n💰 السعر الأصلي: {original_price}\n🏷️ سعر العرض: {sale_price}\n⏰ العرض ينتهي: {deadline}\n\n🛒 للتواصل: {contact}', 1, 'sales,offer'],
+        ['دعوة لحدث خاص', 'event', '📅 دعوة خاصة!\n\n🎯 {event_name}\n📍 المكان: {location}\n🗓️ التاريخ: {date}\n\n✨ {description}\n\n📞 للتسجيل: {contact}', 1, 'event,invitation'],
+        ['comment mention — عام', 'mention', '{mentions}\n👆 شوف المنشور ده مهم جداً 🔥', 1, 'mention,comment'],
+        ['comment mention — عقارات', 'mention', '{mentions}\n🏠 فرصة عقارية لا تفوتك، اطلع على المنشور 👆', 1, 'mention,real_estate'],
+        ['comment mention — عروض', 'mention', '{mentions}\n🔥 عرض خاص لأعضاء المجموعة، لا يفوتك 👆', 1, 'mention,sales']
+      ];
+      const mpTplIns = this._db.prepare('INSERT OR IGNORE INTO mp_templates (id, name, category, content, is_ar, tags) VALUES (lower(hex(randomblob(8))), ?, ?, ?, ?, ?)');
+      for (const [n, c, ct, ar, tg] of mpTpls) mpTplIns.run(n, c, ct, ar, tg);
+
+      this.settingSet('db_version', '19');
+      v = 19;
+    }
   }
 
   // ─── FTS Search ───────────────────────────────────────────────────────────

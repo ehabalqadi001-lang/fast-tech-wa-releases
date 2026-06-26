@@ -491,3 +491,121 @@ contextBridge.exposeInMainWorld('ftwa', {
   },
   offAll: (channel) => ipcRenderer.removeAllListeners(channel),
 });
+
+// ── Marketing Pro Bridge (window.mp) ──────────────────────────────────────────
+contextBridge.exposeInMainWorld('mp', {
+
+  // Real-time IPC event listeners
+  on:  (ch, fn) => ipcRenderer.on(ch, (_, d) => fn(d)),
+  off: (ch, fn) => ipcRenderer.removeListener(ch, fn),
+
+  // Social media accounts
+  accounts: {
+    list:    (f)   => ipcRenderer.invoke('mp:accounts:list',   f),
+    add:     (d)   => ipcRenderer.invoke('mp:accounts:add',    d),
+    update:  (i,d) => ipcRenderer.invoke('mp:accounts:update', i, d),
+    delete:  (i)   => ipcRenderer.invoke('mp:accounts:delete', i),
+    check:   (i)   => ipcRenderer.invoke('mp:accounts:check',  i),
+    login:   (i)   => ipcRenderer.invoke('mp:accounts:login',  i),
+    logout:  (i)   => ipcRenderer.invoke('mp:accounts:logout', i),
+    groups:  (i)   => ipcRenderer.invoke('mp:accounts:groups', i),
+  },
+
+  // Dashboard
+  dashboard: {
+    stats:    ()  => ipcRenderer.invoke('mp:dashboard:stats'),
+    activity: (n) => ipcRenderer.invoke('mp:dashboard:activity', n),
+  },
+
+  // Data extractor
+  extractor: {
+    start:       (o) => ipcRenderer.invoke('mp:extractor:start',       o),
+    stop:        (i) => ipcRenderer.invoke('mp:extractor:stop',        i),
+    leads:       (f) => ipcRenderer.invoke('mp:extractor:leads',       f),
+    export:      (o) => ipcRenderer.invoke('mp:extractor:export',      o),
+    deleteLead:  (i) => ipcRenderer.invoke('mp:extractor:deleteLead',  i),
+  },
+
+  // Campaigns (social media posts)
+  campaigns: {
+    list:   (f)   => ipcRenderer.invoke('mp:campaigns:list',   f),
+    get:    (i)   => ipcRenderer.invoke('mp:campaigns:get',    i),
+    create: (d)   => ipcRenderer.invoke('mp:campaigns:create', d),
+    update: (i,d) => ipcRenderer.invoke('mp:campaigns:update', i, d),
+    delete: (i)   => ipcRenderer.invoke('mp:campaigns:delete', i),
+    start:  (i)   => ipcRenderer.invoke('mp:campaigns:start',  i),
+    pause:  (i)   => ipcRenderer.invoke('mp:campaigns:pause',  i),
+    stop:   (i)   => ipcRenderer.invoke('mp:campaigns:stop',   i),
+    logs:   (i)   => ipcRenderer.invoke('mp:campaigns:logs',   i),
+  },
+
+  // Facebook Groups
+  groups: {
+    list:    (f)  => ipcRenderer.invoke('mp:groups:list',    f),
+    add:     (d)  => ipcRenderer.invoke('mp:groups:add',     d),
+    delete:  (i)  => ipcRenderer.invoke('mp:groups:delete',  i),
+    fetch:   (ai) => ipcRenderer.invoke('mp:groups:fetch',   ai),
+    join:    (o)  => ipcRenderer.invoke('mp:groups:join',    o),
+    publish: (o)  => ipcRenderer.invoke('mp:groups:publish', o),
+  },
+
+  // Facebook Pages
+  pages: {
+    list:      (f) => ipcRenderer.invoke('mp:pages:list',      f),
+    add:       (d) => ipcRenderer.invoke('mp:pages:add',       d),
+    delete:    (i) => ipcRenderer.invoke('mp:pages:delete',    i),
+    post:      (o) => ipcRenderer.invoke('mp:pages:post',      o),
+    schedule:  (o) => ipcRenderer.invoke('mp:pages:schedule',  o),
+    scheduled: (f) => ipcRenderer.invoke('mp:pages:scheduled', f),
+  },
+
+  // Broadcast / DM
+  broadcast: {
+    list:   (f)   => ipcRenderer.invoke('mp:broadcast:list',   f),
+    create: (d)   => ipcRenderer.invoke('mp:broadcast:create', d),
+    update: (i,d) => ipcRenderer.invoke('mp:broadcast:update', i, d),
+    delete: (i)   => ipcRenderer.invoke('mp:broadcast:delete', i),
+    import: (p)   => ipcRenderer.invoke('mp:broadcast:import', p),
+    start:  (i)   => ipcRenderer.invoke('mp:broadcast:start',  i),
+    pause:  (i)   => ipcRenderer.invoke('mp:broadcast:pause',  i),
+    stop:   (i)   => ipcRenderer.invoke('mp:broadcast:stop',   i),
+    logs:   (i)   => ipcRenderer.invoke('mp:broadcast:logs',   i),
+  },
+
+  // Smart Mention Campaigns
+  mention: {
+    list:    (f) => ipcRenderer.invoke('mp:mention:list',    f),
+    get:     (i) => ipcRenderer.invoke('mp:mention:get',     i),
+    create:  (d) => ipcRenderer.invoke('mp:mention:create',  d),
+    delete:  (i) => ipcRenderer.invoke('mp:mention:delete',  i),
+    extract: (o) => ipcRenderer.invoke('mp:mention:extract', o),
+    publish: (o) => ipcRenderer.invoke('mp:mention:publish', o),
+    start:   (i) => ipcRenderer.invoke('mp:mention:start',   i),
+    pause:   (i) => ipcRenderer.invoke('mp:mention:pause',   i),
+    stop:    (i) => ipcRenderer.invoke('mp:mention:stop',    i),
+    logs:    (i) => ipcRenderer.invoke('mp:mention:logs',    i),
+    members: (o) => ipcRenderer.invoke('mp:mention:members', o),
+  },
+
+  // Settings / Proxies / Templates
+  settings: {
+    get:  (k)   => ipcRenderer.invoke('mp:settings:get',  k),
+    set:  (k,v) => ipcRenderer.invoke('mp:settings:set',  k, v),
+    all:  ()    => ipcRenderer.invoke('mp:settings:all'),
+    proxies: {
+      list:   ()  => ipcRenderer.invoke('mp:settings:proxies:list'),
+      add:    (d) => ipcRenderer.invoke('mp:settings:proxies:add',    d),
+      delete: (i) => ipcRenderer.invoke('mp:settings:proxies:delete', i),
+      check:  ()  => ipcRenderer.invoke('mp:settings:proxies:check'),
+    },
+    templates: {
+      list:   (c) => ipcRenderer.invoke('mp:settings:templates:list',   c),
+      add:    (d) => ipcRenderer.invoke('mp:settings:templates:add',    d),
+      delete: (i) => ipcRenderer.invoke('mp:settings:templates:delete', i),
+    },
+  },
+
+  // Shared utilities
+  openFile: (o) => ipcRenderer.invoke('dialog:openFile', o),
+  saveFile: (o) => ipcRenderer.invoke('dialog:saveFile', o),
+});

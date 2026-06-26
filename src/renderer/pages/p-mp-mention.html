@@ -1,0 +1,203 @@
+<div class="pg-hdr">
+  <div>
+    <h1 class="f18 fw7">📌 حملة الإشارات الذكية</h1>
+    <p class="ts f12">3 خطوات: استخراج الأعضاء ← نشر ← الإشارة في التعليقات</p>
+  </div>
+  <button class="btn bp bsm" onclick="openM('mp-men-create')">➕ حملة جديدة</button>
+</div>
+
+<!-- Campaigns Table -->
+<div class="card mb16">
+  <table class="tbl">
+    <thead><tr><th>الاسم</th><th>الحالة</th><th>الأعضاء</th><th>المُشار إليهم</th><th>التعليقات</th><th>إجراءات</th></tr></thead>
+    <tbody id="mp-men-tbody"><tr><td colspan="6" class="tc ts p20">جار التحميل...</td></tr></tbody>
+  </table>
+</div>
+
+<!-- Live Dashboard (hidden by default) -->
+<div id="mp-men-dashboard" class="card p16 mb16" style="display:none">
+  <div class="f13 fw6 mb12">📊 لوحة الحملة النشطة: <span id="mp-men-active-name"></span></div>
+  <div class="g3 mb12">
+    <div class="card p12 tc"><div class="f20 fw7 c-acc" id="mp-men-stat-total">0</div><div class="f11 ts">إجمالي الأعضاء</div></div>
+    <div class="card p12 tc"><div class="f20 fw7" style="color:#10b981" id="mp-men-stat-mentioned">0</div><div class="f11 ts">تم الإشارة</div></div>
+    <div class="card p12 tc"><div class="f20 fw7" style="color:#f59e0b" id="mp-men-stat-comments">0</div><div class="f11 ts">تعليقات</div></div>
+  </div>
+  <div style="height:8px;background:rgba(var(--ar),.1);border-radius:4px;margin-bottom:12px">
+    <div id="mp-men-bar" style="height:100%;width:0%;background:var(--acc);border-radius:4px;transition:width .5s"></div>
+  </div>
+  <div class="flex gap8">
+    <button class="btn bo bsm" onclick="mpMenPause()">⏸ إيقاف مؤقت</button>
+    <button class="btn bo bsm" style="color:#ef4444" onclick="mpMenStop()">⏹ إيقاف</button>
+  </div>
+</div>
+
+<!-- Step-by-step wizard panel -->
+<div id="mp-men-wizard" class="card p16" style="display:none">
+  <div class="f13 fw6 mb12">🔧 تشغيل: <span id="mp-men-wizard-name"></span></div>
+
+  <!-- Step 1 -->
+  <div class="mb16" id="mp-men-step1">
+    <div class="f12 fw6 c-acc mb8">الخطوة 1: استخراج أعضاء المجموعة</div>
+    <div class="fg"><label class="fl">الحساب</label><select id="mp-men-s1-acc" class="fc"><option value="">اختر...</option></select></div>
+    <div class="fg"><label class="fl">رابط المجموعة</label><input id="mp-men-s1-url" class="fc" placeholder="https://www.facebook.com/groups/..." dir="ltr"></div>
+    <div class="fg"><label class="fl">الحد الأقصى</label><input id="mp-men-s1-max" class="fc" type="number" value="5000"></div>
+    <button class="btn bp bsm mt8" onclick="mpMenExtract()">🔍 استخراج الأعضاء</button>
+  </div>
+
+  <!-- Step 2 -->
+  <div class="mb16" id="mp-men-step2">
+    <div class="f12 fw6 c-acc mb8">الخطوة 2: نشر منشور في المجموعة</div>
+    <div class="fg"><label class="fl">الحساب للنشر</label><select id="mp-men-s2-acc" class="fc"><option value="">اختر...</option></select></div>
+    <div class="fg"><label class="fl">نص المنشور</label><textarea id="mp-men-s2-text" class="fc" rows="3"></textarea></div>
+    <button class="btn bp bsm mt8" onclick="mpMenPublish()">📤 نشر المنشور</button>
+  </div>
+
+  <!-- Step 3 -->
+  <div id="mp-men-step3">
+    <div class="f12 fw6 c-acc mb8">الخطوة 3: بدء الإشارات في التعليقات</div>
+    <div class="fg"><label class="fl">الحسابات المستخدمة (متعددة)</label>
+      <select id="mp-men-s3-accs" class="fc" multiple style="height:80px"></select>
+    </div>
+    <div class="g2">
+      <div class="fg"><label class="fl">إشارات لكل تعليق</label><input id="mp-men-s3-per" class="fc" type="number" value="3"></div>
+      <div class="fg"><label class="fl">تأخير (ثانية) بين التعليقات</label><input id="mp-men-s3-delay" class="fc" type="number" value="25"></div>
+    </div>
+    <button class="btn bp bsm mt8" onclick="mpMenStart()">🚀 بدء الإشارات</button>
+  </div>
+
+  <div class="mt12"><button class="btn bo bsm" onclick="document.getElementById('mp-men-wizard').style.display='none'">إغلاق</button></div>
+</div>
+
+<!-- Create Modal -->
+<div class="mo" id="mp-men-create" onclick="if(event.target===this)closeM('mp-men-create')">
+  <div class="md" style="max-width:420px">
+    <div class="md-tt">📌 حملة إشارة جديدة</div>
+    <div class="fg"><label class="fl">اسم الحملة</label><input id="mp-men-c-name" class="fc" placeholder="حملة العقارات"></div>
+    <div class="fg"><label class="fl">معرّف المجموعة</label><input id="mp-men-c-group" class="fc" placeholder="123456789" dir="ltr"></div>
+    <div class="md-cl">
+      <button class="btn bo" onclick="closeM('mp-men-create')">إلغاء</button>
+      <button class="btn bp" onclick="mpMenCreate()">✅ إنشاء</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let _mpMenActiveCamp = null;
+
+window['_pg_mp-mention'] = async function() {
+  await mpMenLoad();
+  await mpMenLoadAccounts();
+  mp.on('mp:mention:progress', d => {
+    if (!_mpMenActiveCamp || d.campaignId !== _mpMenActiveCamp) return;
+    document.getElementById('mp-men-stat-mentioned').textContent = d.mentioned || 0;
+    document.getElementById('mp-men-stat-comments').textContent  = d.commentsPosted || 0;
+    const total = parseInt(document.getElementById('mp-men-stat-total').textContent) || 1;
+    document.getElementById('mp-men-bar').style.width = Math.round(((d.mentioned||0) / total) * 100) + '%';
+  });
+  mp.on('mp:mention:extractDone', d => {
+    document.getElementById('mp-men-stat-total').textContent = d.total;
+    alert(`✅ تم استخراج ${d.total} عضو`);
+    mpMenLoad();
+  });
+  mp.on('mp:mention:done', d => {
+    _mpMenActiveCamp = null;
+    document.getElementById('mp-men-dashboard').style.display = 'none';
+    alert('✅ اكتملت حملة الإشارات!');
+    mpMenLoad();
+  });
+};
+
+async function mpMenLoad() {
+  const tbody = document.getElementById('mp-men-tbody');
+  try {
+    const res = await mp.mention.list({});
+    const camps = Array.isArray(res) ? res : (res?.data || []);
+    tbody.innerHTML = camps.length ? camps.map(c => `
+      <tr>
+        <td class="fw5">${c.name}</td>
+        <td><span class="badge ${c.status==='running'?'badge-green':c.status==='completed'?'badge-blue':'badge-gray'}">${c.status}</span></td>
+        <td>${c.total_members||0}</td>
+        <td>${c.mentioned_count||0}</td>
+        <td>${c.comments_posted||0}</td>
+        <td>
+          <div class="flex gap4">
+            <button class="btn bo bsm" onclick="mpMenOpenWizard('${c.id}','${c.name}')">🔧 تشغيل</button>
+            <button class="btn bo bsm" style="color:#ef4444" onclick="mpMenDelete('${c.id}')">🗑️</button>
+          </div>
+        </td>
+      </tr>`).join('') : '<tr><td colspan="6" class="tc ts p20">لا توجد حملات إشارة</td></tr>';
+  } catch(e) { tbody.innerHTML = `<tr><td colspan="6" class="tc ts p20">خطأ: ${e.message}</td></tr>`; }
+}
+
+async function mpMenLoadAccounts() {
+  const res = await mp.accounts.list({});
+  const accs = Array.isArray(res) ? res : (res?.data || []);
+  const opts = accs.map(a => `<option value="${a.id}">${a.username}</option>`).join('');
+  document.getElementById('mp-men-s1-acc').innerHTML = '<option value="">اختر...</option>' + opts;
+  document.getElementById('mp-men-s2-acc').innerHTML = '<option value="">اختر...</option>' + opts;
+  document.getElementById('mp-men-s3-accs').innerHTML = opts;
+}
+
+async function mpMenCreate() {
+  const name = document.getElementById('mp-men-c-name').value.trim();
+  const group_id = document.getElementById('mp-men-c-group').value.trim();
+  if (!name || !group_id) { alert('أدخل الاسم ومعرف المجموعة'); return; }
+  const res = await mp.mention.create({ name, group_id });
+  if (!res?.ok && !res?.id) { alert('خطأ: ' + (res?.error||'فشل')); return; }
+  closeM('mp-men-create');
+  await mpMenLoad();
+}
+
+function mpMenOpenWizard(id, name) {
+  _mpMenActiveCamp = id;
+  document.getElementById('mp-men-wizard-name').textContent = name;
+  document.getElementById('mp-men-wizard').style.display = '';
+  document.getElementById('mp-men-active-name').textContent = name;
+}
+
+async function mpMenExtract() {
+  const accountId = document.getElementById('mp-men-s1-acc').value;
+  const groupUrl  = document.getElementById('mp-men-s1-url').value.trim();
+  const maxMembers = parseInt(document.getElementById('mp-men-s1-max').value)||5000;
+  if (!accountId || !groupUrl) { alert('اختر حساباً وأدخل الرابط'); return; }
+  const res = await mp.mention.extract({ campaignId: _mpMenActiveCamp, accountId, groupUrl, maxMembers });
+  if (!res?.ok) { alert('خطأ: ' + (res?.error||'فشل')); return; }
+  document.getElementById('mp-men-dashboard').style.display = '';
+  alert('✅ بدأ الاستخراج، سيُعلمك النظام عند الاكتمال');
+}
+
+async function mpMenPublish() {
+  const accountId = document.getElementById('mp-men-s2-acc').value;
+  const postText  = document.getElementById('mp-men-s2-text').value.trim();
+  const campaign  = await mp.mention.get(_mpMenActiveCamp);
+  if (!accountId || !postText) { alert('اختر حساباً وأدخل النص'); return; }
+  const groupUrl = `https://www.facebook.com/groups/${campaign.group_id}`;
+  const res = await mp.mention.publish({ campaignId: _mpMenActiveCamp, accountId, groupUrl, postText });
+  if (res?.ok) alert('✅ تم نشر المنشور'); else alert('❌ ' + (res?.error||'فشل'));
+}
+
+async function mpMenStart() {
+  const accounts = [...document.getElementById('mp-men-s3-accs').selectedOptions].map(o => o.value);
+  const mentionsPerComment = parseInt(document.getElementById('mp-men-s3-per').value)||3;
+  const delayMin = parseInt(document.getElementById('mp-men-s3-delay').value)||20;
+  const config = { mentionsPerComment, delayMin, delayMax: delayMin + 25, accounts };
+  await mp.mention.get(_mpMenActiveCamp).then(c =>
+    mp.mention.create({ name: c.name, group_id: c.group_id, config }) // update config
+  ).catch(()=>{});
+  const res = await mp.mention.start(_mpMenActiveCamp);
+  if (res?.ok) { document.getElementById('mp-men-dashboard').style.display = ''; alert('✅ بدأت حملة الإشارات'); }
+  else alert('❌ ' + (res?.error||'فشل'));
+}
+
+async function mpMenPause() { await mp.mention.pause(_mpMenActiveCamp); }
+async function mpMenStop() {
+  await mp.mention.stop(_mpMenActiveCamp);
+  _mpMenActiveCamp = null;
+  document.getElementById('mp-men-dashboard').style.display = 'none';
+}
+async function mpMenDelete(id) {
+  if (!confirm('حذف الحملة؟')) return;
+  await mp.mention.delete(id);
+  await mpMenLoad();
+}
+</script>

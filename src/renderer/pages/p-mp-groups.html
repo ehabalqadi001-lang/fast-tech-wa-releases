@@ -1,0 +1,169 @@
+<div class="pg-hdr">
+  <div>
+    <h1 class="f18 fw7">👥 نشر المجموعات</h1>
+    <p class="ts f12">نشر جماعي في مجموعات Facebook مع دعم متعدد الحسابات</p>
+  </div>
+  <div class="flex gap8">
+    <button class="btn bo bsm" onclick="openM('mp-grp-fetch')">🔄 جلب المجموعات</button>
+    <button class="btn bp bsm" onclick="openM('mp-grp-add')">➕ إضافة يدوي</button>
+  </div>
+</div>
+
+<!-- Groups Table -->
+<div class="card mb16">
+  <div class="flex ic gap8 mb12 p16 pb0">
+    <div class="f13 fw6">📋 قائمة المجموعات</div>
+    <div class="ms-auto flex gap8">
+      <button class="btn bo bsm" onclick="mpGrpSelAll()">تحديد الكل</button>
+      <span class="f12 ts" id="mp-grp-sel-count">0 محدد</span>
+    </div>
+  </div>
+  <table class="tbl">
+    <thead><tr><th><input type="checkbox" onchange="mpGrpToggleAll(this)"></th><th>اسم المجموعة</th><th>الرابط</th><th>الأعضاء</th><th>آخر نشر</th><th>إجراءات</th></tr></thead>
+    <tbody id="mp-grp-tbody"><tr><td colspan="6" class="tc ts p20">جار التحميل...</td></tr></tbody>
+  </table>
+</div>
+
+<!-- Publish Panel -->
+<div class="card p16">
+  <div class="f13 fw6 mb12">📤 نشر في المجموعات المحددة</div>
+  <div class="fg"><label class="fl">نص المنشور (يمكن استخدام {خيار1|خيار2})</label>
+    <textarea id="mp-grp-text" class="fc" rows="4" placeholder="نص المنشور..."></textarea>
+  </div>
+  <div class="fg"><label class="fl">الحسابات (متعددة بفاصلة أو اختر)</label>
+    <select id="mp-grp-accounts" class="fc" multiple style="height:80px"></select>
+  </div>
+  <div class="g2">
+    <div class="fg"><label class="fl">تأخير أدنى (ثانية)</label><input id="mp-grp-delay-min" class="fc" type="number" value="5"></div>
+    <div class="fg"><label class="fl">تأخير أقصى (ثانية)</label><input id="mp-grp-delay-max" class="fc" type="number" value="15"></div>
+  </div>
+  <div id="mp-grp-pub-progress" class="mb12" style="display:none">
+    <div class="f12 ts mb4">جار النشر: <span id="mp-grp-done">0</span> / <span id="mp-grp-total">0</span></div>
+    <div style="height:6px;background:rgba(var(--ar),.1);border-radius:3px">
+      <div id="mp-grp-bar" style="height:100%;width:0%;background:var(--acc);border-radius:3px;transition:width .3s"></div>
+    </div>
+  </div>
+  <button class="btn bp fi" onclick="mpPublishGroups()">🚀 نشر الآن</button>
+</div>
+
+<!-- Fetch Modal -->
+<div class="mo" id="mp-grp-fetch" onclick="if(event.target===this)closeM('mp-grp-fetch')">
+  <div class="md" style="max-width:400px">
+    <div class="md-tt">🔄 جلب مجموعاتي من Facebook</div>
+    <div class="fg"><label class="fl">الحساب</label><select id="mp-grp-fetch-acc" class="fc"><option value="">اختر حساب...</option></select></div>
+    <div class="md-cl">
+      <button class="btn bo" onclick="closeM('mp-grp-fetch')">إلغاء</button>
+      <button class="btn bp" onclick="mpFetchGroups()">🔍 جلب</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Manual Modal -->
+<div class="mo" id="mp-grp-add" onclick="if(event.target===this)closeM('mp-grp-add')">
+  <div class="md" style="max-width:400px">
+    <div class="md-tt">➕ إضافة مجموعة يدوياً</div>
+    <div class="fg"><label class="fl">معرّف المجموعة أو الرابط</label><input id="mp-grp-add-id" class="fc" placeholder="123456789 أو الرابط الكامل" dir="ltr"></div>
+    <div class="fg"><label class="fl">الاسم</label><input id="mp-grp-add-name" class="fc" placeholder="اسم المجموعة"></div>
+    <div class="md-cl">
+      <button class="btn bo" onclick="closeM('mp-grp-add')">إلغاء</button>
+      <button class="btn bp" onclick="mpAddGroupManual()">✅ إضافة</button>
+    </div>
+  </div>
+</div>
+
+<script>
+window['_pg_mp-groups'] = async function() {
+  await mpLoadGroups();
+  await mpGrpLoadAccounts();
+  mp.on('mp:groups:publishProgress', d => {
+    document.getElementById('mp-grp-pub-progress').style.display = '';
+    document.getElementById('mp-grp-done').textContent  = d.done;
+    document.getElementById('mp-grp-total').textContent = d.total;
+    document.getElementById('mp-grp-bar').style.width   = Math.round((d.done / d.total) * 100) + '%';
+  });
+  mp.on('mp:groups:publishDone', d => {
+    setTimeout(() => document.getElementById('mp-grp-pub-progress').style.display = 'none', 3000);
+    alert(`✅ اكتمل النشر: ${d.done} نجح، ${d.failed} فشل`);
+  });
+};
+
+async function mpLoadGroups() {
+  const tbody = document.getElementById('mp-grp-tbody');
+  try {
+    const res = await mp.groups.list({});
+    const grps = Array.isArray(res) ? res : (res?.data || []);
+    tbody.innerHTML = grps.length ? grps.map(g => `
+      <tr>
+        <td><input type="checkbox" class="mp-grp-cb" value="${g.id}" onchange="mpUpdateGrpCount()"></td>
+        <td class="fw5">${g.name || '—'}</td>
+        <td><a href="${g.url||'#'}" class="f11 ts" target="_blank" style="color:var(--acc)">${g.group_id||''}</a></td>
+        <td>${g.members_count || '—'}</td>
+        <td class="f11 ts">${g.last_posted ? new Date(g.last_posted).toLocaleDateString('ar') : '—'}</td>
+        <td><button class="btn bo bsm" style="color:#ef4444" onclick="mpDeleteGroup('${g.id}')">🗑️</button></td>
+      </tr>`).join('') : '<tr><td colspan="6" class="tc ts p20">لا توجد مجموعات — استخدم "جلب المجموعات"</td></tr>';
+  } catch(e) { tbody.innerHTML = `<tr><td colspan="6" class="tc ts p20">خطأ: ${e.message}</td></tr>`; }
+}
+
+async function mpGrpLoadAccounts() {
+  const res = await mp.accounts.list({});
+  const accs = Array.isArray(res) ? res : (res?.data || []);
+  const sel = document.getElementById('mp-grp-accounts');
+  sel.innerHTML = accs.map(a => `<option value="${a.id}">${a.username} (${a.platform})</option>`).join('');
+  const fetchSel = document.getElementById('mp-grp-fetch-acc');
+  fetchSel.innerHTML = '<option value="">اختر حساب...</option>' + accs.map(a => `<option value="${a.id}">${a.username}</option>`).join('');
+}
+
+function mpGrpSelAll() {
+  document.querySelectorAll('.mp-grp-cb').forEach(c => c.checked = true);
+  mpUpdateGrpCount();
+}
+function mpGrpToggleAll(cb) {
+  document.querySelectorAll('.mp-grp-cb').forEach(c => c.checked = cb.checked);
+  mpUpdateGrpCount();
+}
+function mpUpdateGrpCount() {
+  const cnt = document.querySelectorAll('.mp-grp-cb:checked').length;
+  document.getElementById('mp-grp-sel-count').textContent = cnt + ' محدد';
+}
+
+async function mpFetchGroups() {
+  const ai = document.getElementById('mp-grp-fetch-acc').value;
+  if (!ai) { alert('اختر حساباً'); return; }
+  closeM('mp-grp-fetch');
+  const res = await mp.groups.fetch(ai);
+  alert(res?.ok ? `✅ تم جلب ${res.count} مجموعة` : '❌ ' + (res?.error || 'فشل'));
+  await mpLoadGroups();
+}
+
+async function mpAddGroupManual() {
+  const raw = document.getElementById('mp-grp-add-id').value.trim();
+  const name = document.getElementById('mp-grp-add-name').value.trim();
+  const groupId = raw.includes('facebook.com') ? raw.split('/groups/')[1]?.split('/')[0] : raw;
+  if (!groupId) { alert('أدخل المعرف أو الرابط'); return; }
+  await mp.groups.add({ group_id: groupId, name, url: `https://www.facebook.com/groups/${groupId}`, platform: 'facebook' });
+  closeM('mp-grp-add');
+  await mpLoadGroups();
+}
+
+async function mpPublishGroups() {
+  const groupIds  = [...document.querySelectorAll('.mp-grp-cb:checked')].map(c => c.value);
+  const accountIds= [...document.getElementById('mp-grp-accounts').selectedOptions].map(o => o.value);
+  const text      = document.getElementById('mp-grp-text').value.trim();
+  if (!groupIds.length)  { alert('حدد مجموعات أولاً'); return; }
+  if (!accountIds.length){ alert('حدد حساباً واحداً على الأقل'); return; }
+  if (!text)             { alert('أدخل نص المنشور'); return; }
+  document.getElementById('mp-grp-pub-progress').style.display = '';
+  document.getElementById('mp-grp-total').textContent = groupIds.length;
+  await mp.groups.publish({
+    groupIds, accountIds, text,
+    delayMin: parseInt(document.getElementById('mp-grp-delay-min').value) || 5,
+    delayMax: parseInt(document.getElementById('mp-grp-delay-max').value) || 15
+  });
+}
+
+async function mpDeleteGroup(id) {
+  if (!confirm('حذف المجموعة؟')) return;
+  await mp.groups.delete(id);
+  await mpLoadGroups();
+}
+</script>
